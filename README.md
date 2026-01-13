@@ -39,19 +39,28 @@ cd tldr-swinton
 pip install -e ".[semantic]"
 
 # 3. (Optional) For Ollama-based embeddings (faster, recommended):
-#    Ensure Ollama is running, then:
+#    First ensure Ollama is running:
+pgrep -x ollama || ollama serve &
+#    Then pull the embedding model:
 ollama pull nomic-embed-text
 
 # 4. Verify installation
 tldrs --help
 
-# 5. (Optional) Build semantic index for a project
+# 5. (Optional) Create .tldrignore to exclude files (uses .gitignore syntax)
+echo -e "node_modules/\ndist/\n*.min.js" > /path/to/project/.tldrignore
+
+# 6. Build semantic index for a project (~1-3 min for large projects)
 tldrs index /path/to/project
+
+# 7. Verify semantic search works
+tldrs index --info              # Check index stats
+tldrs find "authentication"     # Test a search query
 ```
 
 **Requirements:**
 - Python 3.10+
-- For semantic search: Either Ollama with `nomic-embed-text` model, or 1.3GB disk space for sentence-transformers fallback
+- For semantic search: Either Ollama with `nomic-embed-text` model (274MB), or 1.3GB disk space for sentence-transformers fallback
 
 ### For Development
 

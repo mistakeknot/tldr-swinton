@@ -103,35 +103,35 @@ def _show_first_run_tip():
 def main():
     _show_first_run_tip()
     parser = argparse.ArgumentParser(
-        prog="tldr",
+        prog="tldrs",
         description="Token-efficient code analysis for LLMs",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Version: %(prog)s """ + __version__ + """
 
 Examples:
-    tldr tree src/                      # File tree for src/
-    tldr structure . --lang python      # Code structure for Python files
-    tldr search "def process" .         # Search for pattern
-    tldr extract src/main.py            # Full file analysis
-    tldr context main --project .       # LLM context starting from main()
-    tldr cfg src/main.py process        # Control flow for process()
-    tldr slice src/main.py func 42      # Lines affecting line 42
+    tldrs tree src/                      # File tree for src/
+    tldrs structure . --lang python      # Code structure for Python files
+    tldrs search "def process" .         # Search for pattern
+    tldrs extract src/main.py            # Full file analysis
+    tldrs context main --project .       # LLM context starting from main()
+    tldrs cfg src/main.py process        # Control flow for process()
+    tldrs slice src/main.py func 42      # Lines affecting line 42
 
 Ignore Patterns:
-    TLDR respects .tldrignore files (gitignore syntax).
+    tldrs respects .tldrignore files (gitignore syntax).
     First run creates .tldrignore with sensible defaults.
     Use --no-ignore to bypass ignore patterns.
 
 Daemon:
-    TLDR runs a per-project daemon for fast repeated queries.
+    tldrs runs a per-project daemon for fast repeated queries.
     - Socket: /tmp/tldr-{hash}.sock (hash from project path)
     - Auto-shutdown: 30 minutes idle
     - Memory: ~50-100MB base, +500MB-1GB with semantic search
 
-    Start explicitly:  tldr daemon start
-    Check status:      tldr daemon status
-    Stop:              tldr daemon stop
+    Start explicitly:  tldrs daemon start
+    Check status:      tldrs daemon status
+    Stop:              tldrs daemon stop
 
 Semantic Search:
     First run downloads embedding model (1.3GB default).
@@ -407,6 +407,52 @@ Semantic Search:
     )
     doctor_p.add_argument(
         "--json", action="store_true", help="Output as JSON"
+    )
+
+    # tldrs index [path] - New semantic indexing with Ollama support
+    index_p = subparsers.add_parser(
+        "index", help="Build semantic index for code search (supports Ollama)"
+    )
+    index_p.add_argument("path", nargs="?", default=".", help="Project root")
+    index_p.add_argument(
+        "--backend",
+        choices=["auto", "ollama", "sentence-transformers"],
+        default="auto",
+        help="Embedding backend (auto tries Ollama first)",
+    )
+    index_p.add_argument(
+        "--model",
+        default=None,
+        help="Embedding model (e.g., nomic-embed-text for Ollama)",
+    )
+    index_p.add_argument(
+        "--summaries",
+        action="store_true",
+        help="Generate 1-line summaries with local LLM (requires Ollama)",
+    )
+    index_p.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="Force full rebuild (ignore existing index)",
+    )
+    index_p.add_argument(
+        "--info",
+        action="store_true",
+        help="Show index info instead of building",
+    )
+
+    # tldrs find <query> - Semantic search using the index
+    find_p = subparsers.add_parser(
+        "find", help="Semantic code search (uses index, run `tldrs index` first)"
+    )
+    find_p.add_argument("query", help="Natural language query (e.g., 'authentication logic')")
+    find_p.add_argument("--path", default=".", help="Project root")
+    find_p.add_argument("-k", type=int, default=10, help="Number of results (default: 10)")
+    find_p.add_argument(
+        "--backend",
+        choices=["auto", "ollama", "sentence-transformers"],
+        default="auto",
+        help="Embedding backend (should match index)",
     )
 
     args = parser.parse_args()
@@ -1030,6 +1076,59 @@ Semantic Search:
                 except (ConnectionRefusedError, FileNotFoundError):
                     # Daemon not running - silently ignore, file edits shouldn't fail
                     pass
+
+        elif args.command == "index":
+            from .index import build_index, search_index, get_index_info
+
+            respect_ignore = not getattr(args, 'no_ignore', False)
+
+            if args.info:
+                # Show index info
+                info = get_index_info(args.path)
+                if info:
+                    print(json.dumps(info, indent=2))
+                else:
+                    print("No index found. Run `tldrs index .` to create one.")
+            else:
+                # Build index
+                stats = build_index(
+                    args.path,
+                    backend=args.backend,
+                    embed_model=args.model,
+                    generate_summaries=args.summaries,
+                    rebuild=args.rebuild,
+                    respect_ignore=respect_ignore,
+                )
+                print(f"\nIndex complete: {stats.total_units} units from {stats.total_files} files")
+                if stats.new_units > 0:
+                    print(f"  New: {stats.new_units}")
+                if stats.updated_units > 0:
+                    print(f"  Updated: {stats.updated_units}")
+                if stats.unchanged_units > 0:
+                    print(f"  Unchanged: {stats.unchanged_units}")
+
+        elif args.command == "find":
+            from .index import search_index
+
+            results = search_index(
+                args.path,
+                args.query,
+                k=args.k,
+                backend=args.backend,
+            )
+
+            if not results:
+                print("No results found. Make sure you've run `tldrs index` first.")
+            else:
+                for r in results:
+                    score_str = f"[{r['score']:.3f}]"
+                    loc = f"{r['file']}:{r['line']}"
+                    print(f"{r['rank']:2}. {score_str} {r['name']} ({r['type']})")
+                    print(f"      {r['signature']}")
+                    print(f"      {loc}")
+                    if r.get('summary'):
+                        print(f"      → {r['summary']}")
+                    print()
 
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
