@@ -4,12 +4,14 @@ version = "0.1.0"
 description = "Token-efficiency benchmarks for tldr-swinton"
 requires-python = ">=3.10"
 dependencies = [
+  "fastapi",
+  "uvicorn",
   "pyyaml",
   "tiktoken",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["httpx", "pytest"]
 
 [build-system]
 requires = ["setuptools>=61.0"]
