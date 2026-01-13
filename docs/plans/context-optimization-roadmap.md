@@ -8,10 +8,137 @@ These features build on tldr-swinton's existing infrastructure (AST parsing, cal
 
 | Phase | Feature | Effort | Token Savings | Status |
 |-------|---------|--------|---------------|--------|
+| 0 | Quick Wins (Oracle Review) | 1-2 days | 2x+ | **Priority** |
 | 1 | DiffLens | 2-3 days | 60-80% | Planned |
 | 2 | SymbolKite | 1-2 days | 40-60% | Planned |
 | 3 | Cassette Integration | 3-5 days | 70-90% | Planned |
 | 4 | CoverageLens | 2-3 days | 50-70% | Planned |
+
+---
+
+## Phase 0: Quick Wins (Oracle Review)
+
+**"Fix the foundation before building higher."**
+
+These are immediate fixes identified through Oracle (GPT-5.2 Pro) review of the codebase. Each provides >2x token reduction with minimal effort.
+
+### 0.1 Fix Call Graph Node Identity (Critical)
+
+**Problem:** Call graph uses plain function names (`validate_token`) instead of qualified names (`auth.py:validate_token`). This causes:
+- Ambiguous lookups when multiple files have same function name
+- Incorrect caller/callee relationships
+- Phantom connections between unrelated code
+
+**Fix:**
+```python
+# Before (in call_graph.py)
+edges.append((caller_name, callee_name))
+
+# After
+edges.append((f"{rel_path}:{caller_name}", f"{callee_path}:{callee_name}"))
+```
+
+**Files:** `src/tldr_swinton/call_graph.py`, `src/tldr_swinton/semantic.py`
+
+**Impact:** Correct call graphs = correct context retrieval = massive token savings
+
+### 0.2 Apply SKIP_DIRS Consistently
+
+**Problem:** `get_relevant_context()` in `semantic.py` doesn't filter SKIP_DIRS, including `venv/`, `node_modules/`, etc.
+
+**Fix:** Apply same filtering as index.py to all file traversal.
+
+**Files:** `src/tldr_swinton/semantic.py`
+
+### 0.3 Add Real Token Budget to `tldrs context`
+
+**Problem:** Current `--depth` flag limits hop count, not token count. Depth 2 could be 50 tokens or 5000 tokens.
+
+**Fix:**
+```bash
+# Add --budget flag
+tldrs context validate_token --budget 2000  # Stop at 2000 tokens
+```
+
+**Implementation:**
+- Add `tiktoken` for accurate token counting (or character approximation)
+- Budget allocator: full code for highest-relevance, signatures for rest
+- Stop expanding when budget exhausted
+
+**Files:** `src/tldr_swinton/semantic.py`, `src/tldr_swinton/cli.py`
+
+### 0.4 Add `--ultracompact` Output Format
+
+**Problem:** Even "compact" format repeats file paths and has verbose structure.
+
+**Dictionary-coded format:**
+```
+# Header: path dictionary
+P0=src/auth.py P1=src/middleware.py P2=src/routes.py
+
+# Body: compressed references
+P0:validate_token(tok:str)->bool @45-72
+  calls: P0:decode_jwt, P1:check_expiry
+  callers: P2:login_handler
+```
+
+**Token savings:** 2-4x over current compact format
+
+**Files:** `src/tldr_swinton/output_formats.py` (new)
+
+### 0.5 Default `include_docstrings=False`
+
+**Problem:** Docstrings often 30-50% of function size, rarely needed for modifications.
+
+**Fix:** Change default, add `--with-docs` flag when needed.
+
+**Files:** `src/tldr_swinton/cli.py`, `src/tldr_swinton/tree_sitter_extract.py`
+
+### 0.6 Fix MCP Context Formatting
+
+**Problem:** MCP server returns verbose dict representations instead of formatted output.
+
+**Fix:** Apply same formatters used by CLI to MCP tool responses.
+
+**Files:** `src/tldr_swinton/mcp_server.py`
+
+### Success Metrics
+
+- **Call graph accuracy**: Zero ambiguous node lookups
+- **Token reduction**: >50% vs current output
+- **Budget compliance**: Output within 5% of requested budget
+
+---
+
+## Innovation Opportunities (From Oracle Review)
+
+These are more ambitious ideas for future consideration:
+
+### Identifier Aliasing / Alpha-Renaming
+Replace verbose identifiers with short aliases:
+```python
+# Original
+def calculate_monthly_subscription_revenue(customer_id: str) -> Decimal
+
+# Alpha-renamed (with legend)
+def A(B:str)->C  # A=calculate_monthly_subscription_revenue, B=customer_id, C=Decimal
+```
+**Potential:** 20-40% additional savings
+
+### Cost-Based Context Query Planner
+Like database query optimization - given a task and budget, find the cheapest query plan that retrieves sufficient context.
+
+### PDG-Guided Minimal Slices
+Program Dependence Graph analysis to include only statements that affect the modification point. Often only 10-30% of a function body is relevant.
+
+### Near-Duplicate Clustering
+Use MinHash to detect near-duplicate functions (copy-paste code). Represent cluster with one exemplar + diff annotations.
+
+### Hierarchical Repo Map
+Graph coarsening: show modules at high level, expand only relevant subtrees.
+
+### Stateful Delta-Context Protocol
+Track what context the LLM has seen, send only deltas. 5-20x savings over multi-turn sessions.
 
 ---
 
