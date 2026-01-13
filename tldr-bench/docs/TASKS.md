@@ -10,6 +10,11 @@ Tasks are defined as YAML lists. Required fields:
 - type
 - notes
 
+## Built-in task files
+
+- curated
+- public
+
 ## Example
 
 ```yaml
