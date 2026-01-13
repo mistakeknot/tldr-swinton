@@ -15,6 +15,10 @@ Tasks are defined as YAML lists. Required fields:
 - curated
 - public
 
+## OpenHands benchmark source
+
+When running OpenHands benchmarks, use the submodule at:\n`../vendor/openhands-benchmarks`.
+
 ## Example
 
 ```yaml

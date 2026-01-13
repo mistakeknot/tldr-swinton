@@ -6,3 +6,6 @@ from pathlib import Path
 class BenchConfig:
     root: Path
     results_dir: Path
+
+
+OPENHANDS_BENCH_DIR_ENV = "OH_BENCH_DIR"

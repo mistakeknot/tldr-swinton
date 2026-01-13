@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Token-efficiency benchmarks for tldr-swinton"
 requires-python = ">=3.10"
 dependencies = [
-  "openhands-benchmarks",
   "pyyaml",
   "tiktoken",
 ]

@@ -1,0 +1,3 @@
+[submodule "tldr-bench/vendor/openhands-benchmarks"]
+	path = tldr-bench/vendor/openhands-benchmarks
+	url = https://github.com/OpenHands/benchmarks
