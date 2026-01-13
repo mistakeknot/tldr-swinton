@@ -26,12 +26,39 @@ This fork fixes those issues while maintaining full compatibility with the origi
 pip install tldr-swinton
 ```
 
-For development:
+### For AI Coding Agents
+
+If you're an AI agent setting up this project for a user, follow these steps:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/mistakeknot/tldr-swinton
+cd tldr-swinton
+
+# 2. Install in development mode with semantic search support
+pip install -e ".[semantic]"
+
+# 3. (Optional) For Ollama-based embeddings (faster, recommended):
+#    Ensure Ollama is running, then:
+ollama pull nomic-embed-text
+
+# 4. Verify installation
+tldrs --help
+
+# 5. (Optional) Build semantic index for a project
+tldrs index /path/to/project
+```
+
+**Requirements:**
+- Python 3.10+
+- For semantic search: Either Ollama with `nomic-embed-text` model, or 1.3GB disk space for sentence-transformers fallback
+
+### For Development
 
 ```bash
 git clone https://github.com/mistakeknot/tldr-swinton
 cd tldr-swinton
-pip install -e .
+pip install -e ".[full]"  # Includes Ollama client + tiktoken
 ```
 
 ## Quick Start
@@ -74,6 +101,36 @@ tldrs search "async.*fetch" src/
 | `tldrs slice <file> <func> <line>` | Program slice (what affects a line) |
 | `tldrs calls [path]` | Build project call graph |
 | `tldrs impact <function> [path]` | Find all callers of a function |
+
+### Semantic Search (NEW)
+
+Semantic code search using embeddings - find code by meaning, not just text patterns.
+
+| Command | Description |
+|---------|-------------|
+| `tldrs index [path]` | Build semantic index (first time or after changes) |
+| `tldrs find <query>` | Search code semantically (e.g., "authentication logic") |
+| `tldrs index --info` | Show index statistics |
+
+```bash
+# First, build the index (takes ~30s for medium projects)
+tldrs index .
+
+# Then search by meaning
+tldrs find "error handling patterns"
+tldrs find "database connection setup"
+tldrs find "user authentication flow"
+```
+
+**Backend Options:**
+- `--backend ollama` - Use Ollama (fast, local, requires `ollama pull nomic-embed-text`)
+- `--backend sentence-transformers` - Use HuggingFace models (1.3GB download)
+- `--backend auto` (default) - Try Ollama first, fall back to sentence-transformers
+
+**Installation for semantic search:**
+```bash
+pip install tldr-swinton[semantic]  # Adds FAISS + sentence-transformers
+```
 
 ### Output Formats
 
