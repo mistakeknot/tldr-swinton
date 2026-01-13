@@ -6,7 +6,7 @@ Features:
 - Builds symbol_index from call_graph for O(1) lookups
 - Handles: search, impact, extract, ping, status commands
 - Auto-shutdown after 30min idle
-- Persists indexes to .tldr/ for fast restart
+- Persists indexes to .tldrs/ for fast restart
 
 P5 Features (Incremental Performance):
 - ContentHashedIndex: Skip unchanged files via content hashing
@@ -172,7 +172,7 @@ class TLDRDaemon:
             project_path: Root path of the project to index
         """
         self.project = project_path
-        self.tldr_dir = project_path / ".tldr"
+        self.tldrs_dir = project_path / ".tldrs"
         self.socket_path = self._compute_socket_path()
         self.last_query = time.time()
         self.indexes: dict[str, Any] = {}
@@ -203,7 +203,7 @@ class TLDRDaemon:
 
         Checks for config in:
         1. .claude/settings.json (Claude Code settings)
-        2. .tldr/config.json (TLDR-specific settings)
+        2. .tldrs/config.json (TLDR-specific settings)
 
         Returns default config if no file found.
         """
@@ -224,7 +224,7 @@ class TLDRDaemon:
                 logger.warning(f"Failed to load Claude settings: {e}")
 
         # Try TLDR config
-        tldr_config = self.tldr_dir / "config.json"
+        tldr_config = self.tldrs_dir / "config.json"
         if tldr_config.exists():
             try:
                 config = json.loads(tldr_config.read_text())
@@ -394,7 +394,7 @@ class TLDRDaemon:
         if "call_graph" in self.indexes:
             return
 
-        call_graph_path = self.tldr_dir / "call_graph.json"
+        call_graph_path = self.tldrs_dir / "call_graph.json"
         if call_graph_path.exists():
             try:
                 self.indexes["call_graph"] = json.loads(call_graph_path.read_text())
@@ -534,7 +534,7 @@ class TLDRDaemon:
             graph = build_project_call_graph(self.project, language=language)
 
             # Create cache directory and save
-            cache_dir = self.tldr_dir / "cache"
+            cache_dir = self.tldrs_dir / "cache"
             cache_dir.mkdir(parents=True, exist_ok=True)
             cache_file = cache_dir / "call_graph.json"
             cache_data = {
@@ -1053,30 +1053,30 @@ class TLDRDaemon:
                 logger.debug(f"Could not re-index {file_path}: {e}")
 
     def write_pid_file(self):
-        """Write daemon PID to .tldr/daemon.pid."""
-        self.tldr_dir.mkdir(parents=True, exist_ok=True)
-        pid_file = self.tldr_dir / "daemon.pid"
+        """Write daemon PID to .tldrs/daemon.pid."""
+        self.tldrs_dir.mkdir(parents=True, exist_ok=True)
+        pid_file = self.tldrs_dir / "daemon.pid"
         pid_file.write_text(str(os.getpid()))
         logger.info(f"Wrote PID {os.getpid()} to {pid_file}")
 
     def remove_pid_file(self):
         """Remove the PID file."""
-        pid_file = self.tldr_dir / "daemon.pid"
+        pid_file = self.tldrs_dir / "daemon.pid"
         if pid_file.exists():
             pid_file.unlink()
             logger.info(f"Removed PID file {pid_file}")
 
     def write_status(self, status: str):
-        """Write status to .tldr/status file."""
-        self.tldr_dir.mkdir(parents=True, exist_ok=True)
-        status_file = self.tldr_dir / "status"
+        """Write status to .tldrs/status file."""
+        self.tldrs_dir.mkdir(parents=True, exist_ok=True)
+        status_file = self.tldrs_dir / "status"
         status_file.write_text(status)
         self._status = status
         logger.info(f"Status: {status}")
 
     def read_status(self) -> str:
-        """Read status from .tldr/status file."""
-        status_file = self.tldr_dir / "status"
+        """Read status from .tldrs/status file."""
+        status_file = self.tldrs_dir / "status"
         if status_file.exists():
             return status_file.read_text().strip()
         return "unknown"
@@ -1201,11 +1201,11 @@ def start_daemon(project_path: str | Path, foreground: bool = False):
         project_path: Path to the project root
         foreground: If True, run in foreground; otherwise daemonize
     """
-    from .tldrignore import ensure_tldrignore
+    from .tldrsignore import ensure_tldrignore
 
     project = Path(project_path).resolve()
 
-    # Ensure .tldrignore exists (create with defaults if not)
+    # Ensure .tldrsignore exists (create with defaults if not)
     created, message = ensure_tldrignore(project)
     if created:
         print(f"\n\033[33m{message}\033[0m\n")  # Yellow warning

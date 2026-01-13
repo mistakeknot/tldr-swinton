@@ -26,7 +26,7 @@ from typing import List, Union
 
 
 # Path to dirty flag file relative to project root
-DIRTY_FILE = ".tldr/cache/dirty.json"
+DIRTY_FILE = ".tldrs/cache/dirty.json"
 
 
 def _get_dirty_path(project_path: Union[str, Path]) -> Path:

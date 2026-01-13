@@ -117,7 +117,7 @@ class ContentHashedIndex:
 
     def save(self) -> None:
         """Persist index to disk."""
-        cache_dir = Path(self.project_root) / ".tldr" / "cache"
+        cache_dir = Path(self.project_root) / ".tldrs" / "cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         index_file = cache_dir / "content_index.json"
@@ -149,7 +149,7 @@ class ContentHashedIndex:
         Returns:
             True if loaded successfully, False otherwise
         """
-        cache_dir = Path(self.project_root) / ".tldr" / "cache"
+        cache_dir = Path(self.project_root) / ".tldrs" / "cache"
         index_file = cache_dir / "content_index.json"
 
         if not index_file.exists():

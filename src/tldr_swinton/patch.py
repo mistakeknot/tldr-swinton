@@ -226,7 +226,7 @@ def get_file_hash_cache(project_root: str) -> dict[str, str]:
         Dict mapping relative file paths to their SHA-1 hashes
     """
     import json
-    cache_path = Path(project_root) / ".tldr" / "cache" / "file_hashes.json"
+    cache_path = Path(project_root) / ".tldrs" / "cache" / "file_hashes.json"
 
     if not cache_path.exists():
         return {}
@@ -245,7 +245,7 @@ def save_file_hash_cache(project_root: str, cache: dict[str, str]) -> None:
         cache: Dict mapping relative file paths to their SHA-1 hashes
     """
     import json
-    cache_path = Path(project_root) / ".tldr" / "cache" / "file_hashes.json"
+    cache_path = Path(project_root) / ".tldrs" / "cache" / "file_hashes.json"
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(json.dumps(cache, indent=2))
 

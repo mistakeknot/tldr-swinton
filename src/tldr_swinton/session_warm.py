@@ -51,7 +51,7 @@ SKIP_DIRS = {
 
 def get_cache_path(project_path: Path) -> Path:
     """Get the path to the call graph cache file."""
-    return project_path / ".tldr" / "cache" / "call_graph.json"
+    return project_path / ".tldrs" / "cache" / "call_graph.json"
 
 
 def get_cache_age(project_path: Path) -> Optional[float]:

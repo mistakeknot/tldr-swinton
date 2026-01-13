@@ -79,12 +79,12 @@ class VectorStore:
     """FAISS-backed vector store for code embeddings.
 
     Stores:
-    - .tldr/index/vectors.faiss - FAISS index
-    - .tldr/index/units.json - Code unit metadata
-    - .tldr/index/meta.json - Store metadata
+    - .tldrs/index/vectors.faiss - FAISS index
+    - .tldrs/index/units.json - Code unit metadata
+    - .tldrs/index/meta.json - Store metadata
     """
 
-    INDEX_DIR = ".tldr/index"
+    INDEX_DIR = ".tldrs/index"
 
     def __init__(self, project_root: str):
         self.project_root = Path(project_root).resolve()

@@ -59,13 +59,13 @@ def _extract_code_units(
     Args:
         project_path: Path to project root
         language: Language to scan for (auto-detect if None)
-        respect_ignore: Respect .tldrignore patterns
+        respect_ignore: Respect .tldrsignore patterns
 
     Returns:
         List of CodeUnit objects with rich metadata
     """
     from .api import extract_file
-    from .tldrignore import load_ignore_patterns, should_ignore
+    from .tldrsignore import load_ignore_patterns, should_ignore
 
     project = Path(project_path).resolve()
     units = []
@@ -393,7 +393,7 @@ def build_index(
 ) -> IndexStats:
     """Build or update the semantic index for a project.
 
-    Creates/updates .tldr/index/ with:
+    Creates/updates .tldrs/index/ with:
     - vectors.faiss - Vector index
     - units.json - Unit metadata
     - meta.json - Index metadata
@@ -406,7 +406,7 @@ def build_index(
         generate_summaries: Generate one-line summaries with Ollama
         rebuild: Force full rebuild (ignore existing index)
         show_progress: Show progress indicators
-        respect_ignore: Respect .tldrignore patterns
+        respect_ignore: Respect .tldrsignore patterns
 
     Returns:
         IndexStats with indexing statistics

@@ -255,13 +255,13 @@ def extract_units_from_project(project_path: str, lang: str = "python", respect_
     Args:
         project_path: Path to project root.
         lang: Programming language ("python", "typescript", "go", "rust").
-        respect_ignore: If True, respect .tldrignore patterns (default True).
+        respect_ignore: If True, respect .tldrsignore patterns (default True).
 
     Returns:
         List of EmbeddingUnit objects with enriched metadata.
     """
     from .api import get_code_structure, build_project_call_graph, get_imports
-    from .tldrignore import load_ignore_patterns, should_ignore
+    from .tldrsignore import load_ignore_patterns, should_ignore
 
     project = Path(project_path).resolve()
     units = []
@@ -619,26 +619,26 @@ def build_semantic_index(
     """Build and save FAISS index + metadata for a project.
 
     Creates:
-    - .tldr/cache/semantic/index.faiss - Vector index
-    - .tldr/cache/semantic/metadata.json - Unit metadata
+    - .tldrs/cache/semantic/index.faiss - Vector index
+    - .tldrs/cache/semantic/metadata.json - Unit metadata
 
     Args:
         project_path: Path to project root.
         lang: Programming language.
         model: Model name from SUPPORTED_MODELS or HuggingFace name.
         show_progress: Show progress spinner (default: True).
-        respect_ignore: If True, respect .tldrignore patterns (default True).
+        respect_ignore: If True, respect .tldrsignore patterns (default True).
 
     Returns:
         Number of indexed units.
     """
     import faiss
     import numpy as np
-    from .tldrignore import ensure_tldrignore
+    from .tldrsignore import ensure_tldrignore
 
     console = _get_progress_console() if show_progress else None
 
-    # Ensure .tldrignore exists (create with defaults if not)
+    # Ensure .tldrsignore exists (create with defaults if not)
     project = Path(project_path).resolve()
     created, message = ensure_tldrignore(project)
     if created and console:
@@ -651,10 +651,10 @@ def build_semantic_index(
     else:
         hf_name = model_key
 
-    cache_dir = project / ".tldr" / "cache" / "semantic"
+    cache_dir = project / ".tldrs" / "cache" / "semantic"
     cache_dir.mkdir(parents=True, exist_ok=True)
 
-    # Extract all units (respecting .tldrignore)
+    # Extract all units (respecting .tldrsignore)
     if console:
         with console.status("[bold green]Extracting code units...") as status:
             units = extract_units_from_project(str(project), lang=lang, respect_ignore=respect_ignore)
@@ -750,7 +750,7 @@ def semantic_search(
         return []
 
     project = Path(project_path).resolve()
-    cache_dir = project / ".tldr" / "cache" / "semantic"
+    cache_dir = project / ".tldrs" / "cache" / "semantic"
 
     index_file = cache_dir / "index.faiss"
     metadata_file = cache_dir / "metadata.json"

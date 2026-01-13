@@ -5,7 +5,7 @@
 #
 # Options:
 #   --yes           Skip confirmation prompts
-#   --keep-indexes  Don't remove .tldr/ directories from projects
+#   --keep-indexes  Don't remove .tldrs/ directories from projects
 #   --dir PATH      Installation directory (default: ~/tldr-swinton)
 #
 
@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --yes, -y       Skip confirmation prompts"
-            echo "  --keep-indexes  Don't offer to remove .tldr/ directories"
+            echo "  --keep-indexes  Don't offer to remove .tldrs/ directories"
             echo "  --dir PATH      Installation directory (default: ~/tldr-swinton)"
             echo "  --help, -h      Show this help message"
             exit 0
@@ -139,8 +139,8 @@ fi
 # Optional: Remove .tldr indexes from projects
 if [ "$KEEP_INDEXES" = false ] && [ "$SKIP_CONFIRM" = false ]; then
     echo ""
-    echo -e "${YELLOW}Note:${NC} Project indexes (.tldr/ directories) were not removed."
-    echo -e "To remove an index from a project, run: ${BLUE}rm -rf /path/to/project/.tldr${NC}"
+    echo -e "${YELLOW}Note:${NC} Project indexes (.tldrs/ directories) were not removed."
+    echo -e "To remove an index from a project, run: ${BLUE}rm -rf /path/to/project/.tldrs${NC}"
 fi
 
 # Success message

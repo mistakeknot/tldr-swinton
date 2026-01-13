@@ -57,7 +57,7 @@ tldrs index .  → embeddings.py (Ollama/sentence-transformers)
                       ↓
                vector_store.py (FAISS IndexFlatIP)
                       ↓
-               .tldr/index/{vectors.faiss, units.json, meta.json}
+               .tldrs/index/{vectors.faiss, units.json, meta.json}
 
 tldrs find "query" → index.py:search_index() → VectorStore.search()
                           ↓
@@ -217,7 +217,7 @@ Should return empty - all imports should be relative (`.`).
 
 ```bash
 tldrs index --info                    # Show index stats
-ls -la .tldr/index/                   # Check index files exist
+ls -la .tldrs/index/                   # Check index files exist
 ```
 
 ## Testing
@@ -293,7 +293,7 @@ The agent workflow eval tests real token savings for code modification tasks (no
   - Added `embeddings.py` - Multi-backend embedding support (Ollama/HuggingFace)
   - Added `vector_store.py` - FAISS wrapper with persistent storage
   - Added `index.py` - Index management with incremental updates
-  - Index stored in `.tldr/index/` (vectors.faiss, units.json, meta.json)
+  - Index stored in `.tldrs/index/` (vectors.faiss, units.json, meta.json)
 
 - **0.1.0** - Initial fork with TypeScript/Rust signature fixes
   - Fixed `FunctionInfo.signature()` to be language-aware

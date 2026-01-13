@@ -78,7 +78,7 @@ def detect_language_from_extension(file_path: str) -> str:
 
 def _show_first_run_tip():
     """Show a one-time tip about Swift support on first run."""
-    marker = Path.home() / ".tldr_first_run"
+    marker = Path.home() / ".tldrs_first_run"
     if marker.exists():
         return
 
@@ -119,8 +119,8 @@ Examples:
     tldrs slice src/main.py func 42      # Lines affecting line 42
 
 Ignore Patterns:
-    tldrs respects .tldrignore files (gitignore syntax).
-    First run creates .tldrignore with sensible defaults.
+    tldrs respects .tldrsignore files (gitignore syntax).
+    First run creates .tldrsignore with sensible defaults.
     Use --no-ignore to bypass ignore patterns.
 
 Daemon:
@@ -149,7 +149,7 @@ Semantic Search:
     parser.add_argument(
         "--no-ignore",
         action="store_true",
-        help="Ignore .tldrignore patterns (include all files)",
+        help="Ignore .tldrsignore patterns (include all files)",
     )
 
     # Shell completion support
@@ -490,7 +490,7 @@ Semantic Search:
         """
         import time
         project = Path(project_path).resolve()
-        cache_dir = project / ".tldr" / "cache"
+        cache_dir = project / ".tldrs" / "cache"
         cache_file = cache_dir / "call_graph.json"
 
         # Check if we have a cached graph
@@ -811,7 +811,7 @@ Semantic Search:
                 graph = build_project_call_graph(project_path, language=args.lang)
 
                 # Create cache directory
-                cache_dir = project_path / ".tldr" / "cache"
+                cache_dir = project_path / ".tldrs" / "cache"
                 cache_dir.mkdir(parents=True, exist_ok=True)
 
                 # Save cache file
@@ -1024,8 +1024,8 @@ Semantic Search:
             project_path = Path(args.project).resolve()
 
             if args.action == "start":
-                # Ensure .tldr directory exists
-                tldr_dir = project_path / ".tldr"
+                # Ensure .tldrs directory exists
+                tldr_dir = project_path / ".tldrs"
                 tldr_dir.mkdir(parents=True, exist_ok=True)
                 # Start daemon (will fork to background on Unix)
                 start_daemon(project_path, foreground=False)
