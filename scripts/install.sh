@@ -122,19 +122,22 @@ echo -e "  ${GREEN}✓${NC} Repository ready at ${INSTALL_DIR}"
 echo ""
 echo -e "${BLUE}[3/5]${NC} Setting up Python environment..."
 
-# Check if Python 3.11+ is available, install if not
-PYTHON_VERSION=$(uv python find 2>/dev/null | head -1 || echo "")
-if [ -z "$PYTHON_VERSION" ]; then
+# Ensure Python 3.10+ is available (required for type union syntax)
+# uv sync will use the lockfile's requires-python constraint
+if ! uv python find ">=3.10" &>/dev/null; then
     echo -e "  ${YELLOW}→${NC} Installing Python 3.11..."
     uv python install 3.11
+else
+    echo -e "  ${GREEN}✓${NC} Python 3.10+ available"
 fi
 
 # Create/update virtual environment and install dependencies
 echo -e "  ${YELLOW}→${NC} Installing dependencies (this may take a minute)..."
 if [ -f "uv.lock" ]; then
+    # uv sync respects requires-python = ">=3.10" from lockfile
     uv sync --extra semantic 2>&1 | grep -v "^  " || true
 else
-    # Fallback if no lockfile
+    # Fallback if no lockfile - explicitly use 3.11
     uv venv -p 3.11 2>/dev/null || true
     uv pip install -e ".[semantic]" 2>&1 | tail -5
 fi
