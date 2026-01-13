@@ -11,6 +11,10 @@ python scripts/run_bench.py --help
 python scripts/run_bench.py --tasks curated --list-tasks
 ```
 
+## CLI Shim (Codex/Claude Code)
+
+See `tldr-bench/shim/README.md` for running the local OpenAI-compatible shim.
+
 ## OpenHands Benchmarks (required for real runs)
 
 This repo includes the OpenHands benchmarks as a submodule:
