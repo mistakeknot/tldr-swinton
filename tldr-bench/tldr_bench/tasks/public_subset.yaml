@@ -1,1 +1,8 @@
-# Public subset tasks (e.g., SWE-bench Verified IDs).
+- id: swe-001
+  title: "SWE-bench placeholder task"
+  repo: "SWE-bench"
+  entry: "TBD"
+  expected_files: []
+  expected_lines: []
+  type: "public_placeholder"
+  notes: "Replace with SWE-bench Verified task IDs."
