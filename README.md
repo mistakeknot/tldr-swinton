@@ -48,6 +48,14 @@ curl -fsSL ... | bash -s -- --no-ollama
 curl -fsSL ... | bash -s -- --dir /path/to/install
 ```
 
+### Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldr-swinton/main/scripts/uninstall.sh | bash
+```
+
+This removes the installation directory, shell alias, and pip packages. Project indexes (`.tldr/` directories) are preserved by default.
+
 ### Quick Install (pip)
 
 ```bash
