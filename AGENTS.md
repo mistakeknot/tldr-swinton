@@ -1,6 +1,6 @@
 # AGENTS.md - AI Agent Instructions for tldr-swinton
 
-This document provides instructions for AI coding assistants working with the tldr-swinton codebase.
+This document provides instructions for all AI coding assistants (Claude, Codex, etc.) working with the tldr-swinton codebase.
 
 ## Project Overview
 
@@ -8,13 +8,30 @@ tldr-swinton is a token-efficient code analysis tool for LLMs. It's a fork of ll
 
 **Key directories:**
 - `src/tldr_swinton/` - Main Python package
-- `src/tldr_swinton/cli.py` - CLI entry point
-- `src/tldr_swinton/hybrid_extractor.py` - Multi-language extraction logic
-- `src/tldr_swinton/ast_extractor.py` - Core data structures and Python extraction
+- `evals/` - Evaluation scripts for token efficiency
+
+## Quick Reference
+
+```bash
+# Install (development)
+pip install -e .
+pip install -e ".[semantic]"  # With semantic search (FAISS + sentence-transformers)
+pip install -e ".[full]"      # Full stack (includes Ollama + tiktoken)
+
+# Test commands
+tldrs extract src/tldr_swinton/embeddings.py    # Extract file info
+tldrs structure src/                             # Show code structure
+tldrs find "authentication logic"                # Semantic search (requires index)
+tldrs index .                                    # Build semantic index
+
+# After code changes
+find . -name "*.pyc" -delete && find . -name "__pycache__" -type d -exec rm -rf {} +
+pip install -e .
+```
 
 ## Architecture
 
-### Extraction Pipeline
+### Core Extraction Pipeline
 
 ```
 CLI (cli.py)
@@ -31,6 +48,22 @@ Language-specific extraction:
 ModuleInfo with FunctionInfo objects
     ↓
 .to_dict() for JSON serialization
+```
+
+### Semantic Search Pipeline (v0.2.0)
+
+```
+tldrs index .  → embeddings.py (Ollama/sentence-transformers)
+                      ↓
+               vector_store.py (FAISS IndexFlatIP)
+                      ↓
+               .tldr/index/{vectors.faiss, units.json, meta.json}
+
+tldrs find "query" → index.py:search_index() → VectorStore.search()
+                          ↓
+                    Lexical fast-path for identifiers (exact match)
+                          ↓
+                    Semantic search for natural language queries
 ```
 
 ### Key Data Structures
@@ -57,58 +90,14 @@ The `language` field is critical - it determines the output format of `signature
 
 **ModuleInfo** (`ast_extractor.py:131`): Container for file analysis results.
 
+**CodeUnit** (`vector_store.py`): Minimal metadata for semantic search results.
+
 ### Language Support
 
 Language detection happens in multiple places:
 1. `cli.py:EXTENSION_TO_LANGUAGE` - Maps file extensions to language names
 2. `hybrid_extractor.py:_detect_language()` - Runtime detection from extension
 3. `api.py:get_code_structure()` - Auto-detection for single files
-
-## Common Tasks
-
-### Adding a New Language
-
-1. Add tree-sitter grammar to `pyproject.toml` dependencies
-2. Add extension mapping in `cli.py:EXTENSION_TO_LANGUAGE`
-3. Add signature format in `FunctionInfo.signature()` (`ast_extractor.py`)
-4. Add extraction method in `HybridExtractor` (`hybrid_extractor.py`)
-5. Add to language maps in `api.py:get_code_structure()`
-
-### Fixing Signature Formatting
-
-The `FunctionInfo.signature()` method (`ast_extractor.py:39-84`) handles all signature formatting. Each language has a branch:
-
-```python
-if self.language in ("typescript", "tsx", "javascript"):
-    return f"{async_prefix}function {self.name}({params_str}){ret}"
-elif self.language == "rust":
-    return f"{async_prefix}fn {self.name}({params_str}){ret_rust}"
-# ... etc
-```
-
-### Debugging Extraction Issues
-
-1. Check if the correct module is being imported:
-   ```bash
-   python -c "from tldr_swinton.hybrid_extractor import HybridExtractor; import inspect; print(inspect.getfile(HybridExtractor))"
-   ```
-
-2. Test extraction directly:
-   ```bash
-   python -c "
-   from tldr_swinton.hybrid_extractor import HybridExtractor
-   e = HybridExtractor()
-   r = e.extract('path/to/file.ts')
-   for f in r.functions[:3]:
-       print(f'{f.name}: {f.language} -> {f.signature()}')
-   "
-   ```
-
-3. Check for import issues (old `tldr.` imports vs new relative imports):
-   ```bash
-   grep -r "from tldr\." src/tldr_swinton/ --include="*.py"
-   ```
-   Should return empty - all imports should be relative (`.`).
 
 ## Critical Rules
 
@@ -146,6 +135,91 @@ for prefix in ("export ", "async ", "default "):
         name = name[len(prefix):]
 ```
 
+### Embeddings Must Be L2-Normalized
+
+FAISS IndexFlatIP expects normalized vectors for cosine similarity:
+```python
+embedding = embedding / np.linalg.norm(embedding)  # Required!
+```
+
+### Incremental Index Updates
+
+`build_index()` reconstructs vectors for unchanged files (via `store.reconstruct_all_vectors()`). Only new/changed files get re-embedded.
+
+## Common Tasks
+
+### Adding a New Language
+
+1. Add tree-sitter grammar to `pyproject.toml` dependencies
+2. Add extension mapping in `cli.py:EXTENSION_TO_LANGUAGE`
+3. Add signature format in `FunctionInfo.signature()` (`ast_extractor.py`)
+4. Add extraction method in `HybridExtractor` (`hybrid_extractor.py`)
+5. Add to language maps in `api.py:get_code_structure()`
+
+### Fixing Signature Formatting
+
+The `FunctionInfo.signature()` method (`ast_extractor.py:39-84`) handles all signature formatting. Each language has a branch:
+
+```python
+if self.language in ("typescript", "tsx", "javascript"):
+    return f"{async_prefix}function {self.name}({params_str}){ret}"
+elif self.language == "rust":
+    return f"{async_prefix}fn {self.name}({params_str}){ret_rust}"
+# ... etc
+```
+
+### Semantic Search Backends
+
+```bash
+# Check available backends
+python -c "from tldr_swinton.embeddings import check_backends; print(check_backends())"
+
+# Ollama (preferred - fast, local)
+ollama pull nomic-embed-text
+tldrs index . --backend ollama
+
+# sentence-transformers (fallback - 1.3GB download)
+tldrs index . --backend sentence-transformers
+
+# Auto (tries Ollama first, falls back)
+tldrs index . --backend auto
+```
+
+## Debugging
+
+### Verify Correct Module Loaded
+
+```bash
+python -c "import tldr_swinton; print(tldr_swinton.__file__)"
+python -c "from tldr_swinton.hybrid_extractor import HybridExtractor; import inspect; print(inspect.getfile(HybridExtractor))"
+```
+
+### Test Extraction Directly
+
+```bash
+python -c "
+from tldr_swinton.hybrid_extractor import HybridExtractor
+e = HybridExtractor()
+r = e.extract('path/to/file.ts')
+for f in r.functions[:3]:
+    print(f'{f.name}: {f.language} -> {f.signature()}')
+"
+```
+
+### Check for Import Issues
+
+```bash
+grep -r "from tldr\." src/tldr_swinton/ --include="*.py"
+```
+Should return empty - all imports should be relative (`.`).
+
+### Check Index Health
+
+```bash
+tldrs index --info                    # Show index stats
+ls -la .tldr/index/                   # Check index files exist
+```
+
 ## Testing
 
 ### Manual Testing
@@ -179,6 +253,21 @@ tldrs structure path/to/file.ts | grep language
    python -c "import tldr_swinton; print(tldr_swinton.__file__)"
    ```
 
+### Evals
+
+```bash
+# Token efficiency eval (basic)
+python evals/token_efficiency_eval.py
+
+# Semantic search eval
+python evals/semantic_search_eval.py
+
+# Agent workflow eval (realistic Claude Code scenarios)
+python evals/agent_workflow_eval.py
+```
+
+The agent workflow eval tests real token savings for code modification tasks (not just search output vs raw code).
+
 ## File Reference
 
 | File | Purpose |
@@ -191,8 +280,20 @@ tldrs structure path/to/file.ts | grep language
 | `dfg_extractor.py` | Data flow graph extraction |
 | `pdg_extractor.py` | Program dependency graph |
 | `signature_extractor_pygments.py` | Fallback signature extraction |
+| `embeddings.py` | Ollama/sentence-transformers embedding backend |
+| `vector_store.py` | FAISS vector storage wrapper |
+| `index.py` | Semantic index management |
+| `semantic.py` | Original semantic search (5-layer embeddings) |
 
 ## Version History
+
+- **0.2.0** - Semantic search with Ollama support
+  - Added `tldrs index` - Build semantic index with Ollama or sentence-transformers
+  - Added `tldrs find` - Natural language code search
+  - Added `embeddings.py` - Multi-backend embedding support (Ollama/HuggingFace)
+  - Added `vector_store.py` - FAISS wrapper with persistent storage
+  - Added `index.py` - Index management with incremental updates
+  - Index stored in `.tldr/index/` (vectors.faiss, units.json, meta.json)
 
 - **0.1.0** - Initial fork with TypeScript/Rust signature fixes
   - Fixed `FunctionInfo.signature()` to be language-aware
