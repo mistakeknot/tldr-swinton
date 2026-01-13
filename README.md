@@ -38,10 +38,11 @@ cd tldr-swinton
 # 2. Install in development mode with semantic search support
 pip install -e ".[semantic]"
 
-# 3. (Optional) For Ollama-based embeddings (faster, recommended):
-#    First ensure Ollama is running:
+# 3. (Recommended) Set up Ollama for fast local embeddings
+#    Check if Ollama is installed:
+which ollama || echo "Ollama not installed - see https://ollama.ai for installation"
+#    If installed, ensure it's running and pull the embedding model:
 pgrep -x ollama || ollama serve &
-#    Then pull the embedding model:
 ollama pull nomic-embed-text
 
 # 4. Verify installation
@@ -60,7 +61,9 @@ tldrs find "authentication"     # Test a search query
 
 **Requirements:**
 - Python 3.10+
-- For semantic search: Either Ollama with `nomic-embed-text` model (274MB), or 1.3GB disk space for sentence-transformers fallback
+- For semantic search embeddings, one of:
+  - **Ollama** (recommended): Install from https://ollama.ai, then `ollama pull nomic-embed-text` (274MB)
+  - **sentence-transformers** (fallback): Automatically downloads BGE model on first use (1.3GB)
 
 ### For Development
 
@@ -132,13 +135,17 @@ tldrs find "user authentication flow"
 ```
 
 **Backend Options:**
-- `--backend ollama` - Use Ollama (fast, local, requires `ollama pull nomic-embed-text`)
-- `--backend sentence-transformers` - Use HuggingFace models (1.3GB download)
+- `--backend ollama` - Use Ollama (fast, local, requires [Ollama](https://ollama.ai) + `ollama pull nomic-embed-text`)
+- `--backend sentence-transformers` - Use HuggingFace BGE model (1.3GB download on first use)
 - `--backend auto` (default) - Try Ollama first, fall back to sentence-transformers
 
 **Installation for semantic search:**
 ```bash
 pip install tldr-swinton[semantic]  # Adds FAISS + sentence-transformers
+
+# (Recommended) Also install Ollama for faster embeddings:
+# See https://ollama.ai for installation, then:
+ollama pull nomic-embed-text
 ```
 
 ### Output Formats
