@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tldr-swinton"
-version = "0.1.0"
+version = "0.2.0"
 description = "Token-efficient code analysis for LLMs - Fork with improved TypeScript and Rust support"
 readme = "README.md"
 license = "MIT"
@@ -40,11 +40,23 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Semantic search with embeddings
 semantic = [
     "sentence-transformers>=2.0",
     "torch>=2.0",
     "faiss-cpu>=1.7",
+    "rich>=13.0",  # Progress bars
 ]
+# Full stack with Ollama integration
+full = [
+    "sentence-transformers>=2.0",
+    "torch>=2.0",
+    "faiss-cpu>=1.7",
+    "rich>=13.0",
+    "ollama>=0.1",  # Local LLM client
+    "tiktoken>=0.5",  # Token counting
+]
+# Additional language grammars
 all = [
     "tree-sitter-kotlin>=0.1.0",
     "tree-sitter-swift>=0.1.0",

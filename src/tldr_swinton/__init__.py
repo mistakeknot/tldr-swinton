@@ -23,7 +23,7 @@ try:
     from importlib.metadata import version
     __version__ = version("tldr-swinton")
 except Exception:
-    __version__ = "0.1.0"
+    __version__ = "0.2.0"
 __author__ = "Steve Yegge (fork)"
 __original_author__ = "parcadei"
 

@@ -504,9 +504,30 @@ class HybridExtractor:
                     module_info.classes.append(cls)
                 prev_comment = None
 
+            # Handle variable_declarator specially for arrow functions
+            # e.g., const MyComponent = () => {} or const MyComponent = memo(() => {})
+            elif node_type == "variable_declarator":
+                arrow_func = self._extract_arrow_from_variable_declarator(child, source, prev_comment)
+                if arrow_func:
+                    module_info.functions.append(arrow_func)
+                    if defined_names:
+                        # Find the arrow function node for call extraction
+                        for c in child.children:
+                            if c.type == "arrow_function":
+                                self._extract_ts_calls(c, arrow_func.name, source, module_info.call_graph, defined_names)
+                                break
+                            elif c.type == "call_expression":
+                                # Handle memo(() => {}) pattern
+                                self._extract_ts_calls(c, arrow_func.name, source, module_info.call_graph, defined_names)
+                                break
+                else:
+                    # No arrow function found, recurse normally
+                    self._extract_ts_nodes(child, source, module_info, defined_names)
+                prev_comment = None
+
             # Recurse into containers
             elif node_type in ("export_statement", "lexical_declaration", "program",
-                            "variable_declaration", "variable_declarator", "statement_block",
+                            "variable_declaration", "statement_block",
                             "export_clause"):
                 self._extract_ts_nodes(child, source, module_info, defined_names)
                 prev_comment = None
@@ -591,6 +612,76 @@ class HybridExtractor:
             line_number=node.start_point[0] + 1,
             language="typescript",
         )
+
+    def _extract_arrow_from_variable_declarator(
+        self, node, source: bytes, docstring: str | None = None
+    ) -> FunctionInfo | None:
+        """Extract arrow function from variable declarator.
+
+        Handles patterns like:
+        - const Foo = () => {}
+        - const Foo = async () => {}
+        - const Foo: Type = () => {}
+        - const Foo = memo(() => {})
+        - const Foo = forwardRef(() => {})
+        """
+        name = ""
+        type_annotation = None
+        arrow_node = None
+
+        for child in node.children:
+            if child.type == "identifier" and not name:
+                name = self._safe_decode(source[child.start_byte:child.end_byte])
+            elif child.type == "type_annotation":
+                type_annotation = self._safe_decode(source[child.start_byte:child.end_byte]).lstrip(": ")
+            elif child.type == "arrow_function":
+                arrow_node = child
+            elif child.type == "call_expression":
+                # Handle memo(() => {}), forwardRef(() => {}), etc.
+                arrow_node = self._find_arrow_in_call(child)
+
+        if not name or not arrow_node:
+            return None
+
+        # Extract params and return type from the arrow function
+        params = []
+        return_type = type_annotation  # Use the outer type annotation if available
+        is_async = False
+
+        text = self._safe_decode(source[arrow_node.start_byte:arrow_node.end_byte])
+        is_async = text.strip().startswith("async")
+
+        for child in arrow_node.children:
+            if child.type == "formal_parameters":
+                for p in child.children:
+                    if p.type not in ("(", ")", ","):
+                        params.append(self._safe_decode(source[p.start_byte:p.end_byte]))
+            elif child.type == "type_annotation" and not return_type:
+                return_type = self._safe_decode(source[child.start_byte:child.end_byte]).lstrip(": ")
+
+        return FunctionInfo(
+            name=name,
+            params=params,
+            return_type=return_type,
+            docstring=docstring,
+            is_async=is_async,
+            line_number=node.start_point[0] + 1,
+            language="typescript",
+        )
+
+    def _find_arrow_in_call(self, node) -> "tree_sitter.Node | None":
+        """Find arrow function inside a call expression like memo(() => {})."""
+        for child in node.children:
+            if child.type == "arguments":
+                for arg in child.children:
+                    if arg.type == "arrow_function":
+                        return arg
+                    # Handle nested: memo(forwardRef(() => {}))
+                    if arg.type == "call_expression":
+                        result = self._find_arrow_in_call(arg)
+                        if result:
+                            return result
+        return None
 
     def _extract_ts_class(
         self,
