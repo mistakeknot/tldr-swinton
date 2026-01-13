@@ -51,3 +51,23 @@
   expected_lines: [256]
   type: "feature_tweak"
   notes: "Changed file detection for affected tests."
+
+- id: cur-cli-codex
+  title: "CLI shim smoke (codex)"
+  repo: "local"
+  entry: "codex"
+  expected_files: []
+  expected_lines: []
+  type: "cli_smoke"
+  notes: "Runs codex with a trivial prompt via bench_command."
+  bench_command: ["codex", "--prompt", "Say 'ok' only."]
+
+- id: cur-cli-claude
+  title: "CLI shim smoke (claude)"
+  repo: "local"
+  entry: "claude"
+  expected_files: []
+  expected_lines: []
+  type: "cli_smoke"
+  notes: "Runs claude with a trivial prompt via bench_command."
+  bench_command: ["claude", "--prompt", "Say 'ok' only."]

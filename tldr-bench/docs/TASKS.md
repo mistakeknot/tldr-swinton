@@ -17,7 +17,13 @@ Tasks are defined as YAML lists. Required fields:
 
 ## OpenHands benchmark source
 
-When running OpenHands benchmarks, use the submodule at:\n`../vendor/openhands-benchmarks`.
+When running OpenHands benchmarks, use the submodule at:
+`../vendor/openhands-benchmarks`.
+
+## bench_command tasks
+
+Tasks can include a `bench_command` list for local CLI shims (Codex/Claude Code).
+These are executed as-is by `run_task` and should be used for smoke tests.
 
 ## Example
 
