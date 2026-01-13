@@ -1,6 +1,7 @@
 # Log Schema
 
-JSONL record fields:
+Each run appends a JSONL record with these fields:
+
 - task_id
 - variant_id
 - budget
@@ -17,3 +18,4 @@ JSONL record fields:
 - symbol_etag_hit
 - cassette_ref_ratio
 - notes
+- timestamp
