@@ -157,6 +157,21 @@ tldrs context handleAuth --project src/ > context.txt
 # - Relevant imports and types
 ```
 
+## Token Efficiency (Verified)
+
+Measured using tiktoken (cl100k_base encoding):
+
+| Format | Avg. Token Savings |
+|--------|-------------------|
+| Compact (function names only) | **93%** |
+| Structure JSON | **62%** |
+
+Run the evaluation yourself:
+```bash
+pip install tiktoken
+python evals/token_efficiency_eval.py
+```
+
 ## Credits
 
 Original project by [parcadei](https://github.com/parcadei/llm-tldr).
