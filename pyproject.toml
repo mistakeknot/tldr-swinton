@@ -58,12 +58,12 @@ full = [
 ]
 # Additional language grammars
 all = [
-    "tree-sitter-kotlin>=0.1.0",
-    "tree-sitter-swift>=0.1.0",
-    "tree-sitter-c-sharp>=0.1.0",
-    "tree-sitter-scala>=0.1.0",
-    "tree-sitter-lua>=0.1.0",
-    "tree-sitter-elixir>=0.1.0",
+    "tree-sitter-kotlin>=1.0.0",
+    "tree-sitter-swift>=0.0.1",
+    "tree-sitter-c-sharp>=0.23.0",
+    "tree-sitter-scala>=0.24.0",
+    "tree-sitter-lua>=0.4.0",
+    "tree-sitter-elixir>=0.3.0",
 ]
 
 [project.scripts]

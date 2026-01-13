@@ -22,41 +22,64 @@ This fork fixes those issues while maintaining full compatibility with the origi
 
 ## Installation
 
+### One-Liner (Recommended for AI Agents)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldr-swinton/main/scripts/install.sh | bash
+```
+
+This installs everything automatically:
+- Installs [uv](https://github.com/astral-sh/uv) package manager if needed
+- Clones the repository to `~/tldr-swinton`
+- Creates a Python virtual environment
+- Installs all dependencies
+- Sets up Ollama embedding model (if Ollama is installed)
+- Adds a `tldrs` shell alias
+
+Options:
+```bash
+# Skip prompts (for automation)
+curl -fsSL ... | bash -s -- --yes
+
+# Skip Ollama setup
+curl -fsSL ... | bash -s -- --no-ollama
+
+# Custom install directory
+curl -fsSL ... | bash -s -- --dir /path/to/install
+```
+
+### Quick Install (pip)
+
 ```bash
 pip install tldr-swinton
 ```
 
-### For AI Coding Agents
+### Manual Setup (Step-by-Step)
 
-If you're an AI agent setting up this project for a user, follow these steps:
+If you prefer manual control or the one-liner doesn't work:
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/mistakeknot/tldr-swinton
 cd tldr-swinton
 
-# 2. Install in development mode with semantic search support
+# 2. Install with uv (recommended) or pip
+uv sync --extra semantic    # Fast, reproducible
+# OR
 pip install -e ".[semantic]"
 
 # 3. (Recommended) Set up Ollama for fast local embeddings
-#    Check if Ollama is installed:
-which ollama || echo "Ollama not installed - see https://ollama.ai for installation"
-#    If installed, ensure it's running and pull the embedding model:
-pgrep -x ollama || ollama serve &
+#    Install from https://ollama.ai, then:
 ollama pull nomic-embed-text
 
 # 4. Verify installation
 tldrs --help
 
-# 5. (Optional) Create .tldrignore to exclude files (uses .gitignore syntax)
-echo -e "node_modules/\ndist/\n*.min.js" > /path/to/project/.tldrignore
-
-# 6. Build semantic index for a project (~1-3 min for large projects)
+# 5. Build semantic index for a project
 tldrs index /path/to/project
 
-# 7. Verify semantic search works
-tldrs index --info              # Check index stats
-tldrs find "authentication"     # Test a search query
+# 6. Search!
+tldrs find "authentication logic"
 ```
 
 **Requirements:**
@@ -70,7 +93,9 @@ tldrs find "authentication"     # Test a search query
 ```bash
 git clone https://github.com/mistakeknot/tldr-swinton
 cd tldr-swinton
-pip install -e ".[full]"  # Includes Ollama client + tiktoken
+uv sync --extra full    # Includes Ollama client + tiktoken
+# OR
+pip install -e ".[full]"
 ```
 
 ## Quick Start
