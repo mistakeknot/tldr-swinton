@@ -2,6 +2,8 @@ import argparse
 import json
 
 from tldr_bench.runners.openhands_runner import run_task
+from tldr_bench.results import default_results_path
+from tldr_bench.logger import JsonlLogger
 from tldr_bench.tasks import load_tasks, resolve_task_file
 
 
@@ -39,6 +41,9 @@ def main() -> int:
                 print(task.get("id", "<missing-id>"))
             return 0
         if args.variant:
+            logger = None
+            if args.print_results:
+                logger = JsonlLogger(default_results_path())
             for task in tasks:
                 task_id = task.get("id", "")
                 if not matches(task_id):
@@ -51,6 +56,8 @@ def main() -> int:
                 result = run_task(task, args.variant)
                 if args.print_results:
                     print(json.dumps(result))
+                    if logger:
+                        logger.log_with_timestamp(result)
     return 0
 
 
