@@ -11,6 +11,13 @@ python scripts/run_bench.py --help
 python scripts/run_bench.py --tasks curated --list-tasks
 ```
 
+Common flags:
+
+- `--filter cur-001,cur-002` (substring match on task IDs)
+- `--print-results` (emit JSON per task)
+- `--allow-cli` (execute `bench_command` tasks)
+- `--dry-run` (print tasks without executing)
+
 ## CLI Shim (Codex/Claude Code)
 
 See `tldr-bench/shim/README.md` for running the local OpenAI-compatible shim.
