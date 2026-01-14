@@ -19,6 +19,8 @@ Common flags:
 - `--dry-run` (print tasks without executing)
 - `--agent codex-cli` (tag JSONL output)
 - `--model codex:default` (tag JSONL output)
+- `--model-alias sonnet` (tag JSONL output)
+- `--resolved-model claude-sonnet-4-20250514` (tag JSONL output)
 - `--config-id shim-local` (tag JSONL output)
 - `--results-file /path/to/file.jsonl` (write JSONL to specific path)
 - `--results-prefix run-` (write JSONL with timestamped prefix)

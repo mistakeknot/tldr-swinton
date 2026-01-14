@@ -20,6 +20,8 @@ def main() -> int:
     parser.add_argument("--print-results", action="store_true")
     parser.add_argument("--agent", default=None)
     parser.add_argument("--model", default=None)
+    parser.add_argument("--model-alias", default=None)
+    parser.add_argument("--resolved-model", default=None)
     parser.add_argument("--config-id", default=None)
     parser.add_argument("--results-file", default=None)
     parser.add_argument("--results-prefix", default=None)
@@ -73,6 +75,10 @@ def main() -> int:
                     result["agent"] = args.agent
                 if args.model:
                     result["model"] = args.model
+                if args.model_alias:
+                    result["model_alias"] = args.model_alias
+                if args.resolved_model:
+                    result["resolved_model"] = args.resolved_model
                 if args.config_id:
                     result["config_id"] = args.config_id
                 if args.print_results:
