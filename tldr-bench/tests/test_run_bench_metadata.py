@@ -49,7 +49,7 @@ def test_metadata_fields_logged(tmp_path):
             "--prompt-budget",
             "4000",
             "--context-strategy",
-            "difflens",
+            "custom",
             "--daemon-enabled",
         ],
         text=True,
@@ -66,6 +66,6 @@ def test_metadata_fields_logged(tmp_path):
     assert "swebench" in content
     assert "SWE-bench_Verified" in content
     assert "django__django-11333" in content
-    assert "difflens" in content
+    assert "custom" in content
     assert "\"host_os\"" in content
     assert "\"host_arch\"" in content

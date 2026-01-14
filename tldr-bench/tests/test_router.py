@@ -13,7 +13,7 @@ def test_router_selects_static_runner(monkeypatch):
     monkeypatch.setattr(router, "run_static", fake_run_static)
 
     task = {"id": "static-1", "runner": "static"}
-    result = router.run_task(task, variant="difflens", run_config={"tokenizer_model": "gpt-4o"})
+    result = router.run_task(task, variant="baselines", run_config={"tokenizer_model": "gpt-4o"})
 
     assert result["task_id"] == "static-1"
     assert result["status"] == "completed"

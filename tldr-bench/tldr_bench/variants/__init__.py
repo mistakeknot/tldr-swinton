@@ -5,11 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from . import baselines, cassette, coveragelens, difflens, symbolkite
+from . import baselines, cassette, coveragelens, symbolkite
 
 VARIANTS = {
     "baselines": baselines,
-    "difflens": difflens,
     "symbolkite": symbolkite,
     "cassette": cassette,
     "coveragelens": coveragelens,

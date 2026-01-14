@@ -47,7 +47,7 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.help_variants:
-        print("baselines, difflens, symbolkite, cassette, coveragelens")
+        print("baselines, symbolkite, cassette, coveragelens")
         return 0
     if args.tasks:
         task_file = resolve_task_file(args.tasks)
