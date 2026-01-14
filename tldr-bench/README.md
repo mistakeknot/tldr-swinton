@@ -22,6 +22,7 @@ Common flags:
 - `--config-id shim-local` (tag JSONL output)
 - `--results-file /path/to/file.jsonl` (write JSONL to specific path)
 - `--results-prefix run-` (write JSONL with timestamped prefix)
+- `--results-dir /path/to/dir` (override results directory)
 
 ## CLI Shim (Codex/Claude Code)
 

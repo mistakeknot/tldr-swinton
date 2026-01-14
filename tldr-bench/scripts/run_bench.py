@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 from pathlib import Path
 
 from tldr_bench.runners.openhands_runner import run_task
@@ -22,6 +23,7 @@ def main() -> int:
     parser.add_argument("--config-id", default=None)
     parser.add_argument("--results-file", default=None)
     parser.add_argument("--results-prefix", default=None)
+    parser.add_argument("--results-dir", default=None)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.help_variants:
@@ -52,6 +54,8 @@ def main() -> int:
                 if args.results_file:
                     path = Path(args.results_file)
                 else:
+                    if args.results_dir:
+                        os.environ["TLDR_BENCH_RESULTS_DIR"] = args.results_dir
                     prefix = args.results_prefix if args.results_prefix else "run-"
                     path = default_results_path(prefix=prefix)
                 logger = JsonlLogger(path)
