@@ -15,6 +15,7 @@ Usage:
 """
 
 from collections import defaultdict
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -1230,7 +1231,12 @@ def get_relevant_context(
                 path_depth = rel_path.count("/") if rel_path else 0
                 return (-basename_match, -exact_match, path_depth, rel_path)
 
-            return [sorted(matches, key=score_match)[0]]
+            chosen = sorted(matches, key=score_match)[0]
+            warnings.warn(
+                f"Ambiguous entry point '{name}' matched {len(matches)} symbols; using {chosen}",
+                stacklevel=2,
+            )
+            return [chosen]
 
         return [name]
 
