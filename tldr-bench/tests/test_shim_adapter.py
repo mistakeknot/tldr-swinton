@@ -17,5 +17,5 @@ def test_assemble_prompt_basic():
 
 def test_resolve_model_command():
     model_map = {"codex": "codex", "claude": "claude"}
-    assert resolve_model_command("codex:default", model_map) == "codex"
-    assert resolve_model_command("claude:sonnet", model_map) == "claude"
+    assert resolve_model_command("codex:default", model_map) == ["codex"]
+    assert resolve_model_command("claude:sonnet", model_map) == ["claude"]

@@ -11,8 +11,8 @@ def test_context_symbol_id_disambiguation(tmp_path: Path) -> None:
     ctx = get_relevant_context(tmp_path, "foo", depth=0)
     names = {f.name for f in ctx.functions}
 
+    assert len(ctx.functions) == 1
     assert "pkg/a.py:foo" in names
-    assert "pkg/b.py:foo" in names
 
 
 def test_context_relative_project_resolves(tmp_path: Path, monkeypatch) -> None:
