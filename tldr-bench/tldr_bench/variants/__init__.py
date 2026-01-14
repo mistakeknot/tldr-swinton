@@ -5,6 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from . import baselines, cassette, coveragelens, difflens, symbolkite
+
+VARIANTS = {
+    "baselines": baselines,
+    "difflens": difflens,
+    "symbolkite": symbolkite,
+    "cassette": cassette,
+    "coveragelens": coveragelens,
+}
+
 
 def resolve_project_root(task: dict[str, Any]) -> Path:
     """Resolve project root for a task."""
@@ -22,3 +32,9 @@ def resolve_project_root(task: dict[str, Any]) -> Path:
         return (root / str(repo)).resolve()
 
     return root
+
+
+def get_variant(name: str):
+    if name in VARIANTS:
+        return VARIANTS[name]
+    raise ValueError(f"Unknown variant: {name}")

@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 
-from tldr_bench.runners.openhands_runner import run_task
+from tldr_bench.runners.router import run_task as run_task_router
 from tldr_bench.results import default_results_path
 from tldr_bench.logger import JsonlLogger
 from tldr_bench.meta import system_metadata
@@ -95,7 +95,10 @@ def main() -> int:
                 if args.dry_run:
                     print(task_id)
                     continue
-                result = run_task(task, args.variant)
+                run_config = {
+                    "tokenizer_model": args.resolved_model or args.model,
+                }
+                result = run_task_router(task, args.variant, run_config)
                 result.update(host_metadata)
                 if args.agent:
                     result["agent"] = args.agent
