@@ -49,6 +49,18 @@ Track task suites:
 - `track_frontier` (CLI frontier, local Codex/Claude)
 - `track_executable` (OpenHands / executable harness)
 
+Token savings snapshot (single example):
+
+- Entry: `tldr_swinton/api.py:get_relevant_context` (depth=2)
+- Baseline 1: default `text` format vs `ultracompact` difflens
+  - 2,234 → 1,359 tokens (39.17% savings)
+- Baseline 2: full file `src/tldr_swinton/api.py` vs `ultracompact` difflens
+  - 11,826 → 1,359 tokens (88.51% savings)
+
+Notes:
+- This is a single point measurement, not a benchmark average.
+- Baselines are defined in `tldr-bench/results/manual-baseline.jsonl`.
+
 ## CLI Shim (Codex/Claude Code)
 
 See `tldr-bench/shim/README.md` for running the local OpenAI-compatible shim.
