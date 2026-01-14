@@ -16,6 +16,8 @@ def main() -> int:
     parser.add_argument("--filter", default=None)
     parser.add_argument("--allow-cli", action="store_true")
     parser.add_argument("--print-results", action="store_true")
+    parser.add_argument("--agent", default=None)
+    parser.add_argument("--model", default=None)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.help_variants:
@@ -54,6 +56,10 @@ def main() -> int:
                     print(task_id)
                     continue
                 result = run_task(task, args.variant)
+                if args.agent:
+                    result["agent"] = args.agent
+                if args.model:
+                    result["model"] = args.model
                 if args.print_results:
                     print(json.dumps(result))
                     if logger:

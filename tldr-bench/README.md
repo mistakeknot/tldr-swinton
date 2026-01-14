@@ -17,6 +17,8 @@ Common flags:
 - `--print-results` (emit JSON per task)
 - `--allow-cli` (execute `bench_command` tasks)
 - `--dry-run` (print tasks without executing)
+- `--agent codex-cli` (tag JSONL output)
+- `--model codex:default` (tag JSONL output)
 
 ## CLI Shim (Codex/Claude Code)
 
