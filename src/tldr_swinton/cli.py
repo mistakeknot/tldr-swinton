@@ -32,6 +32,40 @@ def _get_subprocess_detach_kwargs():
         return {'start_new_session': True}
 
 
+def _vhs_available() -> bool:
+    import shutil
+    return shutil.which("tldrs-vhs") is not None
+
+
+def _vhs_put(text: str) -> str:
+    import subprocess
+    if not _vhs_available():
+        raise RuntimeError("tldrs-vhs not found in PATH")
+    result = subprocess.run(
+        ["tldrs-vhs", "put", "-"],
+        input=text,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "tldrs-vhs put failed")
+    return result.stdout.strip().splitlines()[-1]
+
+
+def _vhs_get(ref: str) -> str:
+    import subprocess
+    if not _vhs_available():
+        raise RuntimeError("tldrs-vhs not found in PATH")
+    result = subprocess.run(
+        ["tldrs-vhs", "get", ref],
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"tldrs-vhs get failed for {ref}")
+    return result.stdout
+
+
 # Extension to language mapping for auto-detection
 EXTENSION_TO_LANGUAGE = {
     '.java': 'java',
@@ -229,6 +263,18 @@ Semantic Search:
         "--with-docs",
         action="store_true",
         help="Include docstrings in output",
+    )
+    ctx_p.add_argument(
+        "--output",
+        choices=["stdout", "vhs"],
+        default="stdout",
+        help="Output target (stdout or vhs ref)",
+    )
+    ctx_p.add_argument(
+        "--include",
+        action="append",
+        default=[],
+        help="Append vhs:// refs to output (may repeat)",
     )
     ctx_p.add_argument(
         "--lang",
@@ -648,7 +694,24 @@ Semantic Search:
                 language=args.lang,
                 include_docstrings=args.with_docs,
             )
-            print(format_context(ctx, fmt=args.format, budget_tokens=args.budget))
+            output = format_context(ctx, fmt=args.format, budget_tokens=args.budget)
+            if args.include:
+                for ref in args.include:
+                    try:
+                        included = _vhs_get(ref)
+                    except Exception as exc:
+                        print(f"Error: {exc}", file=sys.stderr)
+                        sys.exit(1)
+                    output += f"\n\n# Included {ref}\n{included.rstrip()}\n"
+            if args.output == "vhs":
+                try:
+                    ref = _vhs_put(output)
+                except Exception as exc:
+                    print(f"Error: {exc}", file=sys.stderr)
+                    sys.exit(1)
+                print(ref)
+            else:
+                print(output)
 
         elif args.command == "cfg":
             lang = args.lang or detect_language_from_extension(args.file)

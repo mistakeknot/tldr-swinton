@@ -98,6 +98,22 @@ tldrs index /path/to/project
 tldrs find "authentication logic"
 ```
 
+### Optional: Store Outputs in tldrs-vhs
+
+If you have the separate `tldrs-vhs` CLI installed, you can store large
+context outputs as `vhs://` references instead of printing inline:
+
+```bash
+# Install tldrs-vhs (separate repo)
+pip install -e /path/to/tldrs-vhs
+
+# Store context output in vhs store
+tldrs context main --project . --output vhs
+
+# Append a stored ref into output
+tldrs context main --project . --include vhs://<hash>
+```
+
 **Requirements:**
 - Python 3.10+
 - For semantic search embeddings, one of:
