@@ -18,6 +18,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+import re
 
 from .ast_extractor import (
     CallGraphInfo,  # Re-exported for API consumers
@@ -428,6 +429,116 @@ class RelevantContext:
         result = "\n".join(lines)
         token_estimate = len(result) // 4
         return result + f"\n---\n📊 {len(self.functions)} functions | ~{token_estimate} tokens"
+
+
+def parse_unified_diff(diff_text: str) -> list[tuple[str, int, int]]:
+    """Parse unified diff output into (file_path, start_line, end_line) tuples."""
+    hunks: list[tuple[str, int, int]] = []
+    current_file: str | None = None
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git "):
+            parts = line.split()
+            if len(parts) >= 4:
+                path = parts[3]
+                if path.startswith("a/") or path.startswith("b/"):
+                    path = path[2:]
+                current_file = path
+            continue
+        if line.startswith("+++ "):
+            path = line[4:].strip()
+            if path == "/dev/null":
+                current_file = None
+                continue
+            if path.startswith("a/") or path.startswith("b/"):
+                path = path[2:]
+            current_file = path
+            continue
+
+        if line.startswith("@@ ") and current_file:
+            match = re.search(r"\+(\d+)(?:,(\d+))?", line)
+            if not match:
+                continue
+            start = int(match.group(1))
+            count = int(match.group(2) or "1")
+            if count <= 0:
+                end = max(start, 1)
+            else:
+                end = max(start, 1) + count - 1
+            hunks.append((current_file, max(start, 1), end))
+    return hunks
+
+
+def map_hunks_to_symbols(
+    project: str | Path,
+    hunks: list[tuple[str, int, int]],
+    language: str = "python",
+) -> dict[str, set[int]]:
+    """Map diff hunks to enclosing symbols. Returns {symbol_id: {diff_lines}}."""
+    project = Path(project).resolve()
+    extractor = HybridExtractor()
+    results: dict[str, set[int]] = defaultdict(set)
+    hunks_by_file: dict[str, list[tuple[int, int]]] = defaultdict(list)
+    for path, start, end in hunks:
+        hunks_by_file[path].append((start, end))
+
+    for rel_path, ranges in hunks_by_file.items():
+        file_path = project / rel_path
+        if not file_path.exists():
+            continue
+
+        try:
+            source = file_path.read_text()
+        except OSError:
+            continue
+
+        total_lines = max(1, len(source.splitlines()))
+        try:
+            info = extractor.extract(str(file_path))
+        except Exception:
+            continue
+
+        symbol_ranges: list[tuple[str, int, int]] = []
+        top_level: list[tuple[str, int, object]] = []
+        for func in info.functions:
+            top_level.append(("func", func.line_number, func))
+        for cls in info.classes:
+            top_level.append(("class", cls.line_number, cls))
+        top_level.sort(key=lambda item: item[1])
+
+        for idx, (kind, start_line, obj) in enumerate(top_level):
+            end_line = total_lines
+            if idx + 1 < len(top_level):
+                end_line = max(start_line, top_level[idx + 1][1] - 1)
+
+            if kind == "func":
+                symbol_id = f"{rel_path}:{obj.name}"
+                symbol_ranges.append((symbol_id, start_line, end_line))
+                continue
+
+            class_symbol = f"{rel_path}:{obj.name}"
+            symbol_ranges.append((class_symbol, start_line, end_line))
+
+            methods = sorted(obj.methods, key=lambda m: m.line_number)
+            for midx, method in enumerate(methods):
+                mend = end_line
+                if midx + 1 < len(methods):
+                    mend = max(method.line_number, methods[midx + 1].line_number - 1)
+                method_symbol = f"{rel_path}:{obj.name}.{method.name}"
+                symbol_ranges.append((method_symbol, method.line_number, mend))
+
+        for start, end in ranges:
+            best_symbol: str | None = None
+            best_span: int | None = None
+            for symbol_id, s_start, s_end in symbol_ranges:
+                if s_start <= end and s_end >= start:
+                    span = s_end - s_start
+                    if best_span is None or span < best_span:
+                        best_span = span
+                        best_symbol = symbol_id
+            if best_symbol:
+                results[best_symbol].update(range(start, end + 1))
+
+    return results
 
 
 def _get_module_exports(
