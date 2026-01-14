@@ -140,6 +140,7 @@ tldrs context main --project . --include vhs://<hash>
 # Notes:
 # - diff-context defaults to merge-base(main/master) → HEAD
 # - vhs output prints ref + summary/preview (30 lines / 2 KB)
+# - suppress ambiguous entry warnings with TLDRS_NO_WARNINGS=1
 # - Optional overrides:
 #   - TLDRS_VHS_CMD="python -m tldrs_vhs.cli"
 #   - TLDRS_VHS_PYTHONPATH=/path/to/tldrs-vhs/src
@@ -164,6 +165,12 @@ tldrs diff-context --project . --format json
 # Budgeted output (approx tokens)
 tldrs diff-context --project . --budget 2000
 ```
+
+**DiffLens JSON schema notes (2026-01-14):**
+- `--format json` is compact (no indentation); use `--format json-pretty` for debugging.
+- `signatures_only` was removed; infer signature-only slices from `code == null`.
+- `diff_lines` is range-encoded (e.g., `[[1,3],[5,6]]`).
+- `code` is windowed around diffs with `...` separators.
 
 **Requirements:**
 - Python 3.10+

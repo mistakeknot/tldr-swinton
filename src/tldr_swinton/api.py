@@ -15,6 +15,7 @@ Usage:
 """
 
 from collections import defaultdict
+import os
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -761,6 +762,14 @@ def build_diff_context_from_hunks(
         for callee_symbol in callee_symbols:
             reverse_adjacency[callee_symbol].extend(caller_symbols)
 
+    def _dedupe_sorted(values: list[str]) -> list[str]:
+        return sorted(set(values))
+
+    for key, values in list(adjacency.items()):
+        adjacency[key] = _dedupe_sorted(values)
+    for key, values in list(reverse_adjacency.items()):
+        reverse_adjacency[key] = _dedupe_sorted(values)
+
     ordered: list[str] = []
     relevance: dict[str, str] = {}
     for symbol_id in symbol_diff_lines.keys():
@@ -1232,13 +1241,20 @@ def get_relevant_context(
                 return (-basename_match, -exact_match, path_depth, rel_path)
 
             chosen = sorted(matches, key=score_match)[0]
-            warnings.warn(
-                f"Ambiguous entry point '{name}' matched {len(matches)} symbols; using {chosen}",
-                stacklevel=2,
-            )
+            if not os.environ.get("TLDRS_NO_WARNINGS"):
+                warnings.warn(
+                    f"Ambiguous entry point '{name}' matched {len(matches)} symbols; using {chosen}",
+                    stacklevel=2,
+                )
             return [chosen]
 
         return [name]
+
+    def _dedupe_sorted(values: list[str]) -> list[str]:
+        return sorted(set(values))
+
+    for key, values in list(adjacency.items()):
+        adjacency[key] = _dedupe_sorted(values)
 
     visited: set[str] = set()
     queue = [(symbol_id, 0) for symbol_id in resolve_entry_symbols(entry_point)]
