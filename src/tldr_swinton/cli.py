@@ -120,6 +120,7 @@ Examples:
 
 Ignore Patterns:
     tldrs respects .tldrsignore files (gitignore syntax).
+    Legacy .tldrignore is also supported (auto-migrated on first run).
     First run creates .tldrsignore with sensible defaults.
     Use --no-ignore to bypass ignore patterns.
 

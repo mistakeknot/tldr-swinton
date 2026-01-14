@@ -8,6 +8,8 @@ Supports multiple embedding backends:
 Use Ollama for local development, sentence-transformers for production quality.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import sys
@@ -15,7 +17,21 @@ from pathlib import Path
 from typing import Optional, Literal
 from dataclasses import dataclass
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError as exc:  # pragma: no cover - exercised via runtime envs
+    np = None  # type: ignore[assignment]
+    _NUMPY_IMPORT_ERROR = exc
+
+
+def _require_numpy():
+    if np is None:
+        raise RuntimeError(
+            "NumPy is required for semantic indexing. "
+            "Install with: pip install 'tldr-swinton[semantic-ollama]' "
+            "or 'tldr-swinton[semantic]'."
+        ) from _NUMPY_IMPORT_ERROR
+    return np
 
 # Backend types
 BackendType = Literal["ollama", "sentence-transformers", "auto"]
@@ -44,9 +60,10 @@ def _l2_normalize(v: np.ndarray) -> np.ndarray:
     inner product equals cosine similarity. This must be applied
     to ALL embeddings regardless of backend.
     """
-    v = v.astype(np.float32, copy=False)
-    norm = np.linalg.norm(v)
-    if not np.isfinite(norm) or norm == 0.0:
+    np_local = _require_numpy()
+    v = v.astype(np_local.float32, copy=False)
+    norm = np_local.linalg.norm(v)
+    if not np_local.isfinite(norm) or norm == 0.0:
         return v
     return v / norm
 
@@ -91,6 +108,7 @@ class OllamaEmbedder:
 
     def embed(self, text: str) -> np.ndarray:
         """Generate embedding for text using Ollama API."""
+        np_local = _require_numpy()
         import urllib.request
         import urllib.error
 
@@ -107,7 +125,7 @@ class OllamaEmbedder:
         with urllib.request.urlopen(req, timeout=30) as response:
             data = json.loads(response.read().decode())
             embedding = data["embedding"]
-            return np.array(embedding, dtype=np.float32)
+            return np_local.array(embedding, dtype=np_local.float32)
 
     def embed_batch(self, texts: list[str]) -> list[np.ndarray]:
         """Embed multiple texts (Ollama doesn't batch, so sequential)."""
@@ -138,15 +156,17 @@ class SentenceTransformerEmbedder:
 
     def embed(self, text: str) -> np.ndarray:
         """Generate embedding for text."""
+        np_local = _require_numpy()
         model = self._get_model()
         embedding = model.encode(text, normalize_embeddings=True)
-        return np.array(embedding, dtype=np.float32)
+        return np_local.array(embedding, dtype=np_local.float32)
 
     def embed_batch(self, texts: list[str]) -> list[np.ndarray]:
         """Embed multiple texts efficiently."""
+        np_local = _require_numpy()
         model = self._get_model()
         embeddings = model.encode(texts, normalize_embeddings=True)
-        return [np.array(e, dtype=np.float32) for e in embeddings]
+        return [np_local.array(e, dtype=np_local.float32) for e in embeddings]
 
 
 def get_embedder(backend: BackendType = "auto", model: Optional[str] = None):
@@ -175,7 +195,8 @@ def get_embedder(backend: BackendType = "auto", model: Optional[str] = None):
 
         raise RuntimeError(
             "No embedding backend available. Install sentence-transformers "
-            "(pip install sentence-transformers) or run Ollama with nomic-embed-text model."
+            "(pip install 'tldr-swinton[semantic]') or run Ollama with "
+            f"{model or OLLAMA_EMBED_MODEL}."
         )
 
     elif backend == "ollama":
@@ -191,7 +212,7 @@ def get_embedder(backend: BackendType = "auto", model: Optional[str] = None):
         embedder = SentenceTransformerEmbedder(model=model or "BAAI/bge-large-en-v1.5")
         if not embedder.is_available():
             raise RuntimeError(
-                "sentence-transformers not installed. Run: pip install sentence-transformers"
+                "sentence-transformers not installed. Run: pip install 'tldr-swinton[semantic]'"
             )
         return embedder
 

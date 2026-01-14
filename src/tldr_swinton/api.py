@@ -539,7 +539,7 @@ def get_relevant_context(
     Returns:
         RelevantContext with functions reachable from entry_point
     """
-    project = Path(project)
+    project = Path(project).resolve()
 
     # Module query mode: path with / and no . (e.g., "providers/anthropic")
     if "/" in entry_point and "." not in entry_point:

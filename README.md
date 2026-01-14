@@ -72,9 +72,17 @@ git clone https://github.com/mistakeknot/tldr-swinton
 cd tldr-swinton
 
 # 2. Install with uv (recommended) or pip
-uv sync --extra semantic    # Fast, reproducible
+# Ollama-only (no torch):
+uv sync --extra semantic-ollama    # Fast, light-weight
+# OR
+pip install -e ".[semantic-ollama]"
+#
+# If you need sentence-transformers fallback (no Ollama):
+uv sync --extra semantic
 # OR
 pip install -e ".[semantic]"
+
+# Note: `tldrs index`/`tldrs find` require one of the semantic extras above.
 
 # 3. (Recommended) Set up Ollama for fast local embeddings
 #    Install from https://ollama.ai, then:
@@ -174,7 +182,9 @@ tldrs find "user authentication flow"
 
 **Installation for semantic search:**
 ```bash
-pip install tldr-swinton[semantic]  # Adds FAISS + sentence-transformers
+pip install tldr-swinton[semantic-ollama]  # FAISS + NumPy only (for Ollama)
+# OR, if you need sentence-transformers fallback:
+pip install tldr-swinton[semantic]  # Adds FAISS + sentence-transformers (+ torch)
 
 # (Recommended) Also install Ollama for faster embeddings:
 # See https://ollama.ai for installation, then:

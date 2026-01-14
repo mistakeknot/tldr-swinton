@@ -102,7 +102,7 @@ Thumbs.db
 
 
 def load_ignore_patterns(project_dir: str | Path) -> "PathSpec":
-    """Load ignore patterns from .tldrsignore file.
+    """Load ignore patterns from .tldrsignore (or legacy .tldrignore).
 
     Args:
         project_dir: Root directory of the project
@@ -113,12 +113,16 @@ def load_ignore_patterns(project_dir: str | Path) -> "PathSpec":
     import pathspec
 
     project_path = Path(project_dir)
-    tldrignore_path = project_path / ".tldrsignore"
+    tldrsignore_path = project_path / ".tldrsignore"
+    legacy_path = project_path / ".tldrignore"
 
     patterns: list[str] = []
 
-    if tldrignore_path.exists():
-        content = tldrignore_path.read_text()
+    if tldrsignore_path.exists():
+        content = tldrsignore_path.read_text()
+        patterns = content.splitlines()
+    elif legacy_path.exists():
+        content = legacy_path.read_text()
         patterns = content.splitlines()
     else:
         # Use defaults if no .tldrsignore exists
@@ -137,13 +141,22 @@ def ensure_tldrsignore(project_dir: str | Path) -> tuple[bool, str]:
         Tuple of (created: bool, message: str)
     """
     project_path = Path(project_dir)
-    tldrignore_path = project_path / ".tldrsignore"
+    tldrsignore_path = project_path / ".tldrsignore"
+    legacy_path = project_path / ".tldrignore"
 
-    if tldrignore_path.exists():
-        return False, f".tldrsignore already exists at {tldrignore_path}"
+    if tldrsignore_path.exists():
+        return False, f".tldrsignore already exists at {tldrsignore_path}"
+
+    if legacy_path.exists():
+        # Migrate legacy .tldrignore to .tldrsignore
+        tldrsignore_path.write_text(legacy_path.read_text())
+        return True, (
+            f"Migrated {legacy_path.name} to {tldrsignore_path.name} at {tldrsignore_path}. "
+            "You can remove the legacy file once verified."
+        )
 
     # Create with default template
-    tldrignore_path.write_text(DEFAULT_TEMPLATE)
+    tldrsignore_path.write_text(DEFAULT_TEMPLATE)
 
     return True, f"""Created .tldrsignore with sensible defaults:
   - node_modules/, .venv/, __pycache__/

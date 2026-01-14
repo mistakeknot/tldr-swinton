@@ -1551,6 +1551,8 @@ all = [
 ]
 full = [
     { name = "faiss-cpu" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "ollama" },
     { name = "rich" },
     { name = "sentence-transformers" },
@@ -1559,9 +1561,17 @@ full = [
 ]
 semantic = [
     { name = "faiss-cpu" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "rich" },
     { name = "sentence-transformers" },
     { name = "torch" },
+]
+semantic-ollama = [
+    { name = "faiss-cpu" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "rich" },
 ]
 test = [
     { name = "pytest" },
@@ -1571,6 +1581,10 @@ test = [
 requires-dist = [
     { name = "faiss-cpu", marker = "extra == 'full'", specifier = ">=1.7" },
     { name = "faiss-cpu", marker = "extra == 'semantic'", specifier = ">=1.7" },
+    { name = "faiss-cpu", marker = "extra == 'semantic-ollama'", specifier = ">=1.7" },
+    { name = "numpy", marker = "extra == 'full'", specifier = ">=1.26" },
+    { name = "numpy", marker = "extra == 'semantic'", specifier = ">=1.26" },
+    { name = "numpy", marker = "extra == 'semantic-ollama'", specifier = ">=1.26" },
     { name = "ollama", marker = "extra == 'full'", specifier = ">=0.1" },
     { name = "pathspec", specifier = ">=0.11.0" },
     { name = "pygments", specifier = ">=2.0" },
@@ -1578,6 +1592,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0" },
     { name = "rich", marker = "extra == 'full'", specifier = ">=13.0" },
     { name = "rich", marker = "extra == 'semantic'", specifier = ">=13.0" },
+    { name = "rich", marker = "extra == 'semantic-ollama'", specifier = ">=13.0" },
     { name = "sentence-transformers", marker = "extra == 'full'", specifier = ">=2.0" },
     { name = "sentence-transformers", marker = "extra == 'semantic'", specifier = ">=2.0" },
     { name = "tiktoken", marker = "extra == 'full'", specifier = ">=0.5" },
@@ -1600,7 +1615,7 @@ requires-dist = [
     { name = "tree-sitter-swift", marker = "extra == 'all'", specifier = ">=0.0.1" },
     { name = "tree-sitter-typescript", specifier = ">=0.21.0" },
 ]
-provides-extras = ["test", "semantic", "full", "all"]
+provides-extras = ["test", "semantic-ollama", "semantic", "full", "all"]
 
 [[package]]
 name = "tokenizers"

@@ -17,3 +17,17 @@ def test_workspace_iter_respects_tldrsignore(tmp_path: Path) -> None:
 
     assert "src/a.py" in rels
     assert "build/ignore.py" not in rels
+
+
+def test_workspace_iter_respects_legacy_tldrignore(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.py").write_text("def a():\n    return 1\n")
+    (tmp_path / "vendor").mkdir()
+    (tmp_path / "vendor" / "ignore.py").write_text("def b():\n    return 2\n")
+    (tmp_path / ".tldrignore").write_text("vendor/\n")
+
+    files = list(iter_workspace_files(tmp_path, extensions={".py"}))
+    rels = {str(p.relative_to(tmp_path)) for p in files}
+
+    assert "src/a.py" in rels
+    assert "vendor/ignore.py" not in rels

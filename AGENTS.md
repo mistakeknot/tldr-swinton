@@ -15,7 +15,8 @@ tldr-swinton is a token-efficient code analysis tool for LLMs. It's a fork of ll
 ```bash
 # Install (development)
 pip install -e .
-pip install -e ".[semantic]"  # With semantic search (FAISS + sentence-transformers)
+pip install -e ".[semantic-ollama]"  # Ollama-only semantic search (FAISS + NumPy)
+pip install -e ".[semantic]"  # With sentence-transformers fallback (includes torch)
 pip install -e ".[full]"      # Full stack (includes Ollama + tiktoken)
 
 # Test commands

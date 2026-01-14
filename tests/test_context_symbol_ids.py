@@ -13,3 +13,16 @@ def test_context_symbol_id_disambiguation(tmp_path: Path) -> None:
 
     assert "pkg/a.py:foo" in names
     assert "pkg/b.py:foo" in names
+
+
+def test_context_relative_project_resolves(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "a.py").write_text("def foo():\n    return 1\n")
+
+    monkeypatch.chdir(tmp_path)
+    ctx = get_relevant_context(".", "pkg/a.py:foo", depth=0)
+
+    assert len(ctx.functions) == 1
+    func = ctx.functions[0]
+    assert func.file.endswith("pkg/a.py")
+    assert func.line == 1

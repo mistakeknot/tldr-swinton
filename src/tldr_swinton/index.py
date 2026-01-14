@@ -46,6 +46,25 @@ class IndexStats:
     embed_backend: str = ""
 
 
+def _require_semantic_deps() -> None:
+    try:
+        import numpy  # noqa: F401
+    except ImportError as exc:
+        raise RuntimeError(
+            "Semantic indexing requires NumPy. "
+            "Install with: pip install 'tldr-swinton[semantic-ollama]' "
+            "or 'tldr-swinton[semantic]'."
+        ) from exc
+    try:
+        import faiss  # noqa: F401
+    except ImportError as exc:
+        raise RuntimeError(
+            "Semantic indexing requires FAISS. "
+            "Install with: pip install 'tldr-swinton[semantic-ollama]' "
+            "or 'tldr-swinton[semantic]'."
+        ) from exc
+
+
 def _extract_code_units(
     project_path: str,
     language: Optional[str] = None,
@@ -391,6 +410,7 @@ def build_index(
     Returns:
         IndexStats with indexing statistics
     """
+    _require_semantic_deps()
     stats = IndexStats()
     project = Path(project_path).resolve()
 
@@ -528,6 +548,7 @@ def search_index(
     Returns:
         List of result dicts with unit info and score
     """
+    _require_semantic_deps()
     project = Path(project_path).resolve()
     store = VectorStore(str(project))
 

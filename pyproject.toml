@@ -43,8 +43,15 @@ dependencies = [
 [project.optional-dependencies]
 # Test/development helpers
 test = ["pytest>=8.0"]
+# Semantic search (Ollama + FAISS only, no torch)
+semantic-ollama = [
+    "numpy>=1.26",
+    "faiss-cpu>=1.7",
+    "rich>=13.0",  # Progress bars
+]
 # Semantic search with embeddings
 semantic = [
+    "numpy>=1.26",
     "sentence-transformers>=2.0",
     "torch>=2.0",
     "faiss-cpu>=1.7",
@@ -52,6 +59,7 @@ semantic = [
 ]
 # Full stack with Ollama integration
 full = [
+    "numpy>=1.26",
     "sentence-transformers>=2.0",
     "torch>=2.0",
     "faiss-cpu>=1.7",

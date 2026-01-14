@@ -4,6 +4,8 @@ Vector store abstraction for semantic search.
 Supports FAISS for efficient similarity search with persistence.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import hashlib
@@ -11,7 +13,33 @@ from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional, Any
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError as exc:  # pragma: no cover - exercised via runtime envs
+    np = None  # type: ignore[assignment]
+    _NUMPY_IMPORT_ERROR = exc
+
+
+def _require_numpy():
+    if np is None:
+        raise RuntimeError(
+            "NumPy is required for semantic indexing. "
+            "Install with: pip install 'tldr-swinton[semantic-ollama]' "
+            "or 'tldr-swinton[semantic]'."
+        ) from _NUMPY_IMPORT_ERROR
+    return np
+
+
+def _require_faiss():
+    try:
+        import faiss
+    except ImportError as exc:  # pragma: no cover - exercised via runtime envs
+        raise RuntimeError(
+            "FAISS is required for semantic indexing. "
+            "Install with: pip install 'tldr-swinton[semantic-ollama]' "
+            "or 'tldr-swinton[semantic]'."
+        ) from exc
+    return faiss
 
 
 @dataclass
@@ -121,7 +149,7 @@ class VectorStore:
             return False
 
         try:
-            import faiss
+            faiss = _require_faiss()
 
             # Load FAISS index
             self._index = faiss.read_index(str(self.index_path))
@@ -146,7 +174,7 @@ class VectorStore:
 
     def save(self) -> None:
         """Save index to disk."""
-        import faiss
+        faiss = _require_faiss()
 
         self.index_dir.mkdir(parents=True, exist_ok=True)
 
@@ -191,7 +219,8 @@ class VectorStore:
             embed_model: Model used for embeddings
             embed_backend: Backend used (ollama/sentence-transformers)
         """
-        import faiss
+        faiss = _require_faiss()
+        np_local = _require_numpy()
 
         if len(units) != len(embeddings):
             raise ValueError(f"Units ({len(units)}) and embeddings ({len(embeddings)}) count mismatch")
@@ -204,7 +233,7 @@ class VectorStore:
             return
 
         # Stack embeddings
-        matrix = np.vstack(embeddings).astype(np.float32)
+        matrix = np_local.vstack(embeddings).astype(np_local.float32)
         dimension = matrix.shape[1]
 
         # Build FAISS index (inner product for normalized vectors = cosine similarity)
@@ -238,8 +267,10 @@ class VectorStore:
         if self._index is None or not self._units:
             return []
 
+        np_local = _require_numpy()
+
         # Ensure correct shape
-        query = query_vector.reshape(1, -1).astype(np.float32)
+        query = query_vector.reshape(1, -1).astype(np_local.float32)
 
         # Search
         k = min(k, len(self._units))
@@ -288,8 +319,10 @@ class VectorStore:
         Returns:
             (n, d) float32 matrix of all vectors, or empty array if no index
         """
+        np_local = _require_numpy()
+
         if self._index is None or not self._units:
-            return np.zeros((0, 0), dtype=np.float32)
+            return np_local.zeros((0, 0), dtype=np_local.float32)
 
         try:
             # reconstruct_n is efficient for flat indexes
@@ -299,7 +332,7 @@ class VectorStore:
             vectors = []
             for i in range(len(self._units)):
                 vectors.append(self._index.reconstruct(i))
-            return np.vstack(vectors).astype(np.float32)
+            return np_local.vstack(vectors).astype(np_local.float32)
 
     def get_vector(self, idx: int) -> Optional[np.ndarray]:
         """Reconstruct a single vector by index.
@@ -313,7 +346,8 @@ class VectorStore:
         if self._index is None or idx < 0 or idx >= len(self._units):
             return None
         try:
-            return self._index.reconstruct(idx).astype(np.float32)
+            np_local = _require_numpy()
+            return self._index.reconstruct(idx).astype(np_local.float32)
         except Exception:
             return None
 
