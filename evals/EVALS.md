@@ -1,5 +1,13 @@
 # Embedding Model Evaluation
 
+## Other Evals
+
+- `token_efficiency_eval.py` — baseline token savings checks
+- `semantic_search_eval.py` — semantic search quality
+- `agent_workflow_eval.py` — agent workflow evaluation
+- `vhs_eval.py` — vhs ref savings + round-trip checks
+- `difflens_eval.py` — DiffLens diff-first context pack evaluation
+
 Benchmark results comparing embedding models for code semantic search on a real-world TypeScript/Rust codebase (~12,000 code units).
 
 ## Models Tested
