@@ -374,7 +374,7 @@ Semantic Search:
     diff_p.add_argument("--budget", type=int, default=None, help="Approx token budget for output")
     diff_p.add_argument(
         "--format",
-        choices=["ultracompact", "json"],
+        choices=["ultracompact", "json", "json-pretty"],
         default="ultracompact",
         help="Output format (default: ultracompact)",
     )

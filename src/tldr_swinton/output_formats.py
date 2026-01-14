@@ -50,7 +50,9 @@ def format_context(
 def format_context_pack(pack: dict, fmt: str = "ultracompact") -> str:
     """Format a DiffLens-style ContextPack."""
     if fmt == "json":
-        return json.dumps(pack, indent=2)
+        return json.dumps(pack, separators=(",", ":"), ensure_ascii=False)
+    if fmt == "json-pretty":
+        return json.dumps(pack, indent=2, ensure_ascii=False)
     if fmt == "ultracompact":
         return "\n".join(_format_context_pack_ultracompact(pack))
     raise ValueError(f"Unknown format: {fmt}")
