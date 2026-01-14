@@ -12,6 +12,12 @@ def resolve_task_file(name_or_path: str) -> Path:
         return Path(__file__).with_name("curated.yaml")
     if name_or_path == "public":
         return Path(__file__).with_name("public_subset.yaml")
+    if name_or_path == "track_context":
+        return Path(__file__).with_name("track_context.yaml")
+    if name_or_path == "track_frontier":
+        return Path(__file__).with_name("track_frontier.yaml")
+    if name_or_path == "track_executable":
+        return Path(__file__).with_name("track_executable.yaml")
     raise FileNotFoundError(f"Unknown task file: {name_or_path}")
 
 

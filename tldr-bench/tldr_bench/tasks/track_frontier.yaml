@@ -1,0 +1,5 @@
+- id: frontier-001
+  title: "Frontier: codex CLI"
+  repo: "local"
+  runner: "cli"
+  bench_command: ["codex", "--prompt", "Summarize the change request."]

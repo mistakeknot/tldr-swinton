@@ -1,0 +1,7 @@
+- id: ctx-001
+  title: "Context-only: difflens"
+  repo: "tldr-swinton"
+  entry: "tldr_swinton/api.py:get_relevant_context"
+  runner: "static"
+  variant: "difflens"
+  budget: 2000

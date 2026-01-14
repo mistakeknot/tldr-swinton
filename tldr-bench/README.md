@@ -34,6 +34,7 @@ Common flags:
 - `--timeout-seconds 120` (tag JSONL output)
 - `--tldrs-version 0.2.0` (tag JSONL output)
 - `--shim-config shim.toml` (tag JSONL output)
+- `--shim-log-path /path/to/shim.jsonl` (use last JSONL line for CLI usage)
 - `--seed 42` (tag JSONL output)
 - `--prompt-budget 4000` (tag JSONL output)
 - `--context-strategy difflens` (tag JSONL output)
@@ -41,6 +42,12 @@ Common flags:
 - `--results-file /path/to/file.jsonl` (write JSONL to specific path)
 - `--results-prefix run-` (write JSONL with timestamped prefix)
 - `--results-dir /path/to/dir` (override results directory)
+
+Track task suites:
+
+- `track_context` (static/context-only)
+- `track_frontier` (CLI frontier, local Codex/Claude)
+- `track_executable` (OpenHands / executable harness)
 
 ## CLI Shim (Codex/Claude Code)
 
