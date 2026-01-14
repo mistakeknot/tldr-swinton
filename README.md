@@ -117,6 +117,34 @@ tldrs context main --project . --output vhs
 tldrs context main --project . --include vhs://<hash>
 ```
 
+### Agent Snippets (AGENTS.md / CLAUDE.md)
+
+Copy/paste this into a project’s `AGENTS.md` or `CLAUDE.md` to enable
+DiffLens and VHS usage for coding agents:
+
+```md
+## DiffLens + VHS (Agent Context)
+
+# Install tldrs-vhs (https://github.com/mistakeknot/tldrs-vhs)
+curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldrs-vhs/main/scripts/install.sh | bash
+
+# Diff-first context for current changes
+tldrs diff-context --project . --budget 2000
+
+# Store large context outputs as refs
+tldrs context main --project . --output vhs
+
+# Expand a stored ref inline when needed
+tldrs context main --project . --include vhs://<hash>
+
+# Notes:
+# - diff-context defaults to merge-base(main/master) → HEAD
+# - vhs output prints ref + summary/preview (30 lines / 2 KB)
+# - Optional overrides:
+#   - TLDRS_VHS_CMD="python -m tldrs_vhs.cli"
+#   - TLDRS_VHS_PYTHONPATH=/path/to/tldrs-vhs/src
+```
+
 ### DiffLens (Diff-First Context for Agents)
 
 Use DiffLens to generate a compact, diff-focused context pack for the current
