@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Iterable
+import shlex
+from typing import Iterable, Sequence
 
 
 def assemble_prompt(messages: Iterable[dict]) -> str:
@@ -12,8 +13,11 @@ def assemble_prompt(messages: Iterable[dict]) -> str:
     return "\n".join(parts)
 
 
-def resolve_model_command(model: str, model_map: dict[str, str]) -> str:
+def resolve_model_command(model: str, model_map: dict[str, str | Sequence[str]]) -> list[str]:
     prefix = model.split(":", 1)[0]
     if prefix in model_map:
-        return model_map[prefix]
+        value = model_map[prefix]
+        if isinstance(value, (list, tuple)):
+            return list(value)
+        return shlex.split(str(value))
     raise ValueError(f"Unknown model prefix: {prefix}")

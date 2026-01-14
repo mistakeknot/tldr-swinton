@@ -3,5 +3,5 @@ timeout_seconds = 120
 log_path = "/tmp/tldr-shim.jsonl"
 
 [model_map]
-codex = "codex"
-claude = "claude"
+codex = "codex exec"
+claude = "claude -p"

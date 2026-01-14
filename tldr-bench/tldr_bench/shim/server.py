@@ -19,7 +19,7 @@ def load_config(path: Path | None) -> dict[str, Any]:
         return {
             "port": 8089,
             "timeout_seconds": 120,
-            "model_map": {"codex": "codex", "claude": "claude"},
+            "model_map": {"codex": "codex exec", "claude": "claude -p"},
             "log_path": None,
         }
     data = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -32,9 +32,9 @@ def load_config(path: Path | None) -> dict[str, Any]:
     }
 
 
-def run_cli(prompt: str, command: str, timeout_seconds: int) -> str:
+def run_cli(prompt: str, command: list[str], timeout_seconds: int) -> str:
     result = subprocess.run(
-        [command, prompt],
+        [*command, prompt],
         input=prompt,
         text=True,
         capture_output=True,
