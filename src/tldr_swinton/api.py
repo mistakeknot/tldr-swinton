@@ -1152,7 +1152,19 @@ def get_relevant_context(
 
         matches = name_index.get(name, [])
         if matches:
-            return matches
+            if len(matches) == 1:
+                return matches
+
+            def score_match(symbol_id: str) -> tuple[int, int, int, str]:
+                rel_path, sym = symbol_id.rsplit(":", 1) if ":" in symbol_id else ("", symbol_id)
+                basename = Path(rel_path).stem if rel_path else ""
+                sym_tail = sym.split(".")[-1]
+                basename_match = 1 if basename.lower() == sym_tail.lower() else 0
+                exact_match = 1 if sym == name else 0
+                path_depth = rel_path.count("/") if rel_path else 0
+                return (-basename_match, -exact_match, path_depth, rel_path)
+
+            return [sorted(matches, key=score_match)[0]]
 
         return [name]
 

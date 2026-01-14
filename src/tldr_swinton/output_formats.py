@@ -5,6 +5,19 @@ from __future__ import annotations
 import json
 from typing import Iterable
 
+MAX_CALLS = 12
+
+
+def _dedupe_preserve(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        deduped.append(item)
+    return deduped
+
 from .api import RelevantContext
 
 
@@ -143,6 +156,11 @@ def _format_symbol(name: str, file_path: str, path_ids: dict[str, str]) -> str:
     return f"{pid}:{sym}"
 
 
+def _format_symbol_inline(name: str, file_path: str) -> str:
+    file_part, sym = _split_symbol(name, file_path)
+    return f"{file_part}:{sym}"
+
+
 def _format_ultracompact(ctx: RelevantContext) -> list[str]:
     path_ids: dict[str, str] = {}
     lines: list[str] = []
@@ -150,7 +168,8 @@ def _format_ultracompact(ctx: RelevantContext) -> list[str]:
     for func in ctx.functions:
         _format_symbol(func.name, func.file, path_ids)
 
-        for callee in func.calls:
+        calls_list = _dedupe_preserve(func.calls)
+        for callee in calls_list[:MAX_CALLS]:
             _format_symbol(callee, "", path_ids)
 
     if path_ids:
@@ -165,8 +184,12 @@ def _format_ultracompact(ctx: RelevantContext) -> list[str]:
         lines.append(f"{display} {signature} {line_info}".rstrip())
 
         if func.calls:
-            calls = ", ".join(_format_symbol(c, "", path_ids) for c in func.calls)
-            lines.append(f"  calls: {calls}")
+            calls_list = _dedupe_preserve(func.calls)
+            shown = calls_list[:MAX_CALLS]
+            more = len(calls_list) - len(shown)
+            calls = ", ".join(_format_symbol(c, "", path_ids) for c in shown)
+            suffix = f" (+{more})" if more > 0 else ""
+            lines.append(f"  calls: {calls}{suffix}")
 
         lines.append("")
 
@@ -183,15 +206,25 @@ def _format_ultracompact_budgeted(ctx: RelevantContext, budget_tokens: int) -> s
         key=lambda pair: (pair[1].depth, pair[0]),
     )
 
-    def render_func(func, include_calls: bool) -> list[str]:
+    def render_func(func, include_calls: bool, use_inline: bool = False) -> list[str]:
         func_lines: list[str] = []
-        display = _format_symbol(func.name, func.file, path_ids)
+        if use_inline:
+            display = _format_symbol_inline(func.name, func.file)
+        else:
+            display = _format_symbol(func.name, func.file, path_ids)
         signature = func.signature
         line_info = f"@{func.line}" if func.line else ""
         func_lines.append(f"{display} {signature} {line_info}".rstrip())
         if include_calls and func.calls:
-            calls = ", ".join(_format_symbol(c, "", path_ids) for c in func.calls)
-            func_lines.append(f"  calls: {calls}")
+            calls_list = _dedupe_preserve(func.calls)
+            shown = calls_list[:MAX_CALLS]
+            more = len(calls_list) - len(shown)
+            if use_inline:
+                calls = ", ".join(_format_symbol_inline(c, "") for c in shown)
+            else:
+                calls = ", ".join(_format_symbol(c, "", path_ids) for c in shown)
+            suffix = f" (+{more})" if more > 0 else ""
+            func_lines.append(f"  calls: {calls}{suffix}")
         func_lines.append("")
         return func_lines
 
@@ -221,9 +254,31 @@ def _format_ultracompact_budgeted(ctx: RelevantContext, budget_tokens: int) -> s
         collected_cost = _estimate_tokens(collected)
         if header_cost + collected_cost <= budget_tokens:
             lines.extend(header_lines)
-        elif collected_cost > budget_tokens:
+            lines.extend(collected)
+            return "\n".join(lines)
+        if collected_cost > budget_tokens:
             lines.extend(_apply_budget(collected, budget_tokens))
             return "\n".join(lines)
+
+        # Header doesn't fit; re-render inline without path dictionary
+        used = 0
+        for _, func in funcs:
+            full = render_func(func, include_calls=True, use_inline=True)
+            sig = render_func(func, include_calls=False, use_inline=True)
+
+            full_cost = _estimate_tokens(full)
+            sig_cost = _estimate_tokens(sig)
+
+            if used + full_cost <= budget_tokens:
+                lines.extend(full)
+                used += full_cost
+            elif used + sig_cost <= budget_tokens:
+                lines.extend(sig)
+                used += sig_cost
+            else:
+                lines.append("... (budget reached)")
+                break
+        return "\n".join(lines)
 
     lines.extend(collected)
     return "\n".join(lines)
