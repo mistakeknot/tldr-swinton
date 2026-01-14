@@ -117,6 +117,26 @@ tldrs context main --project . --output vhs
 tldrs context main --project . --include vhs://<hash>
 ```
 
+### DiffLens (Diff-First Context for Agents)
+
+Use DiffLens to generate a compact, diff-focused context pack for the current
+working tree (or a specific commit range). This is ideal for coding agents
+because it prioritizes changed symbols and their immediate dependencies.
+
+```bash
+# Default: merge-base with main/master → HEAD (ultracompact output)
+tldrs diff-context --project .
+
+# Explicit range
+tldrs diff-context --project . --base HEAD~1 --head HEAD
+
+# JSON output for tooling
+tldrs diff-context --project . --format json
+
+# Budgeted output (approx tokens)
+tldrs diff-context --project . --budget 2000
+```
+
 **Requirements:**
 - Python 3.10+
 - For semantic search embeddings, one of:
