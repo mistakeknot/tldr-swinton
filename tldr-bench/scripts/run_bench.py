@@ -21,6 +21,7 @@ def main() -> int:
     parser.add_argument("--model", default=None)
     parser.add_argument("--config-id", default=None)
     parser.add_argument("--results-file", default=None)
+    parser.add_argument("--results-prefix", default=None)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.help_variants:
@@ -48,7 +49,11 @@ def main() -> int:
         if args.variant:
             logger = None
             if args.print_results:
-                path = Path(args.results_file) if args.results_file else default_results_path()
+                if args.results_file:
+                    path = Path(args.results_file)
+                else:
+                    prefix = args.results_prefix if args.results_prefix else "run-"
+                    path = default_results_path(prefix=prefix)
                 logger = JsonlLogger(path)
             for task in tasks:
                 task_id = task.get("id", "")

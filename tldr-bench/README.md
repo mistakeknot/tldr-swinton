@@ -21,6 +21,7 @@ Common flags:
 - `--model codex:default` (tag JSONL output)
 - `--config-id shim-local` (tag JSONL output)
 - `--results-file /path/to/file.jsonl` (write JSONL to specific path)
+- `--results-prefix run-` (write JSONL with timestamped prefix)
 
 ## CLI Shim (Codex/Claude Code)
 
