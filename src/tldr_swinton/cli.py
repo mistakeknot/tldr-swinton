@@ -89,6 +89,35 @@ def _vhs_get(ref: str) -> str:
     return result.stdout
 
 
+def _make_vhs_summary(ctx) -> str:
+    files = {func.file for func in ctx.functions if func.file}
+    return (
+        f"Entry {ctx.entry_point} depth={ctx.depth} "
+        f"functions={len(ctx.functions)} files={len(files)}"
+    )
+
+
+def _make_vhs_preview(text: str, max_lines: int = 30, max_bytes: int = 2048) -> str:
+    lines: list[str] = []
+    used = 0
+    for line in text.splitlines():
+        if len(lines) >= max_lines:
+            break
+        line_bytes = len((line + "\n").encode("utf-8"))
+        if used + line_bytes > max_bytes:
+            break
+        lines.append(line)
+        used += line_bytes
+    return "\n".join(lines)
+
+
+def _render_vhs_output(ref: str, summary: str, preview: str) -> str:
+    lines = [ref, f"# Summary: {summary}", "# Preview:"]
+    if preview:
+        lines.append(preview)
+    return "\n".join(lines)
+
+
 # Extension to language mapping for auto-detection
 EXTENSION_TO_LANGUAGE = {
     '.java': 'java',
@@ -732,7 +761,9 @@ Semantic Search:
                 except Exception as exc:
                     print(f"Error: {exc}", file=sys.stderr)
                     sys.exit(1)
-                print(ref)
+                summary = _make_vhs_summary(ctx)
+                preview = _make_vhs_preview(output)
+                print(_render_vhs_output(ref, summary, preview))
             else:
                 print(output)
 

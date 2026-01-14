@@ -110,6 +110,9 @@ curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldrs-vhs/main/scripts/
 # Store context output in vhs store
 tldrs context main --project . --output vhs
 
+# Output includes the ref on the first line plus a short summary + preview
+# (max 30 lines / 2 KB, full lines only)
+
 # Append a stored ref into output
 tldrs context main --project . --include vhs://<hash>
 ```
