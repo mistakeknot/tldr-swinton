@@ -20,6 +20,7 @@ Common flags:
 - `--agent codex-cli` (tag JSONL output)
 - `--model codex:default` (tag JSONL output)
 - `--config-id shim-local` (tag JSONL output)
+- `--results-file /path/to/file.jsonl` (write JSONL to specific path)
 
 ## CLI Shim (Codex/Claude Code)
 

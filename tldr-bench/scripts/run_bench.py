@@ -1,5 +1,6 @@
 import argparse
 import json
+from pathlib import Path
 
 from tldr_bench.runners.openhands_runner import run_task
 from tldr_bench.results import default_results_path
@@ -19,6 +20,7 @@ def main() -> int:
     parser.add_argument("--agent", default=None)
     parser.add_argument("--model", default=None)
     parser.add_argument("--config-id", default=None)
+    parser.add_argument("--results-file", default=None)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.help_variants:
@@ -46,7 +48,8 @@ def main() -> int:
         if args.variant:
             logger = None
             if args.print_results:
-                logger = JsonlLogger(default_results_path())
+                path = Path(args.results_file) if args.results_file else default_results_path()
+                logger = JsonlLogger(path)
             for task in tasks:
                 task_id = task.get("id", "")
                 if not matches(task_id):
