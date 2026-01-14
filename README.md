@@ -105,7 +105,7 @@ context outputs as `vhs://` references instead of printing inline:
 
 ```bash
 # Install tldrs-vhs (separate repo)
-pip install -e /path/to/tldrs-vhs
+curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldrs-vhs/main/scripts/install.sh | bash
 
 # Store context output in vhs store
 tldrs context main --project . --output vhs
