@@ -18,6 +18,7 @@ def main() -> int:
     parser.add_argument("--print-results", action="store_true")
     parser.add_argument("--agent", default=None)
     parser.add_argument("--model", default=None)
+    parser.add_argument("--config-id", default=None)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.help_variants:
@@ -60,6 +61,8 @@ def main() -> int:
                     result["agent"] = args.agent
                 if args.model:
                     result["model"] = args.model
+                if args.config_id:
+                    result["config_id"] = args.config_id
                 if args.print_results:
                     print(json.dumps(result))
                     if logger:

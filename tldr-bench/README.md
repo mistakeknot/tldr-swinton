@@ -19,6 +19,7 @@ Common flags:
 - `--dry-run` (print tasks without executing)
 - `--agent codex-cli` (tag JSONL output)
 - `--model codex:default` (tag JSONL output)
+- `--config-id shim-local` (tag JSONL output)
 
 ## CLI Shim (Codex/Claude Code)
 
