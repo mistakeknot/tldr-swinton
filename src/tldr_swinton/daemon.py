@@ -717,9 +717,9 @@ class TLDRDaemon:
             logger.info("Created new content-hash index")
 
         # Index all Python files in project
-        for py_file in self.project.rglob("*.py"):
-            if ".venv" in str(py_file) or "__pycache__" in str(py_file):
-                continue
+        from .workspace import iter_workspace_files
+
+        for py_file in iter_workspace_files(self.project, extensions={".py"}):
             try:
                 self.dedup_index.get_or_create_edges(str(py_file), lang="python")
             except Exception as e:

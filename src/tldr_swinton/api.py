@@ -1844,42 +1844,21 @@ def search(
 
     import re
 
-    # Directories to skip (common junk)
-    SKIP_DIRS = {
-        "node_modules", "__pycache__", ".git", ".svn", ".hg",
-        "dist", "build", ".next", ".nuxt", "coverage", ".tox",
-        "venv", ".venv", "env", ".env", "vendor", ".cache",
-    }
-
     results = []
     root = Path(root)
     compiled = re.compile(pattern)
     files_scanned = 0
 
-    for file_path in root.rglob("*"):
+    for file_path in iter_workspace_files(root, extensions=extensions):
         # Check file limit
         if max_files > 0 and files_scanned >= max_files:
             break
 
-        if not file_path.is_file():
-            continue
-
-        # Skip hidden files and junk directories
+        files_scanned += 1
         try:
             rel_path = file_path.relative_to(root)
-            parts = rel_path.parts
-            if any(part.startswith(".") for part in parts):
-                continue
-            if any(part in SKIP_DIRS for part in parts):
-                continue
         except ValueError:
             continue
-
-        # Filter by extension
-        if extensions and file_path.suffix not in extensions:
-            continue
-
-        files_scanned += 1
 
         try:
             content = file_path.read_text(encoding="utf-8", errors="ignore")
