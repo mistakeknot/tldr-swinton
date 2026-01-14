@@ -315,9 +315,9 @@ def _format_context_pack_ultracompact(pack: dict) -> list[str]:
 
         code = item.get("code")
         if code:
-            lines.append("  code:")
-            for code_line in code.splitlines():
-                lines.append(f"  {code_line}")
+            lines.append("```")
+            lines.extend(code.splitlines())
+            lines.append("```")
 
         lines.append("")
 

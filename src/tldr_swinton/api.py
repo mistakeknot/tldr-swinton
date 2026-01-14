@@ -578,6 +578,57 @@ def _compute_symbol_ranges(info, rel_path: str, total_lines: int) -> dict[str, t
     return ranges
 
 
+DIFF_CONTEXT_LINES = 6
+
+
+def _merge_windows(diff_lines: list[int], context: int = DIFF_CONTEXT_LINES) -> list[tuple[int, int]]:
+    if not diff_lines:
+        return []
+    windows: list[tuple[int, int]] = []
+    sorted_lines = sorted(diff_lines)
+    start = sorted_lines[0] - context
+    end = sorted_lines[0] + context
+    for line in sorted_lines[1:]:
+        window_start = line - context
+        window_end = line + context
+        if window_start <= end + 1:
+            end = max(end, window_end)
+        else:
+            windows.append((start, end))
+            start = window_start
+            end = window_end
+    windows.append((start, end))
+    return windows
+
+
+def _extract_windowed_code(
+    src_lines: list[str],
+    diff_lines: list[int],
+    symbol_start: int,
+    symbol_end: int,
+    context: int = DIFF_CONTEXT_LINES,
+) -> str | None:
+    windows = _merge_windows(diff_lines, context)
+
+    clamped: list[tuple[int, int]] = []
+    for win_start, win_end in windows:
+        clamped_start = max(symbol_start, win_start)
+        clamped_end = min(symbol_end, win_end)
+        if clamped_start <= clamped_end:
+            clamped.append((clamped_start, clamped_end))
+
+    if not clamped:
+        return None
+
+    parts: list[str] = []
+    for idx, (win_start, win_end) in enumerate(clamped):
+        if idx > 0:
+            parts.append("...")
+        parts.extend(src_lines[win_start - 1:win_end])
+
+    return "\n".join(parts)
+
+
 def build_diff_context_from_hunks(
     project: str | Path,
     hunks: list[tuple[str, int, int]],
@@ -767,7 +818,11 @@ def build_diff_context_from_hunks(
                 start, end = lines_range
                 start = max(1, start)
                 end = min(len(src_lines), end)
-                code = "\n".join(src_lines[start - 1:end])
+                diff_line_list = sorted(symbol_diff_lines.get(symbol_id, []))
+                if diff_line_list:
+                    code = _extract_windowed_code(src_lines, diff_line_list, start, end)
+                else:
+                    code = "\n".join(src_lines[start - 1:end])
 
         sig_cost = _estimate_tokens(signature)
         code_cost = _estimate_tokens(code) if code else 0
