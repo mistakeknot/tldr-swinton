@@ -6,6 +6,12 @@ Start the shim server:
 PYTHONPATH=tldr-bench uv run --with fastapi --with uvicorn python tldr-bench/tldr_bench/shim/server.py --config tldr-bench/shim/config.toml
 ```
 
+Optional JSONL logging (add to `config.toml`):
+
+```toml
+log_path = "/tmp/tldr-shim.jsonl"
+```
+
 Example OpenHands LLM config:
 
 ```json
