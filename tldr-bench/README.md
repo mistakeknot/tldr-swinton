@@ -61,6 +61,12 @@ Notes:
 - This is a single point measurement, not a benchmark average.
 - Baselines are defined in `tldr-bench/results/manual-baseline.jsonl`.
 
+Track B (frontier/CLI) via shim:
+
+1) Start shim with logging enabled (see `tldr-bench/shim/README.md`).
+2) Run:
+   `PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/run_bench.py --tasks track_frontier --variant baselines --allow-cli --shim-log-path /tmp/tldr-shim.jsonl --print-results`
+
 ## CLI Shim (Codex/Claude Code)
 
 See `tldr-bench/shim/README.md` for running the local OpenAI-compatible shim.

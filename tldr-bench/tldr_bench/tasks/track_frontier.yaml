@@ -1,11 +1,11 @@
 - id: frontier-001
-  title: "Frontier: codex CLI"
+  title: "Frontier: codex via shim"
   repo: "local"
   runner: "cli"
-  bench_command: ["codex", "exec", "Summarize the change request."]
+  bench_command: ["uv", "run", "python", "tldr-bench/scripts/shim_client.py", "--model", "codex:default", "--prompt", "Summarize the change request."]
 
 - id: frontier-002
-  title: "Frontier: claude CLI"
+  title: "Frontier: claude via shim"
   repo: "local"
   runner: "cli"
-  bench_command: ["claude", "-p", "Summarize the change request."]
+  bench_command: ["uv", "run", "python", "tldr-bench/scripts/shim_client.py", "--model", "claude:default", "--prompt", "Summarize the change request."]
