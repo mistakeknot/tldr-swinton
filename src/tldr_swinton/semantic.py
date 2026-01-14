@@ -15,6 +15,7 @@ and FAISS for fast vector similarity search.
 import json
 import os
 import sys
+from functools import lru_cache
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
@@ -338,7 +339,7 @@ def extract_units_from_project(project_path: str, lang: str = "python", respect_
                 line=line,
                 language=lang,
                 unit_type="function",
-                signature=signature or f"def {func_name}(...)",
+                signature=signature or _fallback_signature(func_name, lang),
                 docstring=docstring or "",
                 calls=calls_map.get(func_name, [])[:5],
                 called_by=called_by_map.get(func_name, [])[:5],
@@ -390,6 +391,9 @@ def extract_units_from_project(project_path: str, lang: str = "python", respect_
                 # CFG/DFG for methods
                 cfg_summary = _get_cfg_summary(full_path, method, lang)
                 dfg_summary = _get_dfg_summary(full_path, method, lang)
+                method_signature = _get_signature_via_extractor(full_path, method_qualified)
+                if not method_signature:
+                    method_signature = _get_signature_via_extractor(full_path, method)
 
                 unit = EmbeddingUnit(
                     name=method,
@@ -398,7 +402,7 @@ def extract_units_from_project(project_path: str, lang: str = "python", respect_
                     line=method_line,
                     language=lang,
                     unit_type="method",
-                    signature=f"def {method}(self, ...)",
+                    signature=method_signature or _fallback_signature(method, lang, is_method=True),
                     docstring="",
                     calls=calls_map.get(method, [])[:5],
                     called_by=called_by_map.get(method, [])[:5],
@@ -547,6 +551,10 @@ def _get_function_signature(file_path: Path, func_name: str, lang: str) -> Optio
         return None
 
     try:
+        signature = _get_signature_via_extractor(file_path, func_name)
+        if signature:
+            return signature
+
         content = file_path.read_text()
 
         if lang == "python":
@@ -568,11 +576,59 @@ def _get_function_signature(file_path: Path, func_name: str, lang: str) -> Optio
 
                     return f"def {func_name}({', '.join(args)}){returns}"
 
-        # For other languages, return simple signature
-        return f"function {func_name}(...)"
+        return _fallback_signature(func_name, lang)
 
     except Exception:
         return None
+
+
+def _fallback_signature(func_name: str, lang: str, is_method: bool = False) -> str:
+    if lang == "python":
+        if is_method:
+            return f"def {func_name}(self, ...)"
+        return f"def {func_name}(...)"
+    if lang in {"typescript", "tsx", "javascript"}:
+        return f"function {func_name}(...)"
+    if lang == "rust":
+        return f"fn {func_name}(...)"
+    if lang == "go":
+        return f"func {func_name}(...)"
+    return f"{func_name}(...)"
+
+
+@lru_cache(maxsize=256)
+def _extract_module_info(file_path: str):
+    try:
+        from .hybrid_extractor import HybridExtractor
+
+        extractor = HybridExtractor()
+        return extractor.extract(file_path)
+    except Exception:
+        return None
+
+
+def _get_signature_via_extractor(file_path: Path, func_name: str) -> Optional[str]:
+    info = _extract_module_info(str(file_path))
+    if info is None:
+        return None
+
+    class_name = None
+    method_name = func_name
+    if "." in func_name:
+        class_name, method_name = func_name.split(".", 1)
+
+    for func in info.functions:
+        if func.name == func_name:
+            return func.signature()
+
+    for cls in info.classes:
+        if class_name and cls.name != class_name:
+            continue
+        for method in cls.methods:
+            if method.name == method_name:
+                return method.signature()
+
+    return None
 
 
 def _get_function_docstring(file_path: Path, func_name: str, lang: str) -> Optional[str]:
