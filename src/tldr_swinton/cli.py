@@ -32,8 +32,27 @@ def _get_subprocess_detach_kwargs():
         return {'start_new_session': True}
 
 
+def _vhs_command() -> list[str]:
+    override = os.environ.get("TLDRS_VHS_CMD")
+    if override:
+        return override.split()
+    return ["tldrs-vhs"]
+
+
+def _vhs_env() -> dict:
+    env = os.environ.copy()
+    extra_path = env.get("TLDRS_VHS_PYTHONPATH")
+    if extra_path:
+        existing = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = f"{extra_path}:{existing}" if existing else extra_path
+    return env
+
+
 def _vhs_available() -> bool:
     import shutil
+    override = os.environ.get("TLDRS_VHS_CMD")
+    if override:
+        return True
     return shutil.which("tldrs-vhs") is not None
 
 
@@ -41,11 +60,13 @@ def _vhs_put(text: str) -> str:
     import subprocess
     if not _vhs_available():
         raise RuntimeError("tldrs-vhs not found in PATH")
+    env = _vhs_env()
     result = subprocess.run(
-        ["tldrs-vhs", "put", "-"],
+        _vhs_command() + ["put", "-"],
         input=text,
         text=True,
         capture_output=True,
+        env=env,
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or "tldrs-vhs put failed")
@@ -56,10 +77,12 @@ def _vhs_get(ref: str) -> str:
     import subprocess
     if not _vhs_available():
         raise RuntimeError("tldrs-vhs not found in PATH")
+    env = _vhs_env()
     result = subprocess.run(
-        ["tldrs-vhs", "get", ref],
+        _vhs_command() + ["get", ref],
         text=True,
         capture_output=True,
+        env=env,
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"tldrs-vhs get failed for {ref}")
