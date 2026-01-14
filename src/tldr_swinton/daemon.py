@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 @salsa_query
 def cached_search(db: SalsaDB, project: str, pattern: str, max_results: int) -> dict:
     """Cached search query - memoized by SalsaDB."""
-    from tldr import api
+    from . import api
     results = api.search(pattern=pattern, root=Path(project), max_results=max_results)
     return {"status": "ok", "results": results}
 
@@ -48,7 +48,7 @@ def cached_search(db: SalsaDB, project: str, pattern: str, max_results: int) -> 
 @salsa_query
 def cached_extract(db: SalsaDB, file_path: str) -> dict:
     """Cached file extraction - memoized by SalsaDB."""
-    from tldr import api
+    from . import api
     result = api.extract_file(file_path)
     return {"status": "ok", "result": result}
 
@@ -114,11 +114,28 @@ def cached_structure(db: SalsaDB, project: str, language: str, max_results: int)
 
 
 @salsa_query
-def cached_context(db: SalsaDB, project: str, entry: str, language: str, depth: int) -> dict:
+def cached_context(
+    db: SalsaDB,
+    project: str,
+    entry: str,
+    language: str,
+    depth: int,
+    fmt: str,
+    budget: int | None,
+    include_docstrings: bool,
+) -> dict:
     """Cached relevant context - memoized by SalsaDB."""
     from .api import get_relevant_context
-    result = get_relevant_context(entry, project=project, language=language, depth=depth)
-    return {"status": "ok", "result": result}
+    from .output_formats import format_context
+
+    result = get_relevant_context(
+        project,
+        entry,
+        language=language,
+        depth=depth,
+        include_docstrings=include_docstrings,
+    )
+    return {"status": "ok", "result": format_context(result, fmt=fmt, budget_tokens=budget)}
 
 
 @salsa_query
@@ -559,19 +576,19 @@ class TLDRDaemon:
         action = command.get("action", "search")
 
         try:
-            from .semantic import build_semantic_index, semantic_search
+            from .index import build_index, search_index
 
             if action == "index":
                 language = command.get("language", "python")
-                count = build_semantic_index(str(self.project), lang=language)
-                return {"status": "ok", "indexed": count}
+                stats = build_index(str(self.project), language=language)
+                return {"status": "ok", "indexed": stats.total_units}
 
             elif action == "search":
                 query = command.get("query")
                 if not query:
                     return {"status": "error", "message": "Missing required parameter: query"}
                 k = command.get("k", 10)
-                results = semantic_search(str(self.project), query, k=k)
+                results = search_index(str(self.project), query, k=k)
                 return {"status": "ok", "results": results}
 
             else:
@@ -627,6 +644,9 @@ class TLDRDaemon:
         try:
             language = command.get("language", "python")
             depth = command.get("depth", 2)
+            fmt = command.get("format", "text")
+            budget = command.get("budget")
+            include_docstrings = command.get("with_docs", False)
             return self.salsa_db.query(
                 cached_context,
                 self.salsa_db,
@@ -634,6 +654,9 @@ class TLDRDaemon:
                 entry,
                 language,
                 depth,
+                fmt,
+                budget,
+                include_docstrings,
             )
         except Exception as e:
             logger.exception("Relevant context failed")
@@ -783,7 +806,7 @@ class TLDRDaemon:
 
                 # Run semantic index command
                 cmd = [
-                    sys.executable, "-m", "tldr.cli",
+                    sys.executable, "-m", "tldr_swinton.cli",
                     "semantic", "index", str(self.project)
                 ]
                 result = subprocess.run(
@@ -1201,12 +1224,12 @@ def start_daemon(project_path: str | Path, foreground: bool = False):
         project_path: Path to the project root
         foreground: If True, run in foreground; otherwise daemonize
     """
-    from .tldrsignore import ensure_tldrignore
+    from .tldrsignore import ensure_tldrsignore
 
     project = Path(project_path).resolve()
 
     # Ensure .tldrsignore exists (create with defaults if not)
-    created, message = ensure_tldrignore(project)
+    created, message = ensure_tldrsignore(project)
     if created:
         print(f"\n\033[33m{message}\033[0m\n")  # Yellow warning
 
@@ -1228,7 +1251,7 @@ def start_daemon(project_path: str | Path, foreground: bool = False):
             startupinfo.wShowWindow = subprocess.SW_HIDE
 
             proc = subprocess.Popen(
-                [sys.executable, "-m", "tldr.daemon", str(project), "--foreground"],
+                [sys.executable, "-m", "tldr_swinton.daemon", str(project), "--foreground"],
                 startupinfo=startupinfo,
                 creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW,
             )

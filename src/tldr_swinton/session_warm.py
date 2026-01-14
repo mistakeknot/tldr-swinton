@@ -239,7 +239,7 @@ def maybe_warm_background(
         [
             sys.executable,
             "-m",
-            "tldr.cli",
+            "tldr_swinton.cli",
             "warm",
             str(project_path.resolve()),
             "--background",

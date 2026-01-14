@@ -3,7 +3,7 @@
 Install Swift support for TLDR.
 
 Usage:
-    python -m tldr.install_swift
+    python -m tldr_swinton.install_swift
 
 Swift requires a separate installation step because the upstream PyPI package
 (tree-sitter-swift) is broken. This script installs a pre-built wheel for

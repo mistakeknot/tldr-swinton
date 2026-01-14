@@ -65,7 +65,7 @@ def _extract_code_units(
         List of CodeUnit objects with rich metadata
     """
     from .api import extract_file
-    from .tldrsignore import load_ignore_patterns, should_ignore
+    from .workspace import iter_workspace_files
 
     project = Path(project_path).resolve()
     units = []
@@ -87,33 +87,13 @@ def _extract_code_units(
         for ext_set in LANG_EXTENSIONS.values():
             extensions.update(ext_set)
 
-    # Load ignore patterns
-    spec = None
-    if respect_ignore:
-        spec = load_ignore_patterns(project)
-
-    # Scan for files
-    def find_files(path: Path) -> list[Path]:
-        """Recursively find source files."""
-        files = []
-        try:
-            for item in path.iterdir():
-                if item.name.startswith("."):
-                    continue
-                if item.is_dir():
-                    files.extend(find_files(item))
-                elif item.is_file() and item.suffix in extensions:
-                    files.append(item)
-        except PermissionError:
-            pass
-        return files
-
-    source_files = find_files(project)
+    source_files = iter_workspace_files(
+        project,
+        extensions=extensions,
+        respect_ignore=respect_ignore,
+    )
 
     for full_path in source_files:
-        # Check ignore patterns
-        if spec and should_ignore(full_path, project, spec):
-            continue
 
         # Extract rich metadata using extract_file
         try:

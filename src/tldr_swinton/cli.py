@@ -93,7 +93,7 @@ def _show_first_run_tip():
 
     # Show tip
     import sys
-    print("Tip: For Swift support, run: python -m tldr.install_swift", file=sys.stderr)
+    print("Tip: For Swift support, run: python -m tldr_swinton.install_swift", file=sys.stderr)
     print("     (This message appears once)", file=sys.stderr)
     print(file=sys.stderr)
 
@@ -212,6 +212,23 @@ Semantic Search:
     ctx_p.add_argument("entry", help="Entry point (function_name or Class.method)")
     ctx_p.add_argument("--project", default=".", help="Project root directory")
     ctx_p.add_argument("--depth", type=int, default=2, help="Call depth (default: 2)")
+    ctx_p.add_argument(
+        "--format",
+        choices=["text", "ultracompact"],
+        default="text",
+        help="Output format",
+    )
+    ctx_p.add_argument(
+        "--budget",
+        type=int,
+        default=None,
+        help="Approx token budget for output (optional)",
+    )
+    ctx_p.add_argument(
+        "--with-docs",
+        action="store_true",
+        help="Include docstrings in output",
+    )
     ctx_p.add_argument(
         "--lang",
         default="python",
@@ -622,11 +639,15 @@ Semantic Search:
             print(json.dumps(result, indent=2))
 
         elif args.command == "context":
+            from .output_formats import format_context
             ctx = get_relevant_context(
-                args.project, args.entry, depth=args.depth, language=args.lang
+                args.project,
+                args.entry,
+                depth=args.depth,
+                language=args.lang,
+                include_docstrings=args.with_docs,
             )
-            # Output LLM-ready string directly
-            print(ctx.to_llm_string())
+            print(format_context(ctx, fmt=args.format, budget_tokens=args.budget))
 
         elif args.command == "cfg":
             lang = args.lang or detect_language_from_extension(args.file)
@@ -796,7 +817,7 @@ Semantic Search:
             if args.background:
                 # Spawn background process (cross-platform)
                 subprocess.Popen(
-                    [sys.executable, "-m", "tldr.cli", "warm", str(project_path), "--lang", args.lang],
+                    [sys.executable, "-m", "tldr_swinton.cli", "warm", str(project_path), "--lang", args.lang],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     **_get_subprocess_detach_kwargs(),
@@ -829,21 +850,20 @@ Semantic Search:
                 print(f"Indexed {len(files)} files, found {len(graph.edges)} edges")
 
         elif args.command == "semantic":
-            from .semantic import build_semantic_index, semantic_search
+            from .index import build_index, search_index
 
             if args.action == "index":
                 respect_ignore = not getattr(args, 'no_ignore', False)
-                count = build_semantic_index(args.path, lang=args.lang, model=args.model, respect_ignore=respect_ignore)
-                print(f"Indexed {count} code units")
+                stats = build_index(
+                    args.path,
+                    language=args.lang,
+                    embed_model=args.model,
+                    respect_ignore=respect_ignore,
+                )
+                print(f"Indexed {stats.total_units} code units")
 
             elif args.action == "search":
-                results = semantic_search(
-                    args.path,
-                    args.query,
-                    k=args.k,
-                    expand_graph=args.expand,
-                    model=args.model,
-                )
+                results = search_index(args.path, args.query, k=args.k, model=args.model)
                 print(json.dumps(results, indent=2))
 
         elif args.command == "doctor":

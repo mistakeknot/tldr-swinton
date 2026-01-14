@@ -247,10 +247,10 @@ def extract_units_from_project(project_path: str, lang: str = "python", respect_
     """Extract all functions/methods/classes from a project.
 
     Uses existing TLDR APIs:
-    - tldr.api.get_code_structure() for L1 (signatures)
-    - tldr.cross_file_calls for L2 (call graph)
+    - tldr_swinton.api.get_code_structure() for L1 (signatures)
+    - tldr_swinton.cross_file_calls for L2 (call graph)
     - CFG/DFG extractors for L3/L4 summaries
-    - tldr.api.get_imports for L5 (dependencies)
+    - tldr_swinton.api.get_imports for L5 (dependencies)
 
     Args:
         project_path: Path to project root.
@@ -634,13 +634,13 @@ def build_semantic_index(
     """
     import faiss
     import numpy as np
-    from .tldrsignore import ensure_tldrignore
+    from .tldrsignore import ensure_tldrsignore
 
     console = _get_progress_console() if show_progress else None
 
     # Ensure .tldrsignore exists (create with defaults if not)
     project = Path(project_path).resolve()
-    created, message = ensure_tldrignore(project)
+    created, message = ensure_tldrsignore(project)
     if created and console:
         console.print(f"[yellow]{message}[/yellow]")
 

@@ -43,7 +43,7 @@ def _ensure_daemon(project: str, timeout: float = 10.0) -> None:
 
     # Start daemon
     subprocess.Popen(
-        [sys.executable, "-m", "tldr.cli", "daemon", "start", "--project", project],
+        [sys.executable, "-m", "tldr_swinton.cli", "daemon", "start", "--project", project],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
@@ -166,7 +166,13 @@ def extract(file: str) -> dict:
 
 @mcp.tool()
 def context(
-    project: str, entry: str, depth: int = 2, language: str = "python"
+    project: str,
+    entry: str,
+    depth: int = 2,
+    language: str = "python",
+    format: str = "text",
+    budget: int | None = None,
+    with_docs: bool = False,
 ) -> str:
     """Get token-efficient LLM context starting from an entry point.
 
@@ -184,13 +190,21 @@ def context(
     """
     result = _send_command(
         project,
-        {"cmd": "context", "entry": entry, "depth": depth, "language": language},
+        {
+            "cmd": "context",
+            "entry": entry,
+            "depth": depth,
+            "language": language,
+            "format": format,
+            "budget": budget,
+            "with_docs": with_docs,
+        },
     )
     # Return formatted string for LLM consumption
     if result.get("status") == "ok":
         ctx = result.get("result", {})
-        if hasattr(ctx, "to_llm_string"):
-            return ctx.to_llm_string()
+        if isinstance(ctx, str):
+            return ctx
         return str(ctx)
     return str(result)
 

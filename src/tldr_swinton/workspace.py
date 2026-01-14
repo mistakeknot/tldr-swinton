@@ -10,9 +10,10 @@ Provides:
 
 import fnmatch
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Union
+from typing import Iterator, List, Union
 
 
 # Default exclude patterns for common non-source directories
@@ -206,3 +207,68 @@ def filter_paths(paths: List[str], config: WorkspaceConfig) -> List[str]:
         List of paths that should be included
     """
     return [p for p in paths if should_include_path(p, config)]
+
+
+def iter_workspace_files(
+    root: Union[str, Path],
+    extensions: set[str] | None = None,
+    respect_ignore: bool = True,
+    workspace_config: WorkspaceConfig | None = None,
+    use_workspace_config: bool = True,
+    exclude_hidden: bool = True,
+) -> Iterator[Path]:
+    """Iterate files in a workspace with .tldrsignore and workspace filtering.
+
+    Args:
+        root: Project root directory
+        extensions: Optional set of extensions to include (e.g., {".py"})
+        respect_ignore: If True, respect .tldrsignore patterns
+        workspace_config: Optional WorkspaceConfig (auto-loaded if None)
+        use_workspace_config: If False, skip workspace filtering
+        exclude_hidden: If True, skip hidden files/dirs
+
+    Yields:
+        Absolute Path objects for matching files
+    """
+    from .tldrsignore import load_ignore_patterns, should_ignore
+
+    root_path = Path(root).resolve()
+    config = workspace_config
+    if use_workspace_config and config is None:
+        config = load_workspace_config(root_path)
+    if not use_workspace_config:
+        config = None
+    ignore_spec = load_ignore_patterns(root_path) if respect_ignore else None
+
+    for dirpath, dirnames, filenames in os.walk(root_path):
+        rel_dir = os.path.relpath(dirpath, root_path)
+
+        if exclude_hidden:
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+
+        if respect_ignore and ignore_spec:
+            if rel_dir != "." and should_ignore(rel_dir + "/", root_path, ignore_spec):
+                dirnames.clear()
+                continue
+            dirnames[:] = [
+                d for d in dirnames
+                if not should_ignore(os.path.join(rel_dir, d) + "/", root_path, ignore_spec)
+            ]
+
+        for filename in filenames:
+            if exclude_hidden and filename.startswith("."):
+                continue
+            if extensions and Path(filename).suffix not in extensions:
+                continue
+
+            file_path = Path(dirpath) / filename
+            rel_path = file_path.relative_to(root_path)
+
+            if respect_ignore and ignore_spec:
+                if should_ignore(str(rel_path), root_path, ignore_spec):
+                    continue
+
+            if config and not should_include_path(str(rel_path), config):
+                continue
+
+            yield file_path

@@ -96,6 +96,9 @@ def impact_analysis(
     Returns:
         Dict with 'targets' (tree of callers) and 'total_targets' count
     """
+    if target_file is None and ":" in target_func:
+        target_file, target_func = target_func.split(":", 1)
+
     edges = call_graph.edges
     reverse = build_reverse_graph(edges)
 

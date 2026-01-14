@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, Optional
 
-from .workspace import WorkspaceConfig, load_workspace_config, filter_paths
+from .workspace import WorkspaceConfig, load_workspace_config
 
 # Tree-sitter support for TypeScript
 try:
@@ -288,18 +288,14 @@ def scan_project(
         language: "python", "typescript", "go", or "rust"
         workspace_config: Optional WorkspaceConfig for monorepo scoping.
                          If provided, filters files by activePackages and excludePatterns.
-        respect_ignore: If True, respect .tldrignore patterns (default True)
+    respect_ignore: If True, respect .tldrsignore patterns (default True)
 
     Returns:
         List of absolute paths to source files
     """
-    from .tldrignore import load_ignore_patterns, should_ignore
+    from .workspace import iter_workspace_files
 
-    root = Path(root)
-    files = []
-
-    # Load ignore patterns if respecting .tldrignore
-    ignore_spec = load_ignore_patterns(root) if respect_ignore else None
+    root = Path(root).resolve()
 
     if language == "python":
         extensions = {'.py'}
@@ -328,36 +324,16 @@ def scan_project(
     else:
         raise ValueError(f"Unsupported language: {language}")
 
-    for dirpath, dirnames, filenames in os.walk(root):
-        # Skip ignored directories (modifying dirnames in-place prunes os.walk)
-        if respect_ignore and ignore_spec:
-            rel_dir = os.path.relpath(dirpath, root)
-            # Check if current directory should be ignored
-            if rel_dir != '.' and should_ignore(rel_dir + '/', root, ignore_spec):
-                dirnames.clear()  # Don't descend into ignored directories
-                continue
-            # Filter subdirectories
-            dirnames[:] = [
-                d for d in dirnames
-                if not should_ignore(os.path.join(rel_dir, d) + '/', root, ignore_spec)
-            ]
-
-        for filename in filenames:
-            if any(filename.endswith(ext) for ext in extensions):
-                file_path = os.path.join(dirpath, filename)
-                # Check individual file against ignore patterns
-                if respect_ignore and ignore_spec:
-                    rel_path = os.path.relpath(file_path, root)
-                    if should_ignore(rel_path, root, ignore_spec):
-                        continue
-                files.append(file_path)
-
-    # Apply workspace config filtering if provided
-    if workspace_config is not None:
-        # Convert absolute paths to relative for filtering, then back to absolute
-        rel_files = [os.path.relpath(f, root) for f in files]
-        filtered_rel = filter_paths(rel_files, workspace_config)
-        files = [os.path.join(root, f) for f in filtered_rel]
+    files = [
+        str(path)
+        for path in iter_workspace_files(
+            root,
+            extensions=extensions,
+            respect_ignore=respect_ignore,
+            workspace_config=workspace_config,
+            use_workspace_config=workspace_config is not None,
+        )
+    ]
 
     return files
 
@@ -1732,7 +1708,7 @@ def build_function_index(
     Returns:
         Dict mapping (module, func_name) tuples to relative file paths
     """
-    root = Path(root)
+    root = Path(root).resolve()
     index = {}
 
     for src_file in scan_project(root, language, workspace_config):
@@ -2857,7 +2833,7 @@ def build_project_call_graph(
     Returns:
         ProjectCallGraph with edges as (src_file, src_func, dst_file, dst_func)
     """
-    root = Path(root)
+    root = Path(root).resolve()
     graph = ProjectCallGraph()
 
     # Load workspace config if enabled

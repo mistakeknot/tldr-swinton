@@ -6,6 +6,7 @@ from pathlib import Path
 from tldr_bench.runners.openhands_runner import run_task
 from tldr_bench.results import default_results_path
 from tldr_bench.logger import JsonlLogger
+from tldr_bench.meta import system_metadata
 from tldr_bench.tasks import load_tasks, resolve_task_file
 
 
@@ -24,6 +25,21 @@ def main() -> int:
     parser.add_argument("--resolved-model", default=None)
     parser.add_argument("--config-id", default=None)
     parser.add_argument("--cli-version", default=None)
+    parser.add_argument("--run-id", default=None)
+    parser.add_argument("--task-suite", default=None)
+    parser.add_argument("--benchmark", default=None)
+    parser.add_argument("--dataset", default=None)
+    parser.add_argument("--split", default=None)
+    parser.add_argument("--instance-ids", default=None)
+    parser.add_argument("--workspace", default=None)
+    parser.add_argument("--max-iterations", type=int, default=None)
+    parser.add_argument("--timeout-seconds", type=int, default=None)
+    parser.add_argument("--tldrs-version", default=None)
+    parser.add_argument("--shim-config", default=None)
+    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--prompt-budget", type=int, default=None)
+    parser.add_argument("--context-strategy", default=None)
+    parser.add_argument("--daemon-enabled", action="store_true", default=None)
     parser.add_argument("--results-file", default=None)
     parser.add_argument("--results-prefix", default=None)
     parser.add_argument("--results-dir", default=None)
@@ -62,6 +78,14 @@ def main() -> int:
                     prefix = args.results_prefix if args.results_prefix else "run-"
                     path = default_results_path(prefix=prefix)
                 logger = JsonlLogger(path)
+            host_metadata = system_metadata()
+            instance_ids = None
+            if args.instance_ids:
+                instance_ids = [
+                    token.strip()
+                    for token in args.instance_ids.split(",")
+                    if token.strip()
+                ]
             for task in tasks:
                 task_id = task.get("id", "")
                 if not matches(task_id):
@@ -72,6 +96,7 @@ def main() -> int:
                     print(task_id)
                     continue
                 result = run_task(task, args.variant)
+                result.update(host_metadata)
                 if args.agent:
                     result["agent"] = args.agent
                 if args.model:
@@ -84,6 +109,36 @@ def main() -> int:
                     result["config_id"] = args.config_id
                 if args.cli_version:
                     result["cli_version"] = args.cli_version
+                if args.run_id:
+                    result["run_id"] = args.run_id
+                if args.task_suite:
+                    result["task_suite"] = args.task_suite
+                if args.benchmark:
+                    result["benchmark"] = args.benchmark
+                if args.dataset:
+                    result["dataset"] = args.dataset
+                if args.split:
+                    result["split"] = args.split
+                if instance_ids:
+                    result["instance_ids"] = instance_ids
+                if args.workspace:
+                    result["workspace"] = args.workspace
+                if args.max_iterations is not None:
+                    result["max_iterations"] = args.max_iterations
+                if args.timeout_seconds is not None:
+                    result["timeout_seconds"] = args.timeout_seconds
+                if args.tldrs_version:
+                    result["tldrs_version"] = args.tldrs_version
+                if args.shim_config:
+                    result["shim_config"] = args.shim_config
+                if args.seed is not None:
+                    result["seed"] = args.seed
+                if args.prompt_budget is not None:
+                    result["prompt_budget"] = args.prompt_budget
+                if args.context_strategy:
+                    result["context_strategy"] = args.context_strategy
+                if args.daemon_enabled is not None:
+                    result["daemon_enabled"] = args.daemon_enabled
                 if args.print_results:
                     print(json.dumps(result))
                     if logger:

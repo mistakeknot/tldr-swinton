@@ -152,6 +152,7 @@ from .hybrid_extractor import (
     HybridExtractor,
     extract_directory,  # Re-exported for API
 )
+from .workspace import iter_workspace_files
 from .pdg_extractor import (
     PDGInfo,
     extract_c_pdg,
@@ -376,6 +377,7 @@ class FunctionContext:
     signature: str
     docstring: str | None = None
     calls: list[str] = field(default_factory=list)
+    depth: int = 0
     blocks: int | None = None  # CFG blocks count
     cyclomatic: int | None = None  # Cyclomatic complexity
 
@@ -394,9 +396,9 @@ class RelevantContext:
             ""
         ]
 
-        for i, func in enumerate(self.functions):
+        for func in self.functions:
             # Indentation based on call depth
-            indent = "  " * min(i, self.depth)
+            indent = "  " * min(func.depth, self.depth)
 
             # Function header
             short_file = Path(func.file).name if func.file else "?"
@@ -432,7 +434,7 @@ def _get_module_exports(
     project: Path,
     module_path: str,
     language: str = "python",
-    include_docstrings: bool = True
+    include_docstrings: bool = False
 ) -> "RelevantContext":
     """Get all exports from a module path.
 
@@ -478,7 +480,7 @@ def _get_module_exports(
     for func in module_info.functions:
         ctx = FunctionContext(
             name=func.name,
-            signature=f"def {func.name}({', '.join(func.params)}) -> {func.return_type or 'None'}",
+            signature=func.signature(),
             file=str(module_file),
             line=func.line_number,
             docstring=func.docstring if include_docstrings else None,
@@ -502,7 +504,7 @@ def _get_module_exports(
         for method in cls.methods:
             method_ctx = FunctionContext(
                 name=f"{cls.name}.{method.name}",
-                signature=f"def {method.name}({', '.join(method.params)}) -> {method.return_type or 'None'}",
+                signature=method.signature(),
                 file=str(module_file),
                 line=method.line_number,
                 docstring=method.docstring if include_docstrings else None,
@@ -522,7 +524,7 @@ def get_relevant_context(
     entry_point: str,
     depth: int = 2,
     language: str = "python",
-    include_docstrings: bool = True
+    include_docstrings: bool = False
 ) -> RelevantContext:
     """
     Get token-efficient context for an LLM starting from an entry point.
@@ -555,15 +557,10 @@ def get_relevant_context(
     # Search for module file matching entry_point
     if "." not in entry_point and "/" not in entry_point:
         module_file = None
-        for f in project.rglob(f"{entry_point}{ext_for_lang}"):
-            # Skip hidden dirs
-            try:
-                rel = f.relative_to(project)
-                if not any(p.startswith('.') for p in rel.parts):
-                    module_file = f
-                    break
-            except ValueError:
-                pass
+        for f in iter_workspace_files(project, extensions={ext_for_lang}):
+            if f.name == f"{entry_point}{ext_for_lang}":
+                module_file = f
+                break
 
         if module_file:
             # Found a module file - return its exports as module query
@@ -574,9 +571,15 @@ def get_relevant_context(
     # Build cross-file call graph
     call_graph = build_project_call_graph(str(project), language=language)
 
-    # Index all signatures
+    # Index all symbols
     extractor = HybridExtractor()
-    signatures: dict[str, tuple[str, FunctionInfo]] = {}  # func_name -> (file, info)
+    symbol_index: dict[str, FunctionInfo] = {}
+    symbol_files: dict[str, str] = {}
+    symbol_raw_names: dict[str, str] = {}
+    signature_overrides: dict[str, str] = {}
+    name_index: dict[str, list[str]] = defaultdict(list)
+    qualified_index: dict[str, list[str]] = defaultdict(list)
+    file_name_index: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
 
     ext_map = {
         "python": {".py"},
@@ -589,50 +592,71 @@ def get_relevant_context(
     # Also cache file sources for CFG extraction
     file_sources: dict[str, str] = {}
 
-    for file_path in project.rglob("*"):
-        # Check for hidden paths relative to project root, not absolute path
+    for file_path in iter_workspace_files(project, extensions=extensions):
         try:
-            rel_path = file_path.relative_to(project)
-            is_hidden = any(p.startswith('.') for p in rel_path.parts)
-        except ValueError:
-            is_hidden = False  # Not relative to project, allow it
-        if file_path.suffix in extensions and not is_hidden:
-            try:
-                source = file_path.read_text()
-                file_sources[str(file_path)] = source
+            source = file_path.read_text()
+            file_sources[str(file_path)] = source
 
-                info = extractor.extract(str(file_path))
-                for func in info.functions:
-                    # Primary key: module.function (e.g., "claude_spawn.spawn_agent")
-                    module_name = file_path.stem  # "claude_spawn" from "claude_spawn.py"
-                    qualified_key = f"{module_name}.{func.name}"
-                    signatures[qualified_key] = (str(file_path), func)
+            info = extractor.extract(str(file_path))
+            rel_path = str(file_path.relative_to(project))
 
-                    # Also store unqualified for backward compat (first wins)
-                    if func.name not in signatures:
-                        signatures[func.name] = (str(file_path), func)
-                for cls in info.classes:
-                    # Index class itself as callable (dataclasses, constructors)
-                    # Create a pseudo-FunctionInfo for the class
-                    class_as_func = FunctionInfo(
-                        name=cls.name,
-                        params=[],  # Could extract __init__ params if needed
-                        return_type=cls.name,
-                        docstring=cls.docstring,
-                        line_number=cls.line_number,
+            def register_symbol(
+                qualified_name: str,
+                func_info: FunctionInfo,
+                raw_name: str | None = None,
+                signature_override: str | None = None,
+                include_module_alias: bool = False,
+            ) -> str:
+                symbol_id = f"{rel_path}:{qualified_name}"
+                symbol_index[symbol_id] = func_info
+                symbol_files[symbol_id] = str(file_path)
+
+                raw = raw_name or func_info.name
+                symbol_raw_names[symbol_id] = raw
+                name_index[raw].append(symbol_id)
+                file_name_index[rel_path][raw].append(symbol_id)
+
+                qualified_index[qualified_name].append(symbol_id)
+                if include_module_alias:
+                    module_name = file_path.stem
+                    qualified_index[f"{module_name}.{raw}"].append(symbol_id)
+
+                if signature_override:
+                    signature_overrides[symbol_id] = signature_override
+
+                return symbol_id
+
+            for func in info.functions:
+                register_symbol(
+                    qualified_name=func.name,
+                    func_info=func,
+                    include_module_alias=True,
+                )
+
+            for cls in info.classes:
+                class_as_func = FunctionInfo(
+                    name=cls.name,
+                    params=[],
+                    return_type=cls.name,
+                    docstring=cls.docstring,
+                    line_number=cls.line_number,
+                    language=info.language,
+                )
+                register_symbol(
+                    qualified_name=cls.name,
+                    func_info=class_as_func,
+                    raw_name=cls.name,
+                    signature_override=f"class {cls.name}",
+                )
+
+                for method in cls.methods:
+                    register_symbol(
+                        qualified_name=f"{cls.name}.{method.name}",
+                        func_info=method,
+                        raw_name=method.name,
                     )
-                    signatures[cls.name] = (str(file_path), class_as_func)
-
-                    for method in cls.methods:
-                        # Store as ClassName.method
-                        key = f"{cls.name}.{method.name}"
-                        signatures[key] = (str(file_path), method)
-                        # Also store just method name (for call graph join)
-                        # Only if not already taken by a standalone function
-                        if method.name not in signatures:
-                            signatures[method.name] = (str(file_path), method)
-            except Exception:
-                pass  # Skip files that fail to parse
+        except Exception:
+            pass  # Skip files that fail to parse
 
     # CFG extractor based on language
     cfg_extractors = {
@@ -655,96 +679,118 @@ def get_relevant_context(
     # Build adjacency list from call graph edges
     # Edge format: (caller_file, caller_func, callee_file, callee_func)
     adjacency: dict[str, list[str]] = defaultdict(list)
+
+    def _to_rel_path(path_str: str) -> str:
+        path_obj = Path(path_str)
+        if path_obj.is_absolute():
+            try:
+                return str(path_obj.relative_to(project))
+            except ValueError:
+                return str(path_obj)
+        return str(path_obj)
+
     for edge in call_graph.edges:
         caller_file, caller_func, callee_file, callee_func = edge
-        adjacency[caller_func].append(callee_func)
+        caller_rel = _to_rel_path(caller_file)
+        callee_rel = _to_rel_path(callee_file)
+
+        caller_symbols = file_name_index.get(caller_rel, {}).get(caller_func, [])
+        if not caller_symbols:
+            caller_symbols = [f"{caller_rel}:{caller_func}"]
+
+        callee_symbols = file_name_index.get(callee_rel, {}).get(callee_func, [])
+        if not callee_symbols:
+            callee_symbols = [f"{callee_rel}:{callee_func}"]
+
+        for caller_symbol in caller_symbols:
+            adjacency[caller_symbol].extend(callee_symbols)
 
     # BFS from entry point up to depth
-    visited = set()
-    queue = [(entry_point, 0)]
-    result_functions = []
+    def resolve_entry_symbols(name: str) -> list[str]:
+        if ":" in name:
+            file_part, sym_part = name.split(":", 1)
+            symbol_id = f"{file_part}:{sym_part}"
+            if symbol_id in symbol_index:
+                return [symbol_id]
+            symbol_id = f"{_to_rel_path(file_part)}:{sym_part}"
+            if symbol_id in symbol_index:
+                return [symbol_id]
+            matches = []
+            for rel_path, names in file_name_index.items():
+                if rel_path == file_part or rel_path.endswith(file_part):
+                    matches.extend(names.get(sym_part, []))
+            if matches:
+                return matches
 
-    # Helper to resolve function name to signature (handles qualified/unqualified)
-    def resolve_func_name(name: str) -> list[tuple[str, tuple[str, FunctionInfo]]]:
-        """Resolve function name, returning all matches for ambiguous names."""
-        # If qualified (has dot), do direct lookup
         if "." in name:
-            if name in signatures:
-                return [(name, signatures[name])]
-            return []
+            matches = qualified_index.get(name, [])
+            if matches:
+                return matches
 
-        # Unqualified name - find all qualified matches
-        matches = [(k, v) for k, v in signatures.items()
-                   if k.endswith(f".{name}")]
-
+        matches = name_index.get(name, [])
         if matches:
-            # Return all matches (could be 1 or more)
             return matches
-        elif name in signatures:
-            # Fall back to direct unqualified lookup
-            return [(name, signatures[name])]
 
-        return []
+        return [name]
+
+    visited: set[str] = set()
+    queue = [(symbol_id, 0) for symbol_id in resolve_entry_symbols(entry_point)]
+    result_functions: list[FunctionContext] = []
 
     while queue:
-        func_name, current_depth = queue.pop(0)
+        symbol_id, current_depth = queue.pop(0)
 
-        if func_name in visited or current_depth > depth:
+        if symbol_id in visited or current_depth > depth:
             continue
-        visited.add(func_name)
+        visited.add(symbol_id)
 
-        # Get signature info if available (may return multiple matches)
-        resolved_list = resolve_func_name(func_name)
-        if resolved_list:
-            for resolved_name, (file_path, func_info) in resolved_list:
-                # Skip if we already processed this qualified name
-                if resolved_name in visited and resolved_name != func_name:
-                    continue
-                visited.add(resolved_name)
+        func_info = symbol_index.get(symbol_id)
+        if func_info:
+            file_path = symbol_files[symbol_id]
+            raw_name = symbol_raw_names.get(symbol_id, func_info.name)
 
-                # Try to get CFG complexity
-                blocks = None
-                cyclomatic = None
-                # Use the actual function name from func_info for CFG lookup
-                cfg_func_name = func_info.name
-                if file_path in file_sources:
-                    try:
-                        cfg = cfg_extractor_fn(file_sources[file_path], cfg_func_name)
-                        if cfg and cfg.blocks:
-                            blocks = len(cfg.blocks)
-                            cyclomatic = cfg.cyclomatic_complexity
-                    except Exception:
-                        pass  # CFG extraction failed, skip
+            blocks = None
+            cyclomatic = None
+            if file_path in file_sources:
+                try:
+                    cfg = cfg_extractor_fn(file_sources[file_path], raw_name)
+                    if cfg and cfg.blocks:
+                        blocks = len(cfg.blocks)
+                        cyclomatic = cfg.cyclomatic_complexity
+                except Exception:
+                    pass  # CFG extraction failed, skip
 
-                ctx = FunctionContext(
-                    name=resolved_name,  # Use qualified name for clarity
-                    file=file_path,
-                    line=func_info.line_number,
-                    signature=func_info.signature(),
-                    docstring=func_info.docstring if include_docstrings else None,
-                    calls=adjacency.get(func_info.name, []),  # Use unqualified for adjacency lookup
-                    blocks=blocks,
-                    cyclomatic=cyclomatic
-                )
-                result_functions.append(ctx)
+            signature = signature_overrides.get(symbol_id, func_info.signature())
 
-                # Queue callees from this function
-                for callee in adjacency.get(func_info.name, []):
-                    if callee not in visited and current_depth < depth:
-                        queue.append((callee, current_depth + 1))
-        else:
-            # Function not found in signatures, still include it
             ctx = FunctionContext(
-                name=func_name,
-                file="?",
-                line=0,
-                signature=f"def {func_name}(...)",
-                calls=adjacency.get(func_name, [])
+                name=symbol_id,
+                file=file_path,
+                line=func_info.line_number,
+                signature=signature,
+                docstring=func_info.docstring if include_docstrings else None,
+                calls=adjacency.get(symbol_id, []),
+                depth=current_depth,
+                blocks=blocks,
+                cyclomatic=cyclomatic
             )
             result_functions.append(ctx)
 
-            # Queue callees
-            for callee in adjacency.get(func_name, []):
+            for callee in adjacency.get(symbol_id, []):
+                if callee not in visited and current_depth < depth:
+                    queue.append((callee, current_depth + 1))
+        else:
+            fallback_name = symbol_id.split(":")[-1]
+            ctx = FunctionContext(
+                name=symbol_id,
+                file="?",
+                line=0,
+                signature=f"def {fallback_name}(...)",
+                calls=adjacency.get(symbol_id, []),
+                depth=current_depth,
+            )
+            result_functions.append(ctx)
+
+            for callee in adjacency.get(symbol_id, []):
                 if callee not in visited and current_depth < depth:
                     queue.append((callee, current_depth + 1))
 
@@ -1096,7 +1142,7 @@ def scan_project_files(
     Args:
         root: Project root directory path
         language: "python", "typescript", "go", or "rust"
-        respect_ignore: If True, respect .tldrignore patterns (default True)
+        respect_ignore: If True, respect .tldrsignore patterns (default True)
 
     Returns:
         List of absolute paths to source files
@@ -1584,23 +1630,9 @@ def get_code_structure(
     result = {"root": str(root), "language": language, "files": []}
 
     count = 0
-    for file_path in root.rglob("*"):
+    for file_path in iter_workspace_files(root, extensions=extensions):
         if count >= max_results:
             break
-
-        if not file_path.is_file():
-            continue
-
-        if file_path.suffix not in extensions:
-            continue
-
-        # Skip hidden files (only check relative path, not parent directories)
-        try:
-            rel_path = file_path.relative_to(root)
-            if any(part.startswith(".") for part in rel_path.parts):
-                continue
-        except ValueError:
-            continue
 
         try:
             info = _extract_file_impl(str(file_path))
@@ -1627,8 +1659,8 @@ if __name__ == "__main__":
     import sys
 
     if len(sys.argv) < 3:
-        print("Usage: python -m tldr.api <project_path> <entry_point> [depth] [language]")
-        print("Example: python -m tldr.api /path/to/project build_project_call_graph 2 python")
+        print("Usage: python -m tldr_swinton.api <project_path> <entry_point> [depth] [language]")
+        print("Example: python -m tldr_swinton.api /path/to/project build_project_call_graph 2 python")
         sys.exit(1)
 
     project_path = sys.argv[1]

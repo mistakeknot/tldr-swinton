@@ -1,4 +1,4 @@
-"""TLDR ignore file handling (.tldrignore).
+"""TLDR ignore file handling (.tldrsignore).
 
 Provides gitignore-style pattern matching for excluding files from indexing.
 Uses pathspec library for gitignore-compatible pattern matching.
@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathspec import PathSpec
 
-# Default .tldrignore template
+# Default .tldrsignore template
 DEFAULT_TEMPLATE = """\
 # TLDR ignore patterns (gitignore syntax)
 # Auto-generated - review and customize for your project
@@ -102,7 +102,7 @@ Thumbs.db
 
 
 def load_ignore_patterns(project_dir: str | Path) -> "PathSpec":
-    """Load ignore patterns from .tldrignore file.
+    """Load ignore patterns from .tldrsignore file.
 
     Args:
         project_dir: Root directory of the project
@@ -113,7 +113,7 @@ def load_ignore_patterns(project_dir: str | Path) -> "PathSpec":
     import pathspec
 
     project_path = Path(project_dir)
-    tldrignore_path = project_path / ".tldrignore"
+    tldrignore_path = project_path / ".tldrsignore"
 
     patterns: list[str] = []
 
@@ -121,14 +121,14 @@ def load_ignore_patterns(project_dir: str | Path) -> "PathSpec":
         content = tldrignore_path.read_text()
         patterns = content.splitlines()
     else:
-        # Use defaults if no .tldrignore exists
+        # Use defaults if no .tldrsignore exists
         patterns = DEFAULT_TEMPLATE.splitlines()
 
-    return pathspec.PathSpec.from_lines("gitwildmatch", patterns)
+    return pathspec.PathSpec.from_lines("gitignore", patterns)
 
 
-def ensure_tldrignore(project_dir: str | Path) -> tuple[bool, str]:
-    """Ensure .tldrignore exists, creating with defaults if needed.
+def ensure_tldrsignore(project_dir: str | Path) -> tuple[bool, str]:
+    """Ensure .tldrsignore exists, creating with defaults if needed.
 
     Args:
         project_dir: Root directory of the project
@@ -137,21 +137,21 @@ def ensure_tldrignore(project_dir: str | Path) -> tuple[bool, str]:
         Tuple of (created: bool, message: str)
     """
     project_path = Path(project_dir)
-    tldrignore_path = project_path / ".tldrignore"
+    tldrignore_path = project_path / ".tldrsignore"
 
     if tldrignore_path.exists():
-        return False, f".tldrignore already exists at {tldrignore_path}"
+        return False, f".tldrsignore already exists at {tldrignore_path}"
 
     # Create with default template
     tldrignore_path.write_text(DEFAULT_TEMPLATE)
 
-    return True, f"""Created .tldrignore with sensible defaults:
+    return True, f"""Created .tldrsignore with sensible defaults:
   - node_modules/, .venv/, __pycache__/
   - dist/, build/, *.egg-info/
   - Binary files (*.so, *.dll, *.whl)
   - Security files (.env, *.pem, *.key)
 
-Review .tldrignore before indexing large codebases.
+Review .tldrsignore before indexing large codebases.
 Edit to exclude vendor code, test fixtures, etc."""
 
 
@@ -191,7 +191,7 @@ def filter_files(
     project_dir: str | Path,
     respect_ignore: bool = True,
 ) -> list[Path]:
-    """Filter a list of files, removing those matching .tldrignore patterns.
+    """Filter a list of files, removing those matching .tldrsignore patterns.
 
     Args:
         files: List of file paths to filter
@@ -206,3 +206,8 @@ def filter_files(
 
     spec = load_ignore_patterns(project_dir)
     return [f for f in files if not should_ignore(f, project_dir, spec)]
+
+
+def ensure_tldrignore(project_dir: str | Path) -> tuple[bool, str]:
+    """Backward-compatible alias for ensure_tldrsignore()."""
+    return ensure_tldrsignore(project_dir)
