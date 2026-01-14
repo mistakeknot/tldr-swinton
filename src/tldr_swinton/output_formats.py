@@ -47,7 +47,7 @@ def _apply_budget(lines: Iterable[str], budget_tokens: int) -> list[str]:
     used = 0
     output: list[str] = []
     for line in lines:
-        est = max(1, len(line) // 4)
+        est = _estimate_tokens(line)
         if used + est > budget_tokens:
             output.append("... (budget reached)")
             break
@@ -56,8 +56,19 @@ def _apply_budget(lines: Iterable[str], budget_tokens: int) -> list[str]:
     return output
 
 
-def _estimate_tokens(lines: Iterable[str]) -> int:
-    return sum(max(1, len(line) // 4) for line in lines)
+def _estimate_tokens(text_or_lines: str | Iterable[str]) -> int:
+    if isinstance(text_or_lines, str):
+        text = text_or_lines
+    else:
+        text = "\n".join(text_or_lines)
+
+    try:
+        import tiktoken
+
+        encoding = tiktoken.get_encoding("cl100k_base")
+        return len(encoding.encode(text))
+    except Exception:
+        return max(1, len(text) // 4)
 
 
 def _render_text_function(ctx: RelevantContext, func, include_details: bool) -> list[str]:
