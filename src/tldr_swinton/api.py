@@ -182,6 +182,7 @@ __all__ = [
     "get_slice",
     # Main API
     "get_relevant_context",
+    "get_diff_context",
     "query",
     "FunctionContext",
     "RelevantContext",
@@ -190,6 +191,9 @@ __all__ = [
     "scan_project_files",
     "get_imports",
     "build_function_index",
+    "parse_unified_diff",
+    "map_hunks_to_symbols",
+    "build_diff_context_from_hunks",
     # Security exceptions
     "PathTraversalError",
 ]
@@ -539,6 +543,310 @@ def map_hunks_to_symbols(
                 results[best_symbol].update(range(start, end + 1))
 
     return results
+
+
+def _compute_symbol_ranges(info, rel_path: str, total_lines: int) -> dict[str, tuple[int, int]]:
+    ranges: dict[str, tuple[int, int]] = {}
+    top_level: list[tuple[str, int, object]] = []
+    for func in info.functions:
+        top_level.append(("func", func.line_number, func))
+    for cls in info.classes:
+        top_level.append(("class", cls.line_number, cls))
+    top_level.sort(key=lambda item: item[1])
+
+    for idx, (kind, start_line, obj) in enumerate(top_level):
+        end_line = total_lines
+        if idx + 1 < len(top_level):
+            end_line = max(start_line, top_level[idx + 1][1] - 1)
+
+        if kind == "func":
+            symbol_id = f"{rel_path}:{obj.name}"
+            ranges[symbol_id] = (start_line, end_line)
+            continue
+
+        class_symbol = f"{rel_path}:{obj.name}"
+        ranges[class_symbol] = (start_line, end_line)
+
+        methods = sorted(obj.methods, key=lambda m: m.line_number)
+        for midx, method in enumerate(methods):
+            mend = end_line
+            if midx + 1 < len(methods):
+                mend = max(method.line_number, methods[midx + 1].line_number - 1)
+            method_symbol = f"{rel_path}:{obj.name}.{method.name}"
+            ranges[method_symbol] = (method.line_number, mend)
+
+    return ranges
+
+
+def build_diff_context_from_hunks(
+    project: str | Path,
+    hunks: list[tuple[str, int, int]],
+    language: str = "python",
+    budget_tokens: int | None = None,
+) -> dict:
+    project = Path(project).resolve()
+    symbol_diff_lines = map_hunks_to_symbols(project, hunks, language=language)
+
+    extractor = HybridExtractor()
+    symbol_index: dict[str, FunctionInfo] = {}
+    symbol_files: dict[str, str] = {}
+    symbol_raw_names: dict[str, str] = {}
+    signature_overrides: dict[str, str] = {}
+    name_index: dict[str, list[str]] = defaultdict(list)
+    qualified_index: dict[str, list[str]] = defaultdict(list)
+    file_name_index: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
+    symbol_ranges: dict[str, tuple[int, int]] = {}
+    file_sources: dict[str, str] = {}
+
+    ext_map = {
+        "python": {".py"},
+        "typescript": {".ts", ".tsx"},
+        "go": {".go"},
+        "rust": {".rs"},
+    }
+    extensions = ext_map.get(language, {".py"})
+
+    for file_path in iter_workspace_files(project, extensions=extensions):
+        try:
+            source = file_path.read_text()
+            file_sources[str(file_path)] = source
+            total_lines = max(1, len(source.splitlines()))
+            info = extractor.extract(str(file_path))
+            rel_path = str(file_path.relative_to(project))
+
+            def register_symbol(
+                qualified_name: str,
+                func_info: FunctionInfo,
+                raw_name: str | None = None,
+                signature_override: str | None = None,
+                include_module_alias: bool = False,
+            ) -> str:
+                symbol_id = f"{rel_path}:{qualified_name}"
+                symbol_index[symbol_id] = func_info
+                symbol_files[symbol_id] = str(file_path)
+
+                raw = raw_name or func_info.name
+                symbol_raw_names[symbol_id] = raw
+                name_index[raw].append(symbol_id)
+                file_name_index[rel_path][raw].append(symbol_id)
+
+                qualified_index[qualified_name].append(symbol_id)
+                if include_module_alias:
+                    module_name = file_path.stem
+                    qualified_index[f"{module_name}.{raw}"].append(symbol_id)
+
+                if signature_override:
+                    signature_overrides[symbol_id] = signature_override
+
+                return symbol_id
+
+            for func in info.functions:
+                register_symbol(
+                    qualified_name=func.name,
+                    func_info=func,
+                    include_module_alias=True,
+                )
+
+            for cls in info.classes:
+                class_as_func = FunctionInfo(
+                    name=cls.name,
+                    params=[],
+                    return_type=cls.name,
+                    docstring=cls.docstring,
+                    line_number=cls.line_number,
+                    language=info.language,
+                )
+                register_symbol(
+                    qualified_name=cls.name,
+                    func_info=class_as_func,
+                    raw_name=cls.name,
+                    signature_override=f"class {cls.name}",
+                )
+
+                for method in cls.methods:
+                    register_symbol(
+                        qualified_name=f"{cls.name}.{method.name}",
+                        func_info=method,
+                        raw_name=method.name,
+                    )
+
+            symbol_ranges.update(_compute_symbol_ranges(info, rel_path, total_lines))
+        except Exception:
+            continue
+
+    call_graph = build_project_call_graph(str(project), language=language)
+    adjacency: dict[str, list[str]] = defaultdict(list)
+    reverse_adjacency: dict[str, list[str]] = defaultdict(list)
+
+    def _to_rel_path(path_str: str) -> str:
+        path_obj = Path(path_str)
+        if path_obj.is_absolute():
+            try:
+                return str(path_obj.relative_to(project))
+            except ValueError:
+                return str(path_obj)
+        return str(path_obj)
+
+    for edge in call_graph.edges:
+        caller_file, caller_func, callee_file, callee_func = edge
+        caller_rel = _to_rel_path(caller_file)
+        callee_rel = _to_rel_path(callee_file)
+
+        caller_symbols = file_name_index.get(caller_rel, {}).get(caller_func, [])
+        if not caller_symbols:
+            caller_symbols = [f"{caller_rel}:{caller_func}"]
+
+        callee_symbols = file_name_index.get(callee_rel, {}).get(callee_func, [])
+        if not callee_symbols:
+            callee_symbols = [f"{callee_rel}:{callee_func}"]
+
+        for caller_symbol in caller_symbols:
+            adjacency[caller_symbol].extend(callee_symbols)
+        for callee_symbol in callee_symbols:
+            reverse_adjacency[callee_symbol].extend(caller_symbols)
+
+    ordered: list[str] = []
+    relevance: dict[str, str] = {}
+    for symbol_id in symbol_diff_lines.keys():
+        ordered.append(symbol_id)
+        relevance[symbol_id] = "contains_diff"
+
+    for symbol_id in list(ordered):
+        for callee in adjacency.get(symbol_id, []):
+            if callee not in relevance:
+                relevance[callee] = "callee"
+                ordered.append(callee)
+        for caller in reverse_adjacency.get(symbol_id, []):
+            if caller not in relevance:
+                relevance[caller] = "caller"
+                ordered.append(caller)
+
+    def _estimate_tokens(text: str) -> int:
+        return max(1, len(text) // 4)
+
+    slices: list[dict] = []
+    signatures_only: list[str] = []
+    budget_used = 0
+
+    for symbol_id in ordered:
+        func_info = symbol_index.get(symbol_id)
+        signature = signature_overrides.get(symbol_id)
+        if not signature:
+            if func_info:
+                signature = func_info.signature()
+            else:
+                signature = f"def {symbol_id.split(':')[-1]}(...)"
+
+        lines_range = symbol_ranges.get(symbol_id)
+        if not lines_range and func_info:
+            lines_range = (func_info.line_number, func_info.line_number)
+
+        code = None
+        if symbol_id in symbol_diff_lines and lines_range:
+            file_path = symbol_files.get(symbol_id)
+            if file_path and file_path in file_sources:
+                src_lines = file_sources[file_path].splitlines()
+                start, end = lines_range
+                start = max(1, start)
+                end = min(len(src_lines), end)
+                code = "\n".join(src_lines[start - 1:end])
+
+        sig_cost = _estimate_tokens(signature)
+        code_cost = _estimate_tokens(code) if code else 0
+        total_cost = sig_cost + code_cost
+
+        if budget_tokens is not None and budget_used + total_cost > budget_tokens:
+            if code and budget_used + sig_cost <= budget_tokens:
+                code = None
+                total_cost = sig_cost
+            else:
+                break
+
+        budget_used += total_cost
+
+        slice_entry = {
+            "id": symbol_id,
+            "relevance": relevance.get(symbol_id, "adjacent"),
+            "signature": signature,
+            "code": code,
+            "lines": list(lines_range) if lines_range else [],
+            "diff_lines": sorted(symbol_diff_lines.get(symbol_id, [])),
+        }
+        slices.append(slice_entry)
+        if not code:
+            signatures_only.append(symbol_id)
+
+    return {
+        "base": None,
+        "head": None,
+        "budget_used": budget_used,
+        "slices": slices,
+        "signatures_only": signatures_only,
+    }
+
+
+def get_diff_context(
+    project: str | Path,
+    base: str | None = None,
+    head: str | None = None,
+    budget_tokens: int | None = None,
+    language: str = "python",
+) -> dict:
+    import subprocess
+
+    project = Path(project).resolve()
+    base_ref = base or "HEAD~1"
+    head_ref = head or "HEAD"
+
+    def _run_diff(args: list[str]) -> str:
+        result = subprocess.run(
+            ["git", "-C", str(project), "diff", "--unified=0"] + args,
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            return ""
+        return result.stdout
+
+    diff_text = _run_diff([f"{base_ref}..{head_ref}"])
+    diff_text += _run_diff(["--staged"])
+    diff_text += _run_diff([])
+
+    hunks = parse_unified_diff(diff_text)
+    if not hunks:
+        hunks = _fallback_recent_files(project, language=language)
+    pack = build_diff_context_from_hunks(
+        project,
+        hunks,
+        language=language,
+        budget_tokens=budget_tokens,
+    )
+    pack["base"] = base_ref
+    pack["head"] = head_ref
+    return pack
+
+
+def _fallback_recent_files(project: Path, language: str = "python", limit: int = 5) -> list[tuple[str, int, int]]:
+    ext_map = {
+        "python": {".py"},
+        "typescript": {".ts", ".tsx"},
+        "go": {".go"},
+        "rust": {".rs"},
+    }
+    extensions = ext_map.get(language, {".py"})
+    files = list(iter_workspace_files(project, extensions=extensions))
+    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+    hunks: list[tuple[str, int, int]] = []
+    for file_path in files[:limit]:
+        try:
+            source = file_path.read_text()
+        except OSError:
+            continue
+        total_lines = max(1, len(source.splitlines()))
+        rel_path = str(file_path.relative_to(project))
+        hunks.append((rel_path, 1, total_lines))
+    return hunks
 
 
 def _get_module_exports(

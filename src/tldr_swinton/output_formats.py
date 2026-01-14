@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Iterable
 
 from .api import RelevantContext
@@ -30,6 +31,15 @@ def format_context(
         return _format_text_budgeted(ctx, budget_tokens)
     if fmt == "ultracompact":
         return _format_ultracompact_budgeted(ctx, budget_tokens)
+    raise ValueError(f"Unknown format: {fmt}")
+
+
+def format_context_pack(pack: dict, fmt: str = "ultracompact") -> str:
+    """Format a DiffLens-style ContextPack."""
+    if fmt == "json":
+        return json.dumps(pack, indent=2)
+    if fmt == "ultracompact":
+        return "\n".join(_format_context_pack_ultracompact(pack))
     raise ValueError(f"Unknown format: {fmt}")
 
 
@@ -206,3 +216,48 @@ def _format_ultracompact_budgeted(ctx: RelevantContext, budget_tokens: int) -> s
 
     lines.extend(collected)
     return "\n".join(lines)
+
+
+def _format_context_pack_ultracompact(pack: dict) -> list[str]:
+    path_ids: dict[str, str] = {}
+    lines: list[str] = []
+
+    base = pack.get("base")
+    head = pack.get("head")
+    if base or head:
+        lines.append(f"## Diff Context: {base}..{head}")
+        lines.append("")
+
+    for item in pack.get("slices", []):
+        _format_symbol(item.get("id", "?"), "", path_ids)
+
+    if path_ids:
+        header = " ".join([f"{pid}={path}" for path, pid in path_ids.items()])
+        lines.append(header)
+        lines.append("")
+
+    for item in pack.get("slices", []):
+        symbol_id = item.get("id", "?")
+        display = _format_symbol(symbol_id, "", path_ids)
+        signature = item.get("signature", "")
+        lines_range = item.get("lines") or []
+        line_info = ""
+        if len(lines_range) == 2:
+            line_info = f"@{lines_range[0]}-{lines_range[1]}"
+        relevance = item.get("relevance", "")
+        lines.append(f"{display} {signature} {line_info} [{relevance}]".rstrip())
+
+        code = item.get("code")
+        if code:
+            lines.append("  code:")
+            for code_line in code.splitlines():
+                lines.append(f"  {code_line}")
+
+        lines.append("")
+
+    sig_only = pack.get("signatures_only") or []
+    if sig_only:
+        sigs = ", ".join(_format_symbol(s, "", path_ids) for s in sig_only)
+        lines.append(f"signatures_only: {sigs}")
+
+    return lines

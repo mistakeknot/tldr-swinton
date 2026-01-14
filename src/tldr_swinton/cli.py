@@ -118,6 +118,37 @@ def _render_vhs_output(ref: str, summary: str, preview: str) -> str:
     return "\n".join(lines)
 
 
+def _git_ref_exists(project: Path, ref: str) -> bool:
+    import subprocess
+    result = subprocess.run(
+        ["git", "-C", str(project), "rev-parse", "--verify", ref],
+        text=True,
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
+def _git_merge_base(project: Path, ref: str) -> str | None:
+    import subprocess
+    result = subprocess.run(
+        ["git", "-C", str(project), "merge-base", "HEAD", ref],
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def _resolve_diff_base(project: Path) -> str:
+    for ref in ("main", "master"):
+        if _git_ref_exists(project, ref):
+            merge_base = _git_merge_base(project, ref)
+            if merge_base:
+                return merge_base
+    return "HEAD~1"
+
+
 # Extension to language mapping for auto-detection
 EXTENSION_TO_LANGUAGE = {
     '.java': 'java',
@@ -329,6 +360,25 @@ Semantic Search:
         help="Append vhs:// refs to output (may repeat)",
     )
     ctx_p.add_argument(
+        "--lang",
+        default="python",
+        choices=["python", "typescript", "javascript", "go", "rust", "java", "c",
+                 "cpp", "ruby", "php", "kotlin", "swift", "csharp", "scala", "lua", "elixir"],
+        help="Language",
+    )
+
+    diff_p = subparsers.add_parser("diff-context", help="Diff-first context pack")
+    diff_p.add_argument("--project", default=".", help="Project root directory")
+    diff_p.add_argument("--base", default=None, help="Base ref (default: merge-base with main/master)")
+    diff_p.add_argument("--head", default="HEAD", help="Head ref (default: HEAD)")
+    diff_p.add_argument("--budget", type=int, default=None, help="Approx token budget for output")
+    diff_p.add_argument(
+        "--format",
+        choices=["ultracompact", "json"],
+        default="ultracompact",
+        help="Output format (default: ultracompact)",
+    )
+    diff_p.add_argument(
         "--lang",
         default="python",
         choices=["python", "typescript", "javascript", "go", "rust", "java", "c",
@@ -580,6 +630,7 @@ Semantic Search:
         get_cfg_context,
         get_code_structure,
         get_dfg_context,
+        get_diff_context,
         get_file_tree,
         get_imports,
         get_relevant_context,
@@ -766,6 +817,18 @@ Semantic Search:
                 print(_render_vhs_output(ref, summary, preview))
             else:
                 print(output)
+        elif args.command == "diff-context":
+            from .output_formats import format_context_pack
+            project = Path(args.project).resolve()
+            base = args.base or _resolve_diff_base(project)
+            pack = get_diff_context(
+                project,
+                base=base,
+                head=args.head,
+                budget_tokens=args.budget,
+                language=args.lang,
+            )
+            print(format_context_pack(pack, fmt=args.format))
 
         elif args.command == "cfg":
             lang = args.lang or detect_language_from_extension(args.file)
