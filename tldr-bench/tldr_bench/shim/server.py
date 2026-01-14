@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 import tomllib
 
 from tldr_bench.shim.adapter import assemble_prompt, resolve_model_command
+from tldr_bench.metrics import count_tokens
 
 
 def load_config(path: Path | None) -> dict[str, Any]:
@@ -71,6 +72,8 @@ def create_app(config: dict[str, Any]) -> FastAPI:
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=500, detail=str(exc))
         duration = time.time() - start
+        prompt_tokens = count_tokens(prompt, model=model)
+        completion_tokens = count_tokens(output, model=model)
         response = {
             "id": f"shim-{int(start * 1000)}",
             "object": "chat.completion",
@@ -83,7 +86,11 @@ def create_app(config: dict[str, Any]) -> FastAPI:
                     "finish_reason": "stop",
                 }
             ],
-            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
             "shim": {"elapsed_ms": int(duration * 1000)},
         }
         return JSONResponse(content=response)

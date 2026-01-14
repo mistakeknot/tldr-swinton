@@ -25,3 +25,15 @@ def test_chat_completion_basic():
     assert resp.status_code == 200
     body = resp.json()
     assert body["choices"][0]["message"]["content"] == "ok"
+
+
+def test_shim_returns_usage_fields():
+    app = create_app({"model_map": {"codex": "codex"}})
+    app.state.runner = lambda prompt, cmd, timeout: "ok"
+    client = TestClient(app)
+    payload = {"model": "codex:default", "messages": [{"role": "user", "content": "hi"}]}
+    resp = client.post("/v1/chat/completions", json=payload)
+    body = resp.json()
+    assert body["usage"]["prompt_tokens"] > 0
+    assert body["usage"]["completion_tokens"] > 0
+    assert body["shim"]["elapsed_ms"] >= 0
