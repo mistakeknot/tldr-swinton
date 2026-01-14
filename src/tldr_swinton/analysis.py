@@ -99,6 +99,15 @@ def impact_analysis(
     if target_file is None and ":" in target_func:
         target_file, target_func = target_func.split(":", 1)
 
+    normalized_target_file = None
+    if target_file is not None:
+        normalized_target_file = str(Path(target_file))
+
+    def _file_matches(path: str) -> bool:
+        if normalized_target_file is None:
+            return True
+        return path == normalized_target_file or path.endswith(normalized_target_file)
+
     edges = call_graph.edges
     reverse = build_reverse_graph(edges)
 
@@ -109,9 +118,8 @@ def impact_analysis(
     all_callees = set()
     for from_file, from_func, to_file, to_func in edges:
         callee = FunctionRef(file=to_file, name=to_func)
-        if callee.name == target_func:
-            if target_file is None or target_file in callee.file:
-                all_callees.add(callee)
+        if callee.name == target_func and _file_matches(callee.file):
+            all_callees.add(callee)
 
     targets = list(all_callees)
 

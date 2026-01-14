@@ -629,6 +629,10 @@ def build_diff_context_from_hunks(
                 symbol_raw_names[symbol_id] = raw
                 name_index[raw].append(symbol_id)
                 file_name_index[rel_path][raw].append(symbol_id)
+                if qualified_name != raw:
+                    file_name_index[rel_path][qualified_name].append(symbol_id)
+                if qualified_name != raw:
+                    file_name_index[rel_path][qualified_name].append(symbol_id)
 
                 qualified_index[qualified_name].append(symbol_id)
                 if include_module_alias:

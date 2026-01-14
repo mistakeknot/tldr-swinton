@@ -16,6 +16,7 @@ Key functions:
 
 import ast
 import os
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, Optional
@@ -2182,36 +2183,64 @@ def _extract_file_calls(file_path: Path, root: Path) -> dict[str, list[tuple[str
 
     calls_by_func = {}
 
-    # Collect all function names defined in this file (for intra-file calls)
-    defined_funcs = set()
-    defined_classes = set()
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            defined_funcs.add(node.name)
-        elif isinstance(node, ast.ClassDef):
+    # Collect definitions in this file
+    defined_funcs: set[str] = set()
+    defined_classes: set[str] = set()
+    methods_by_class: dict[str, set[str]] = defaultdict(set)
+
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
             defined_classes.add(node.name)
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    methods_by_class[node.name].add(child.name)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            defined_funcs.add(node.name)
 
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            visitor = CallVisitor(defined_funcs=defined_funcs)
-            visitor.visit(node)
+    def _record_calls(func_node: ast.AST, func_key: str, current_class: str | None):
+        scope_defined = set(defined_funcs)
+        if current_class:
+            scope_defined |= methods_by_class.get(current_class, set())
 
-            calls = []
-            for call in visitor.calls:
-                if call in defined_funcs or call in defined_classes:
-                    calls.append(('intra', call))
-                else:
-                    calls.append(('direct', call))
+        visitor = CallVisitor(defined_funcs=scope_defined)
+        visitor.visit(func_node)
 
-            for obj, method in visitor.attr_calls:
+        calls: list[tuple[str, str]] = []
+        for call in visitor.calls:
+            if current_class and call in methods_by_class.get(current_class, set()):
+                calls.append(('intra', f"{current_class}.{call}"))
+            elif call in defined_funcs or call in defined_classes:
+                calls.append(('intra', call))
+            else:
+                calls.append(('direct', call))
+
+        for obj, method in visitor.attr_calls:
+            if current_class and obj in {"self", "cls"}:
+                calls.append(('intra', f"{current_class}.{method}"))
+            elif obj in defined_classes:
+                calls.append(('intra', f"{obj}.{method}"))
+            else:
                 calls.append(('attr', f"{obj}.{method}"))
 
-            # Add function references (higher-order usage)
-            for ref in visitor.refs:
-                if ref in defined_funcs:
-                    calls.append(('ref', ref))
+        # Add function references (higher-order usage)
+        for ref in visitor.refs:
+            if current_class and ref in methods_by_class.get(current_class, set()):
+                calls.append(('ref', f"{current_class}.{ref}"))
+            elif ref in defined_funcs:
+                calls.append(('ref', ref))
 
-            calls_by_func[node.name] = calls
+        if calls:
+            calls_by_func[func_key] = calls
+
+    # Module-level functions
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            _record_calls(node, node.name, None)
+        elif isinstance(node, ast.ClassDef):
+            class_name = node.name
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    _record_calls(child, f"{class_name}.{child.name}", class_name)
 
     # Also scan module-level code for function calls and references
     # This catches: COMMANDS = {"key": func}, if __name__ == "__main__", etc.
@@ -2235,6 +2264,12 @@ def _extract_file_calls(file_path: Path, root: Path) -> dict[str, list[tuple[str
                 module_calls.append(('intra', call))
             else:
                 module_calls.append(('direct', call))  # Could be imported function
+
+        for obj, method in visitor.attr_calls:
+            if obj in defined_classes:
+                module_calls.append(('intra', f"{obj}.{method}"))
+            else:
+                module_calls.append(('attr', f"{obj}.{method}"))
 
     # Add module-level calls from a synthetic "<module>" function
     if module_calls:
