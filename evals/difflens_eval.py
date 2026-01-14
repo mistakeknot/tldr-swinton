@@ -6,6 +6,7 @@ Creates a tiny git repo with a diff and measures:
 - token savings vs full file
 - latency to build diff context
 - presence of diff-mapped symbols
+- range-encoded diff_lines and windowed code (when applicable)
 """
 
 from __future__ import annotations
@@ -67,6 +68,14 @@ def _build_fixture_source(dummy_funcs: int = 300, bar_extra: bool = False) -> st
     return "\n".join(lines) + "\n"
 
 
+def _build_window_fixture_source() -> str:
+    lines = ["def foo():"]
+    for idx in range(1, 45):
+        lines.append(f"    line{idx} = {idx}")
+    lines.append("    return line44")
+    return "\n".join(lines) + "\n"
+
+
 def _write_repo(repo: Path) -> None:
     _run_git(repo, ["init"])
     _run_git(repo, ["config", "user.email", "diff-eval@example.com"])
@@ -78,6 +87,22 @@ def _write_repo(repo: Path) -> None:
     _run_git(repo, ["commit", "-m", "init"])
 
     file_path.write_text(_build_fixture_source(dummy_funcs=300, bar_extra=True))
+
+
+def _write_window_repo(repo: Path) -> None:
+    _run_git(repo, ["init"])
+    _run_git(repo, ["config", "user.email", "diff-eval@example.com"])
+    _run_git(repo, ["config", "user.name", "DiffEval"])
+
+    file_path = repo / "app.py"
+    file_path.write_text(_build_window_fixture_source())
+    _run_git(repo, ["add", "app.py"])
+    _run_git(repo, ["commit", "-m", "init"])
+
+    lines = _build_window_fixture_source().splitlines()
+    lines[2] = "    line2 = 999"
+    lines[29] = "    line29 = 999"
+    file_path.write_text("\n".join(lines) + "\n")
 
 
 def _run_repo_eval(repo: Path, base: str, head: str, label: str) -> EvalResult:
@@ -162,6 +187,30 @@ def run_eval() -> int:
             passed=savings >= 0.0,
             details=f"full={tokens_full}, pack={tokens_pack}, savings={savings:.1f}% (latency={elapsed:.3f}s)",
             metric=savings,
+        ))
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        window_repo = Path(tmpdir)
+        _write_window_repo(window_repo)
+        pack = get_diff_context(window_repo, base="HEAD", head="HEAD", budget_tokens=2000, language="python")
+        slices = pack.get("slices", [])
+        diff_lines = slices[0].get("diff_lines") if slices else None
+        code = slices[0].get("code") if slices else None
+
+        ranges_ok = isinstance(diff_lines, list) and all(
+            isinstance(item, list) and len(item) == 2 for item in diff_lines or []
+        )
+        code_windowed = bool(code and "..." in code)
+
+        results.append(EvalResult(
+            name="Diff lines are range-encoded",
+            passed=ranges_ok,
+            details=f"diff_lines={diff_lines}",
+        ))
+        results.append(EvalResult(
+            name="Windowed diff code contains separators",
+            passed=code_windowed,
+            details="windowed" if code_windowed else "full",
         ))
 
     if args.repo:
