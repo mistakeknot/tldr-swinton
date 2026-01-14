@@ -23,6 +23,7 @@ def main() -> int:
     parser.add_argument("--model-alias", default=None)
     parser.add_argument("--resolved-model", default=None)
     parser.add_argument("--config-id", default=None)
+    parser.add_argument("--cli-version", default=None)
     parser.add_argument("--results-file", default=None)
     parser.add_argument("--results-prefix", default=None)
     parser.add_argument("--results-dir", default=None)
@@ -81,6 +82,8 @@ def main() -> int:
                     result["resolved_model"] = args.resolved_model
                 if args.config_id:
                     result["config_id"] = args.config_id
+                if args.cli_version:
+                    result["cli_version"] = args.cli_version
                 if args.print_results:
                     print(json.dumps(result))
                     if logger:
