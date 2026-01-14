@@ -60,7 +60,7 @@
   expected_lines: []
   type: "cli_smoke"
   notes: "Runs codex with a trivial prompt via bench_command."
-  bench_command: ["codex", "--prompt", "Say 'ok' only."]
+  bench_command: ["codex", "exec", "Say 'ok' only."]
 
 - id: cur-cli-claude
   title: "CLI shim smoke (claude)"
@@ -70,4 +70,4 @@
   expected_lines: []
   type: "cli_smoke"
   notes: "Runs claude with a trivial prompt via bench_command."
-  bench_command: ["claude", "--prompt", "Say 'ok' only."]
+  bench_command: ["claude", "-p", "Say 'ok' only."]
