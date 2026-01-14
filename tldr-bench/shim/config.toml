@@ -1,5 +1,6 @@
 port = 8089
 timeout_seconds = 120
+log_path = "/tmp/tldr-shim.jsonl"
 
 [model_map]
 codex = "codex"
