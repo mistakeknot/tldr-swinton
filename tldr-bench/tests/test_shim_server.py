@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from tldr_bench.shim.server import create_app
@@ -37,3 +39,17 @@ def test_shim_returns_usage_fields():
     assert body["usage"]["prompt_tokens"] > 0
     assert body["usage"]["completion_tokens"] > 0
     assert body["shim"]["elapsed_ms"] >= 0
+
+
+def test_shim_writes_jsonl_log(tmp_path):
+    log_path = tmp_path / "shim.jsonl"
+    app = create_app({"model_map": {"codex": "codex"}, "log_path": str(log_path)})
+    app.state.runner = lambda prompt, cmd, timeout: "ok"
+    client = TestClient(app)
+    payload = {"model": "codex:default", "messages": [{"role": "user", "content": "hi"}]}
+    resp = client.post("/v1/chat/completions", json=payload)
+    assert resp.status_code == 200
+    lines = log_path.read_text().splitlines()
+    assert lines
+    entry = json.loads(lines[-1])
+    assert entry["usage"]["prompt_tokens"] > 0

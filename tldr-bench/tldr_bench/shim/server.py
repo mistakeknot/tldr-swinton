@@ -16,13 +16,19 @@ from tldr_bench.metrics import count_tokens
 
 def load_config(path: Path | None) -> dict[str, Any]:
     if path is None:
-        return {"port": 8089, "timeout_seconds": 120, "model_map": {"codex": "codex", "claude": "claude"}}
+        return {
+            "port": 8089,
+            "timeout_seconds": 120,
+            "model_map": {"codex": "codex", "claude": "claude"},
+            "log_path": None,
+        }
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     model_map = data.get("model_map", {})
     return {
         "port": data.get("port", 8089),
         "timeout_seconds": data.get("timeout_seconds", 120),
         "model_map": model_map,
+        "log_path": data.get("log_path"),
     }
 
 
@@ -93,6 +99,21 @@ def create_app(config: dict[str, Any]) -> FastAPI:
             },
             "shim": {"elapsed_ms": int(duration * 1000)},
         }
+        log_path = app.state.config.get("log_path")
+        if log_path:
+            entry = {
+                "timestamp": int(start),
+                "model": model,
+                "usage": response["usage"],
+                "elapsed_ms": int(duration * 1000),
+            }
+            try:
+                path = Path(log_path)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(entry) + "\n")
+            except OSError:
+                pass
         return JSONResponse(content=response)
 
     return app
