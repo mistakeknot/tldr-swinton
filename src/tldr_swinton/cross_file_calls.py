@@ -2320,6 +2320,9 @@ def _extract_ts_file_calls(file_path: Path, root: Path) -> dict[str, list[tuple[
     # Second pass: extract calls from each function
     def extract_calls_from_func(func_node, func_name: str):
         calls = []
+        current_class = None
+        if "." in func_name:
+            current_class = func_name.split(".", 1)[0]
 
         def visit_calls(node):
             if node.type == "call_expression":
@@ -2347,7 +2350,10 @@ def _extract_ts_file_calls(file_path: Path, root: Path) -> dict[str, list[tuple[
 
                         if obj_is_this and method_name:
                             # this.method() - treat as intra-file call to the method
-                            calls.append(('intra', method_name))
+                            if current_class:
+                                calls.append(('intra', f"{current_class}.{method_name}"))
+                            else:
+                                calls.append(('intra', method_name))
                         elif obj_name and method_name:
                             calls.append(('attr', f"{obj_name}.{method_name}"))
                         break

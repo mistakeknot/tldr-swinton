@@ -321,9 +321,4 @@ def _format_context_pack_ultracompact(pack: dict) -> list[str]:
 
         lines.append("")
 
-    sig_only = pack.get("signatures_only") or []
-    if sig_only:
-        sigs = ", ".join(_format_symbol(s, "", path_ids) for s in sig_only)
-        lines.append(f"signatures_only: {sigs}")
-
     return lines

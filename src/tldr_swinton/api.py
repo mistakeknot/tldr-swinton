@@ -728,8 +728,22 @@ def build_diff_context_from_hunks(
     def _estimate_tokens(text: str) -> int:
         return max(1, len(text) // 4)
 
+    def _to_ranges(lines: list[int]) -> list[list[int]]:
+        if not lines:
+            return []
+        ranges: list[list[int]] = []
+        start = lines[0]
+        end = lines[0]
+        for line in lines[1:]:
+            if line == end + 1:
+                end = line
+            else:
+                ranges.append([start, end])
+                start = end = line
+        ranges.append([start, end])
+        return ranges
+
     slices: list[dict] = []
-    signatures_only: list[str] = []
     budget_used = 0
 
     for symbol_id in ordered:
@@ -774,18 +788,15 @@ def build_diff_context_from_hunks(
             "signature": signature,
             "code": code,
             "lines": list(lines_range) if lines_range else [],
-            "diff_lines": sorted(symbol_diff_lines.get(symbol_id, [])),
+            "diff_lines": _to_ranges(sorted(symbol_diff_lines.get(symbol_id, []))),
         }
         slices.append(slice_entry)
-        if not code:
-            signatures_only.append(symbol_id)
 
     return {
         "base": None,
         "head": None,
         "budget_used": budget_used,
         "slices": slices,
-        "signatures_only": signatures_only,
     }
 
 
