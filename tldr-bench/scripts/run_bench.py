@@ -36,6 +36,7 @@ def main() -> int:
     parser.add_argument("--timeout-seconds", type=int, default=None)
     parser.add_argument("--tldrs-version", default=None)
     parser.add_argument("--shim-config", default=None)
+    parser.add_argument("--shim-log-path", default=None)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--prompt-budget", type=int, default=None)
     parser.add_argument("--context-strategy", default=None)
@@ -97,6 +98,7 @@ def main() -> int:
                     continue
                 run_config = {
                     "tokenizer_model": args.resolved_model or args.model,
+                    "shim_log_path": args.shim_log_path,
                 }
                 result = run_task_router(task, args.variant, run_config)
                 result.update(host_metadata)
