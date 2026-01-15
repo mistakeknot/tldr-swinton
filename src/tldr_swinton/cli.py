@@ -379,6 +379,12 @@ Semantic Search:
     diff_p.add_argument("--head", default="HEAD", help="Head ref (default: HEAD)")
     diff_p.add_argument("--budget", type=int, default=None, help="Approx token budget for output")
     diff_p.add_argument(
+        "--compress",
+        choices=["none", "two-stage"],
+        default="none",
+        help="Experimental compression mode (default: none)",
+    )
+    diff_p.add_argument(
         "--format",
         choices=["ultracompact", "json", "json-pretty"],
         default="ultracompact",
@@ -837,6 +843,7 @@ Semantic Search:
                 head=args.head,
                 budget_tokens=args.budget,
                 language=args.lang,
+                compress=None if args.compress == "none" else args.compress,
             )
             print(format_context_pack(pack, fmt=args.format))
 

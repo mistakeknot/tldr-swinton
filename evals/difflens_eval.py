@@ -387,9 +387,22 @@ def _write_window_repo(repo: Path) -> None:
     file_path.write_text("\n".join(lines) + "\n")
 
 
-def _run_repo_eval(repo: Path, base: str, head: str, label: str) -> EvalResult:
+def _run_repo_eval(
+    repo: Path,
+    base: str,
+    head: str,
+    label: str,
+    compress: str | None = None,
+) -> EvalResult:
     t0 = time.perf_counter()
-    pack = get_diff_context(repo, base=base, head=head, budget_tokens=4000, language="python")
+    pack = get_diff_context(
+        repo,
+        base=base,
+        head=head,
+        budget_tokens=4000,
+        language="python",
+        compress=compress,
+    )
     elapsed = time.perf_counter() - t0
 
     output = format_context_pack(pack, fmt="ultracompact")
@@ -485,9 +498,21 @@ def _sum_tokens(repo: Path, files: set[str], include_deps: bool = False) -> int:
     )
 
 
-def _run_fixture_eval(repo: Path, language: str, label: str) -> list[EvalResult]:
+def _run_fixture_eval(
+    repo: Path,
+    language: str,
+    label: str,
+    compress: str | None = None,
+) -> list[EvalResult]:
     t0 = time.perf_counter()
-    pack = get_diff_context(repo, base="HEAD", head="HEAD", budget_tokens=2000, language=language)
+    pack = get_diff_context(
+        repo,
+        base="HEAD",
+        head="HEAD",
+        budget_tokens=2000,
+        language=language,
+        compress=compress,
+    )
     elapsed = time.perf_counter() - t0
 
     output = format_context_pack(pack, fmt="ultracompact")
@@ -546,6 +571,12 @@ def run_eval() -> int:
     parser.add_argument("--repo", default=None, help="Optional repo path to evaluate")
     parser.add_argument("--base", default=None, help="Base ref for repo eval")
     parser.add_argument("--head", default="HEAD", help="Head ref for repo eval")
+    parser.add_argument(
+        "--compress",
+        default="none",
+        choices=["none", "two-stage"],
+        help="Compression mode to evaluate",
+    )
     args = parser.parse_args()
 
     results: list[EvalResult] = []
@@ -553,17 +584,18 @@ def run_eval() -> int:
     with tempfile.TemporaryDirectory() as tmpdir:
         repo = Path(tmpdir)
         _write_multifile_repo(repo)
-        results.extend(_run_fixture_eval(repo, language="python", label="Fixture (Python)"))
+        compress = None if args.compress == "none" else args.compress
+        results.extend(_run_fixture_eval(repo, language="python", label="Fixture (Python)", compress=compress))
 
     with tempfile.TemporaryDirectory() as tmpdir:
         repo = Path(tmpdir)
         _write_ts_repo(repo)
-        results.extend(_run_fixture_eval(repo, language="typescript", label="Fixture (TypeScript)"))
+        results.extend(_run_fixture_eval(repo, language="typescript", label="Fixture (TypeScript)", compress=compress))
 
     with tempfile.TemporaryDirectory() as tmpdir:
         repo = Path(tmpdir)
         _write_rust_repo(repo)
-        results.extend(_run_fixture_eval(repo, language="rust", label="Fixture (Rust)"))
+        results.extend(_run_fixture_eval(repo, language="rust", label="Fixture (Rust)", compress=compress))
 
     with tempfile.TemporaryDirectory() as tmpdir:
         window_repo = Path(tmpdir)
@@ -592,7 +624,7 @@ def run_eval() -> int:
     if args.repo:
         repo_path = Path(args.repo).resolve()
         base = args.base or "HEAD~1"
-        results.append(_run_repo_eval(repo_path, base, args.head, label="Repo"))
+        results.append(_run_repo_eval(repo_path, base, args.head, label="Repo", compress=compress))
 
     print("=" * 70)
     print("DiffLens Evaluation")

@@ -96,3 +96,20 @@ def test_rust_fixture_written(tmp_path: Path) -> None:
     module._write_rust_repo(tmp_path)
     files = sorted(p.name for p in tmp_path.iterdir() if p.suffix == ".rs")
     assert len(files) >= 25
+
+
+def test_two_stage_compress_prunes_blocks(tmp_path: Path) -> None:
+    module = _load_eval_module()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    module._write_multifile_repo(repo)
+    pack = module.get_diff_context(
+        repo,
+        base="HEAD",
+        head="HEAD",
+        budget_tokens=500,
+        language="python",
+        compress="two-stage",
+    )
+    slices = pack.get("slices", [])
+    assert any(slice_.get("dropped_blocks", 0) > 0 for slice_ in slices)

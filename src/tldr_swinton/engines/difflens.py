@@ -204,11 +204,83 @@ def _extract_windowed_code(
     return "\n".join(parts)
 
 
+def _split_blocks_by_blank(lines: list[str]) -> list[tuple[int, int]]:
+    blocks: list[tuple[int, int]] = []
+    start = 0
+    idx = 0
+    while idx < len(lines):
+        if lines[idx].strip() == "" or lines[idx].strip() == "...":
+            if start < idx:
+                blocks.append((start, idx - 1))
+            start = idx + 1
+        idx += 1
+    if start < len(lines):
+        blocks.append((start, len(lines) - 1))
+    return blocks or [(0, len(lines) - 1)]
+
+
+def _two_stage_prune(
+    code: str,
+    code_start: int,
+    diff_lines: list[int],
+    budget_tokens: int | None,
+) -> tuple[str, int, int]:
+    lines = code.splitlines()
+    blocks = _split_blocks_by_blank(lines)
+    block_count = len(blocks)
+    if block_count == 0:
+        return code, 0, 0
+
+    def _line_in_block(block: tuple[int, int], line_no: int) -> bool:
+        idx = line_no - code_start
+        return block[0] <= idx <= block[1]
+
+    keep_indexes: list[int] = []
+    for b_idx, block in enumerate(blocks):
+        if any(_line_in_block(block, line_no) for line_no in diff_lines):
+            keep_indexes.append(b_idx)
+
+    if not keep_indexes:
+        keep_indexes = [0]
+
+    expanded: set[int] = set()
+    for idx in keep_indexes:
+        expanded.add(idx)
+        if idx - 1 >= 0:
+            expanded.add(idx - 1)
+        if idx + 1 < block_count:
+            expanded.add(idx + 1)
+
+    keep = sorted(expanded)
+
+    max_blocks = None
+    if budget_tokens is not None:
+        if budget_tokens <= 800:
+            max_blocks = 1
+        elif budget_tokens <= 1600:
+            max_blocks = 2
+        else:
+            max_blocks = 3
+    if max_blocks is not None and len(keep) > max_blocks:
+        keep = keep[:max_blocks]
+
+    kept_lines: list[str] = []
+    for idx, block_idx in enumerate(keep):
+        if idx > 0:
+            kept_lines.append("...")
+        start, end = blocks[block_idx]
+        kept_lines.extend(lines[start:end + 1])
+
+    dropped_blocks = max(0, block_count - len(keep))
+    return "\n".join(kept_lines), block_count, dropped_blocks
+
+
 def build_diff_context_from_hunks(
     project: str | Path,
     hunks: list[tuple[str, int, int]],
     language: str = "python",
     budget_tokens: int | None = None,
+    compress: str | None = None,
 ) -> dict:
     project = Path(project).resolve()
     symbol_diff_lines = map_hunks_to_symbols(project, hunks, language=language)
@@ -392,18 +464,43 @@ def build_diff_context_from_hunks(
             lines_range = (func_info.line_number, func_info.line_number)
 
         code = None
+        code_scope_range = lines_range
+        if compress == "two-stage" and symbol_id in symbol_diff_lines and lines_range:
+            rel_part, qual_part = symbol_id.split(":", 1)
+            if "." in qual_part:
+                class_name = qual_part.split(".", 1)[0]
+                class_symbol = f"{rel_part}:{class_name}"
+                class_range = symbol_ranges.get(class_symbol)
+                if class_range:
+                    code_scope_range = class_range
         if symbol_id in symbol_diff_lines and lines_range:
             file_path = symbol_files.get(symbol_id)
             if file_path and file_path in file_sources:
                 src_lines = file_sources[file_path].splitlines()
-                start, end = lines_range
+                start, end = code_scope_range or lines_range
                 start = max(1, start)
                 end = min(len(src_lines), end)
                 diff_line_list = sorted(symbol_diff_lines.get(symbol_id, []))
-                if diff_line_list:
-                    code = _extract_windowed_code(src_lines, diff_line_list, start, end)
-                else:
+                if compress == "two-stage":
                     code = "\n".join(src_lines[start - 1:end])
+                else:
+                    if diff_line_list:
+                        code = _extract_windowed_code(src_lines, diff_line_list, start, end)
+                    else:
+                        code = "\n".join(src_lines[start - 1:end])
+                if code and compress == "two-stage":
+                    code, block_count, dropped_blocks = _two_stage_prune(
+                        code,
+                        start,
+                        diff_line_list,
+                        budget_tokens,
+                    )
+                else:
+                    block_count = 0
+                    dropped_blocks = 0
+        else:
+            block_count = 0
+            dropped_blocks = 0
 
         sig_cost = _estimate_tokens(signature)
         code_cost = _estimate_tokens(code) if code else 0
@@ -423,8 +520,10 @@ def build_diff_context_from_hunks(
             "relevance": relevance.get(symbol_id, "adjacent"),
             "signature": signature,
             "code": code,
-            "lines": list(lines_range) if lines_range else [],
+            "lines": list(code_scope_range) if code_scope_range else (list(lines_range) if lines_range else []),
             "diff_lines": _to_ranges(sorted(symbol_diff_lines.get(symbol_id, []))),
+            "block_count": block_count,
+            "dropped_blocks": dropped_blocks,
         }
         slices.append(slice_entry)
 
@@ -465,6 +564,7 @@ def get_diff_context(
     head: str | None = None,
     budget_tokens: int | None = None,
     language: str = "python",
+    compress: str | None = None,
 ) -> dict:
     project = Path(project).resolve()
     base_ref = base or "HEAD~1"
@@ -492,6 +592,7 @@ def get_diff_context(
         hunks,
         language=language,
         budget_tokens=budget_tokens,
+        compress=compress,
     )
     pack["base"] = base_ref
     pack["head"] = head_ref

@@ -282,6 +282,7 @@ def build_diff_context_from_hunks(
     hunks: list[tuple[str, int, int]],
     language: str = "python",
     budget_tokens: int | None = None,
+    compress: str | None = None,
 ) -> dict:
     from .engines.difflens import (
         build_diff_context_from_hunks as _build_diff_context_from_hunks,
@@ -292,6 +293,7 @@ def build_diff_context_from_hunks(
         hunks,
         language=language,
         budget_tokens=budget_tokens,
+        compress=compress,
     )
 
 
@@ -301,6 +303,7 @@ def get_diff_context(
     head: str | None = None,
     budget_tokens: int | None = None,
     language: str = "python",
+    compress: str | None = None,
 ) -> dict:
     from .engines.difflens import get_diff_context as _get_diff_context
 
@@ -310,6 +313,7 @@ def get_diff_context(
         head=head,
         budget_tokens=budget_tokens,
         language=language,
+        compress=compress,
     )
 
 
