@@ -99,11 +99,36 @@ def test_rust_fixture_written(tmp_path: Path) -> None:
 
 
 def test_two_stage_compress_prunes_blocks(tmp_path: Path) -> None:
-    module = _load_eval_module()
+    from tldr_swinton.api import get_diff_context
     repo = tmp_path / "repo"
     repo.mkdir()
-    module._write_multifile_repo(repo)
-    pack = module.get_diff_context(
+    import subprocess
+    subprocess.run(["git", "-C", str(repo), "init"], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "diff-eval@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "DiffEval"], check=True)
+
+    file_path = repo / "app.py"
+    file_path.write_text(
+        "def foo():\n"
+        "    a = 1\n"
+        "\n"
+        "    b = 2\n"
+        "\n"
+        "    c = 3\n"
+    )
+    subprocess.run(["git", "-C", str(repo), "add", "app.py"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-m", "init"], check=True)
+
+    file_path.write_text(
+        "def foo():\n"
+        "    a = 1\n"
+        "\n"
+        "    b = 99\n"
+        "\n"
+        "    c = 3\n"
+    )
+
+    pack = get_diff_context(
         repo,
         base="HEAD",
         head="HEAD",
@@ -113,3 +138,51 @@ def test_two_stage_compress_prunes_blocks(tmp_path: Path) -> None:
     )
     slices = pack.get("slices", [])
     assert any(slice_.get("dropped_blocks", 0) > 0 for slice_ in slices)
+
+
+def test_two_stage_keeps_method_scope_on_single_method_diff(tmp_path: Path) -> None:
+    from tldr_swinton.api import get_diff_context
+    repo = tmp_path / "repo-scope"
+    repo.mkdir()
+    import subprocess
+    subprocess.run(["git", "-C", str(repo), "init"], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "diff-eval@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "DiffEval"], check=True)
+
+    file_path = repo / "app.py"
+    file_path.write_text(
+        "class A:\n"
+        "    def method_0(self):\n"
+        "        value = 1\n"
+        "        return value\n"
+        "\n"
+        "    def method_1(self):\n"
+        "        value = 2\n"
+        "        return value\n"
+    )
+    subprocess.run(["git", "-C", str(repo), "add", "app.py"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-m", "init"], check=True)
+
+    file_path.write_text(
+        "class A:\n"
+        "    def method_0(self):\n"
+        "        value = 1\n"
+        "        return value + 1\n"
+        "\n"
+        "    def method_1(self):\n"
+        "        value = 2\n"
+        "        return value\n"
+    )
+
+    pack = get_diff_context(
+        repo,
+        base="HEAD",
+        head="HEAD",
+        budget_tokens=1200,
+        language="python",
+        compress="two-stage",
+    )
+    slice_map = {s["id"]: s for s in pack.get("slices", [])}
+    method_slice = slice_map.get("app.py:A.method_0")
+    assert method_slice and method_slice.get("code")
+    assert "method_1" not in method_slice["code"]

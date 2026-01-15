@@ -419,6 +419,17 @@ def build_diff_context_from_hunks(
         ordered.append(symbol_id)
         relevance[symbol_id] = "contains_diff"
 
+    class_diff_counts: dict[str, set[str]] = defaultdict(set)
+    for symbol_id in symbol_diff_lines.keys():
+        rel_part, qual_part = symbol_id.split(":", 1)
+        if "." in qual_part:
+            class_name = qual_part.split(".", 1)[0]
+            class_symbol = f"{rel_part}:{class_name}"
+            class_diff_counts[class_symbol].add(symbol_id)
+    class_multi_diff = {
+        class_symbol for class_symbol, members in class_diff_counts.items() if len(members) > 1
+    }
+
     for symbol_id in list(ordered):
         for callee in adjacency.get(symbol_id, []):
             if callee not in relevance:
@@ -470,9 +481,10 @@ def build_diff_context_from_hunks(
             if "." in qual_part:
                 class_name = qual_part.split(".", 1)[0]
                 class_symbol = f"{rel_part}:{class_name}"
-                class_range = symbol_ranges.get(class_symbol)
-                if class_range:
-                    code_scope_range = class_range
+                if class_symbol in class_multi_diff and (budget_tokens is None or budget_tokens >= 4000):
+                    class_range = symbol_ranges.get(class_symbol)
+                    if class_range:
+                        code_scope_range = class_range
         if symbol_id in symbol_diff_lines and lines_range:
             file_path = symbol_files.get(symbol_id)
             if file_path and file_path in file_sources:
