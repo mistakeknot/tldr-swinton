@@ -54,6 +54,32 @@ Track task suites:
 Token savings snapshots are tool-specific. Use your variant outputs plus the
 baseline runners to compute savings for your own strategy.
 
+## Official datasets (SWE-bench / RepoBench / LongBench)
+
+The official dataset files are vendored under `tldr-bench/data/` and tracked
+via Git LFS.
+
+Setup:
+
+```bash
+git lfs install
+git lfs pull
+python scripts/data/verify_datasets.py
+```
+
+Token-only runs against the official datasets:
+
+```
+PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/run_bench.py \
+  --tasks official_datasets --variant baselines --print-results
+```
+
+If `git lfs install` fails due to existing hooks, run:
+
+```
+bash tldr-bench/scripts/data/lfs_setup.sh
+```
+
 Track B (frontier/CLI) via shim:
 
 1) Start shim with logging enabled (see `tldr-bench/shim/README.md`).
