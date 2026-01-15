@@ -213,6 +213,7 @@ def iter_workspace_files(
     root: Union[str, Path],
     extensions: set[str] | None = None,
     respect_ignore: bool = True,
+    respect_gitignore: bool = False,
     workspace_config: WorkspaceConfig | None = None,
     use_workspace_config: bool = True,
     exclude_hidden: bool = True,
@@ -223,6 +224,7 @@ def iter_workspace_files(
         root: Project root directory
         extensions: Optional set of extensions to include (e.g., {".py"})
         respect_ignore: If True, respect .tldrsignore patterns
+        respect_gitignore: If True, also respect .gitignore patterns
         workspace_config: Optional WorkspaceConfig (auto-loaded if None)
         use_workspace_config: If False, skip workspace filtering
         exclude_hidden: If True, skip hidden files/dirs
@@ -238,7 +240,11 @@ def iter_workspace_files(
         config = load_workspace_config(root_path)
     if not use_workspace_config:
         config = None
-    ignore_spec = load_ignore_patterns(root_path) if respect_ignore else None
+    ignore_spec = (
+        load_ignore_patterns(root_path, include_gitignore=respect_gitignore)
+        if respect_ignore
+        else None
+    )
 
     for dirpath, dirnames, filenames in os.walk(root_path):
         rel_dir = os.path.relpath(dirpath, root_path)

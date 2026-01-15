@@ -240,6 +240,7 @@ Ignore Patterns:
     Legacy .tldrignore is also supported (auto-migrated on first run).
     First run creates .tldrsignore with sensible defaults.
     Use --no-ignore to bypass ignore patterns.
+    Use --respect-gitignore to also apply .gitignore patterns.
 
 Daemon:
     tldrs runs a per-project daemon for fast repeated queries.
@@ -268,6 +269,11 @@ Semantic Search:
         "--no-ignore",
         action="store_true",
         help="Ignore .tldrsignore patterns (include all files)",
+    )
+    parser.add_argument(
+        "--respect-gitignore",
+        action="store_true",
+        help="Also respect .gitignore patterns (opt-in)",
     )
 
     # Shell completion support
@@ -910,7 +916,13 @@ Semantic Search:
 
             # Scan all source files and check their imports
             respect_ignore = not getattr(args, 'no_ignore', False)
-            files = scan_project_files(str(project), language=args.lang, respect_ignore=respect_ignore)
+            respect_gitignore = getattr(args, 'respect_gitignore', False)
+            files = scan_project_files(
+                str(project),
+                language=args.lang,
+                respect_ignore=respect_ignore,
+                respect_gitignore=respect_gitignore,
+            )
             importers = []
             for file_path in files:
                 try:
@@ -1009,7 +1021,13 @@ Semantic Search:
                 from .cross_file_calls import scan_project
 
                 respect_ignore = not getattr(args, 'no_ignore', False)
-                files = scan_project(project_path, language=args.lang, respect_ignore=respect_ignore)
+                respect_gitignore = getattr(args, 'respect_gitignore', False)
+                files = scan_project(
+                    project_path,
+                    language=args.lang,
+                    respect_ignore=respect_ignore,
+                    respect_gitignore=respect_gitignore,
+                )
                 graph = build_project_call_graph(project_path, language=args.lang)
 
                 # Create cache directory
@@ -1035,11 +1053,13 @@ Semantic Search:
 
             if args.action == "index":
                 respect_ignore = not getattr(args, 'no_ignore', False)
+                respect_gitignore = getattr(args, 'respect_gitignore', False)
                 stats = build_index(
                     args.path,
                     language=args.lang,
                     embed_model=args.model,
                     respect_ignore=respect_ignore,
+                    respect_gitignore=respect_gitignore,
                 )
                 print(f"Indexed {stats.total_units} code units")
 
@@ -1282,6 +1302,7 @@ Semantic Search:
             from .index import build_index, search_index, get_index_info
 
             respect_ignore = not getattr(args, 'no_ignore', False)
+            respect_gitignore = getattr(args, 'respect_gitignore', False)
 
             if args.info:
                 # Show index info
@@ -1299,6 +1320,7 @@ Semantic Search:
                     generate_summaries=args.summaries,
                     rebuild=args.rebuild,
                     respect_ignore=respect_ignore,
+                    respect_gitignore=respect_gitignore,
                 )
                 print(f"\nIndex complete: {stats.total_units} units from {stats.total_files} files")
                 if stats.new_units > 0:

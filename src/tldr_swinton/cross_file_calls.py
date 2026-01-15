@@ -280,6 +280,7 @@ def scan_project(
     language: str = "python",
     workspace_config: Optional[WorkspaceConfig] = None,
     respect_ignore: bool = True,
+    respect_gitignore: bool = False,
 ) -> list[str]:
     """
     Find all source files in the project for the given language.
@@ -290,6 +291,7 @@ def scan_project(
         workspace_config: Optional WorkspaceConfig for monorepo scoping.
                          If provided, filters files by activePackages and excludePatterns.
     respect_ignore: If True, respect .tldrsignore patterns (default True)
+    respect_gitignore: If True, also respect .gitignore patterns (default False)
 
     Returns:
         List of absolute paths to source files
@@ -331,6 +333,7 @@ def scan_project(
             root,
             extensions=extensions,
             respect_ignore=respect_ignore,
+            respect_gitignore=respect_gitignore,
             workspace_config=workspace_config,
             use_workspace_config=workspace_config is not None,
         )

@@ -244,7 +244,12 @@ def compute_embedding(text: str, model_name: Optional[str] = None):
     return np.array(embedding, dtype=np.float32)
 
 
-def extract_units_from_project(project_path: str, lang: str = "python", respect_ignore: bool = True) -> List[EmbeddingUnit]:
+def extract_units_from_project(
+    project_path: str,
+    lang: str = "python",
+    respect_ignore: bool = True,
+    respect_gitignore: bool = False,
+) -> List[EmbeddingUnit]:
     """Extract all functions/methods/classes from a project.
 
     Uses existing TLDR APIs:
@@ -257,6 +262,7 @@ def extract_units_from_project(project_path: str, lang: str = "python", respect_
         project_path: Path to project root.
         lang: Programming language ("python", "typescript", "go", "rust").
         respect_ignore: If True, respect .tldrsignore patterns (default True).
+        respect_gitignore: If True, also respect .gitignore patterns (default False).
 
     Returns:
         List of EmbeddingUnit objects with enriched metadata.
@@ -272,7 +278,7 @@ def extract_units_from_project(project_path: str, lang: str = "python", respect_
 
     # Filter ignored files
     if respect_ignore:
-        spec = load_ignore_patterns(project)
+        spec = load_ignore_patterns(project, include_gitignore=respect_gitignore)
         structure["files"] = [
             f for f in structure.get("files", [])
             if not should_ignore(project / f.get("path", ""), project, spec)
@@ -671,6 +677,7 @@ def build_semantic_index(
     model: Optional[str] = None,
     show_progress: bool = True,
     respect_ignore: bool = True,
+    respect_gitignore: bool = False,
 ) -> int:
     """Build and save FAISS index + metadata for a project.
 
@@ -684,6 +691,7 @@ def build_semantic_index(
         model: Model name from SUPPORTED_MODELS or HuggingFace name.
         show_progress: Show progress spinner (default: True).
         respect_ignore: If True, respect .tldrsignore patterns (default True).
+        respect_gitignore: If True, also respect .gitignore patterns (default False).
 
     Returns:
         Number of indexed units.
@@ -713,10 +721,20 @@ def build_semantic_index(
     # Extract all units (respecting .tldrsignore)
     if console:
         with console.status("[bold green]Extracting code units...") as status:
-            units = extract_units_from_project(str(project), lang=lang, respect_ignore=respect_ignore)
+            units = extract_units_from_project(
+                str(project),
+                lang=lang,
+                respect_ignore=respect_ignore,
+                respect_gitignore=respect_gitignore,
+            )
             status.update(f"[bold green]Extracted {len(units)} code units")
     else:
-        units = extract_units_from_project(str(project), lang=lang, respect_ignore=respect_ignore)
+        units = extract_units_from_project(
+            str(project),
+            lang=lang,
+            respect_ignore=respect_ignore,
+            respect_gitignore=respect_gitignore,
+        )
 
     if not units:
         return 0

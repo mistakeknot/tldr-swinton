@@ -68,7 +68,8 @@ def _require_semantic_deps() -> None:
 def _extract_code_units(
     project_path: str,
     language: Optional[str] = None,
-    respect_ignore: bool = True
+    respect_ignore: bool = True,
+    respect_gitignore: bool = False,
 ) -> list[CodeUnit]:
     """Extract code units from project using rich extraction API.
 
@@ -79,6 +80,7 @@ def _extract_code_units(
         project_path: Path to project root
         language: Language to scan for (auto-detect if None)
         respect_ignore: Respect .tldrsignore patterns
+        respect_gitignore: If True, also respect .gitignore patterns
 
     Returns:
         List of CodeUnit objects with rich metadata
@@ -110,6 +112,7 @@ def _extract_code_units(
         project,
         extensions=extensions,
         respect_ignore=respect_ignore,
+        respect_gitignore=respect_gitignore,
     )
 
     for full_path in source_files:
@@ -388,7 +391,8 @@ def build_index(
     generate_summaries: bool = False,
     rebuild: bool = False,
     show_progress: bool = True,
-    respect_ignore: bool = True
+    respect_ignore: bool = True,
+    respect_gitignore: bool = False,
 ) -> IndexStats:
     """Build or update the semantic index for a project.
 
@@ -406,6 +410,7 @@ def build_index(
         rebuild: Force full rebuild (ignore existing index)
         show_progress: Show progress indicators
         respect_ignore: Respect .tldrsignore patterns
+        respect_gitignore: If True, also respect .gitignore patterns
 
     Returns:
         IndexStats with indexing statistics
@@ -432,7 +437,12 @@ def build_index(
     # Extract code units
     if show_progress:
         print("Scanning codebase...")
-    units = _extract_code_units(str(project), language, respect_ignore)
+    units = _extract_code_units(
+        str(project),
+        language,
+        respect_ignore=respect_ignore,
+        respect_gitignore=respect_gitignore,
+    )
     stats.total_files = len(set(u.file for u in units))
     stats.total_units = len(units)
 

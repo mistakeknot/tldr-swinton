@@ -101,7 +101,10 @@ Thumbs.db
 """
 
 
-def load_ignore_patterns(project_dir: str | Path) -> "PathSpec":
+def load_ignore_patterns(
+    project_dir: str | Path,
+    include_gitignore: bool = False,
+) -> "PathSpec":
     """Load ignore patterns from .tldrsignore (or legacy .tldrignore).
 
     Args:
@@ -115,18 +118,23 @@ def load_ignore_patterns(project_dir: str | Path) -> "PathSpec":
     project_path = Path(project_dir)
     tldrsignore_path = project_path / ".tldrsignore"
     legacy_path = project_path / ".tldrignore"
+    gitignore_path = project_path / ".gitignore"
 
     patterns: list[str] = []
 
+    if include_gitignore and gitignore_path.exists():
+        content = gitignore_path.read_text()
+        patterns.extend(content.splitlines())
+
     if tldrsignore_path.exists():
         content = tldrsignore_path.read_text()
-        patterns = content.splitlines()
+        patterns.extend(content.splitlines())
     elif legacy_path.exists():
         content = legacy_path.read_text()
-        patterns = content.splitlines()
+        patterns.extend(content.splitlines())
     else:
         # Use defaults if no .tldrsignore exists
-        patterns = DEFAULT_TEMPLATE.splitlines()
+        patterns.extend(DEFAULT_TEMPLATE.splitlines())
 
     return pathspec.PathSpec.from_lines("gitignore", patterns)
 
@@ -172,6 +180,7 @@ def should_ignore(
     file_path: str | Path,
     project_dir: str | Path,
     spec: "PathSpec | None" = None,
+    include_gitignore: bool = False,
 ) -> bool:
     """Check if a file should be ignored.
 
@@ -184,7 +193,7 @@ def should_ignore(
         True if file should be ignored, False otherwise
     """
     if spec is None:
-        spec = load_ignore_patterns(project_dir)
+        spec = load_ignore_patterns(project_dir, include_gitignore=include_gitignore)
 
     project_path = Path(project_dir)
     file_path = Path(file_path)
@@ -203,6 +212,7 @@ def filter_files(
     files: list[Path],
     project_dir: str | Path,
     respect_ignore: bool = True,
+    respect_gitignore: bool = False,
 ) -> list[Path]:
     """Filter a list of files, removing those matching .tldrsignore patterns.
 
@@ -217,7 +227,7 @@ def filter_files(
     if not respect_ignore:
         return files
 
-    spec = load_ignore_patterns(project_dir)
+    spec = load_ignore_patterns(project_dir, include_gitignore=respect_gitignore)
     return [f for f in files if not should_ignore(f, project_dir, spec)]
 
 

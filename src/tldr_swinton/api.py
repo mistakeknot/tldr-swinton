@@ -472,6 +472,7 @@ def scan_project_files(
     root: str,
     language: str = "python",
     respect_ignore: bool = True,
+    respect_gitignore: bool = False,
 ) -> list[str]:
     """
     Find all source files in project for given language.
@@ -480,6 +481,7 @@ def scan_project_files(
         root: Project root directory path
         language: "python", "typescript", "go", or "rust"
         respect_ignore: If True, respect .tldrsignore patterns (default True)
+        respect_gitignore: If True, also respect .gitignore patterns (default False)
 
     Returns:
         List of absolute paths to source files
@@ -489,7 +491,12 @@ def scan_project_files(
         >>> print(files)
         ['/path/to/project/main.py', '/path/to/project/utils/helper.py']
     """
-    return _scan_project(root, language, respect_ignore=respect_ignore)
+    return _scan_project(
+        root,
+        language,
+        respect_ignore=respect_ignore,
+        respect_gitignore=respect_gitignore,
+    )
 
 
 def get_imports(file_path: str, language: str = "python") -> list[dict]:
