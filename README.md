@@ -20,6 +20,27 @@ This fork fixes those issues while maintaining full compatibility with the origi
 | Function names | `export async initCache` | `initCache` |
 | Single file analysis | Not supported | Fully supported |
 
+## Benchmarks (2026-01-15)
+
+| Eval | Measures | Headline |
+|------|----------|----------|
+| DiffLens (avg across Python/TS/Rust) | Diff-focused context vs diff+deps baseline | **48.0% token savings** at **~0.77s** avg latency |
+| Token efficiency eval | Compact + structure savings vs raw | **93.1%** compact savings, **62.4%** structure JSON savings |
+| Semantic search eval | Retrieval + token footprint | **84.8%** token savings; top-1 auth/db, cache in top-3 |
+| Agent workflow eval | Realistic agent scenarios | **61.2%** aggregate savings |
+
+**Methodology highlights:**
+- DiffLens baseline uses **diff+deps** (changed files + direct local imports). Diff-only may be negative and is reported in the eval output.
+- Metrics come from the built-in eval scripts in `evals/` and are reproducible locally.
+
+**Reproduce:**
+```bash
+.venv/bin/python evals/difflens_eval.py
+.venv/bin/python evals/token_efficiency_eval.py
+.venv/bin/python evals/semantic_search_eval.py
+.venv/bin/python evals/agent_workflow_eval.py
+```
+
 ## Installation
 
 ### One-Liner (Recommended for AI Agents)
