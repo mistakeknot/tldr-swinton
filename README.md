@@ -128,6 +128,9 @@ context outputs as `vhs://` references instead of printing inline:
 # Install tldrs-vhs (separate repo)
 curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldrs-vhs/main/scripts/install.sh | bash
 
+# Non-interactive shells/CI may not load aliases:
+export TLDRS_VHS_CMD="$HOME/tldrs-vhs/.venv/bin/tldrs-vhs"
+
 # Store context output in vhs store
 tldrs context main --project . --output vhs
 

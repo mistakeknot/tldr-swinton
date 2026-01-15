@@ -44,6 +44,7 @@ def main() -> int:
     store = _run(cmd_store)
     if store.returncode != 0:
         print("VHS store failed. Is tldrs-vhs installed?", file=sys.stderr)
+        print("Tip: set TLDRS_VHS_CMD=/path/to/tldrs-vhs/.venv/bin/tldrs-vhs", file=sys.stderr)
         sys.stderr.write(store.stderr)
         return 2
 
