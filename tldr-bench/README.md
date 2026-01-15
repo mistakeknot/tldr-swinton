@@ -113,6 +113,31 @@ PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/run_savings_sweep.py \
   --instance-ids psf__requests-2674,django__django-11333
 ```
 
+## Module Selection (Frontier / Agent Runs)
+
+When a frontier agent needs context, prefer tools in this order:
+
+```bash
+# 1) Diff-first context for recent changes
+tldrs diff-context --project . --budget 2000
+
+# 2) Symbol-level context for a specific entry
+tldrs context <entry> --project . --depth 2 --budget 2000 --format ultracompact
+
+# 3) Structure / extract for files or folders
+tldrs structure src/
+tldrs extract path/to/file.py
+
+# 4) Semantic search (requires index)
+tldrs index .
+tldrs find "authentication logic"
+
+# 5) Deep analysis helpers (optional)
+tldrs slice <file> <func> <line>
+tldrs cfg <file> <function>
+tldrs dfg <file> <function>
+```
+
 ## CLI Shim (Codex/Claude Code)
 
 See `tldr-bench/shim/README.md` for running the local OpenAI-compatible shim.

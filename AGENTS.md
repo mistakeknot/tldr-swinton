@@ -47,6 +47,44 @@ cd -
 Dataset files are under `tldr-bench/data/data/`. Do not add large dataset files
 directly to this repo; update the datasets repo instead and bump the submodule.
 
+## Module Selection (Agents)
+
+Preferred order when gathering context:
+
+```bash
+# 1) Diff-first context for recent changes
+tldrs diff-context --project . --budget 2000
+
+# 2) Symbol-level context for a specific entry
+tldrs context <entry> --project . --depth 2 --budget 2000 --format ultracompact
+
+# 3) Structure / extract for files or folders
+tldrs structure src/
+tldrs extract path/to/file.py
+
+# 4) Semantic search (requires index)
+tldrs index .
+tldrs find "authentication logic"
+
+# 5) Deep analysis helpers (optional)
+tldrs slice <file> <func> <line>
+tldrs cfg <file> <function>
+tldrs dfg <file> <function>
+```
+
+For large outputs, store as VHS refs:
+
+```bash
+tldrs context <entry> --project . --output vhs
+tldrs context <entry> --project . --include vhs://<hash>
+```
+
+If `tldrs-vhs` isn't on PATH (non-interactive shells), set:
+
+```bash
+export TLDRS_VHS_CMD="$HOME/tldrs-vhs/.venv/bin/tldrs-vhs"
+```
+
 ## Compression Prototype Promotion Gate
 
 Experimental compression modes (e.g., `--compress two-stage` or `--compress chunk-summary`) **must not be promoted** until they pass all of:
