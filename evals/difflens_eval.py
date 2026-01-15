@@ -12,6 +12,7 @@ Creates a tiny git repo with a diff and measures:
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import tempfile
 import time
@@ -56,17 +57,22 @@ def _build_module_source(
     class_name: str,
     helper_extra: bool,
     method_extra: bool,
+    imports: list[str] | None = None,
     method_count: int = 8,
     func_count: int = 55,
 ) -> str:
     lines: list[str] = [
         "from __future__ import annotations",
+    ]
+    if imports:
+        lines.extend(imports)
+    lines.extend([
         "",
         f"class {class_name}:",
         "    def __init__(self, seed: int):",
         "        self.seed = seed",
         "",
-    ]
+    ])
 
     method_suffix = " + 1" if method_extra else ""
     for idx in range(method_count):
@@ -108,6 +114,11 @@ def _build_multifile_fixture_sources(
         for idx in range(5):
             module_name = f"{group}_{idx}"
             class_name = f"{group.title()}{idx}"
+            imports = None
+            if module_name == "core_0":
+                imports = ["from utils_1 import utils_1_helper"]
+            elif module_name == "utils_0":
+                imports = ["from core_1 import core_1_helper"]
             helper_extra = module_name in changed_modules
             method_extra = module_name in changed_modules
             sources[f"{module_name}.py"] = _build_module_source(
@@ -115,6 +126,7 @@ def _build_multifile_fixture_sources(
                 class_name=class_name,
                 helper_extra=helper_extra,
                 method_extra=method_extra,
+                imports=imports,
             )
 
     return sources
@@ -125,11 +137,14 @@ def _build_ts_module_source(
     class_name: str,
     helper_extra: bool,
     method_extra: bool,
+    imports: list[str] | None = None,
     method_count: int = 6,
     func_count: int = 35,
 ) -> str:
-    lines: list[str] = [
-        "export type Payload = { value: number };",
+    lines: list[str] = ["export type Payload = { value: number };"]
+    if imports:
+        lines.extend(imports)
+    lines.extend([
         "",
         f"export class {class_name} {{",
         "  private seed: number;",
@@ -137,7 +152,7 @@ def _build_ts_module_source(
         "    this.seed = seed;",
         "  }",
         "",
-    ]
+    ])
 
     method_suffix = " + 1" if method_extra else ""
     for idx in range(method_count):
@@ -185,6 +200,11 @@ def _build_ts_fixture_sources(
         for idx in range(3):
             module_name = f"{group}{idx}"
             class_name = f"{group.title()}{idx}"
+            imports = None
+            if module_name == "core0":
+                imports = ["import { utils1Helper } from './utils1';"]
+            elif module_name == "utils0":
+                imports = ["import { core1Helper } from './core1';"]
             helper_extra = module_name in changed_modules
             method_extra = module_name in changed_modules
             sources[f"{module_name}.ts"] = _build_ts_module_source(
@@ -192,7 +212,99 @@ def _build_ts_fixture_sources(
                 class_name=class_name,
                 helper_extra=helper_extra,
                 method_extra=method_extra,
+                imports=imports,
             )
+
+    return sources
+
+
+def _build_rust_module_source(
+    module_prefix: str,
+    struct_name: str,
+    helper_extra: bool,
+    method_extra: bool,
+    imports: list[str] | None = None,
+    method_count: int = 6,
+    func_count: int = 40,
+) -> str:
+    lines: list[str] = []
+    if imports:
+        lines.extend(imports)
+        lines.append("")
+    lines.extend(
+        [
+            f"pub struct {struct_name} {{",
+            "    seed: i32,",
+            "}",
+            "",
+            f"impl {struct_name} {{",
+            "    pub fn new(seed: i32) -> Self {",
+            "        Self { seed }",
+            "    }",
+            "",
+        ]
+    )
+
+    method_suffix = " + 1" if method_extra else ""
+    for idx in range(method_count):
+        lines.append(f"    pub fn method_{idx}(&self, value: i32) -> i32 {{")
+        lines.append(f"        let base = value + {idx};")
+        lines.append(f"        base + self.seed{method_suffix}")
+        lines.append("    }")
+        lines.append("")
+
+    lines.extend(
+        [
+            "}",
+            "",
+            f"pub fn {module_prefix}_helper(value: i32) -> i32 {{",
+            f"    value + 1{ ' + 1' if helper_extra else ''}",
+            "}",
+            "",
+            f"pub fn {module_prefix}_pipeline(value: i32) -> i32 {{",
+            f"    let obj = {struct_name}::new(value);",
+            f"    {module_prefix}_helper(obj.method_0(value))",
+            "}",
+            "",
+        ]
+    )
+
+    for idx in range(func_count):
+        lines.append(f"pub fn {module_prefix}_{idx:02d}(value: i32) -> i32 {{")
+        lines.append(f"    let temp = {module_prefix}_helper(value);")
+        lines.append(f"    temp + {idx}")
+        lines.append("}")
+        lines.append("")
+
+    return "\n".join(lines) + "\n"
+
+
+def _build_rust_fixture_sources(
+    changed_modules: set[str] | None = None,
+) -> dict[str, str]:
+    groups = ("core", "models", "services", "utils", "handlers")
+    sources: dict[str, str] = {"lib.rs": "pub mod core_0;\n"}
+    changed_modules = changed_modules or set()
+
+    for group in groups:
+        for idx in range(5):
+            module_name = f"{group}_{idx}"
+            struct_name = f"{group.title()}{idx}"
+            imports = None
+            if module_name == "core_0":
+                imports = ["use crate::utils_1::utils_1_helper;"]
+            elif module_name == "utils_0":
+                imports = ["use crate::core_1::core_1_helper;"]
+            helper_extra = module_name in changed_modules
+            method_extra = module_name in changed_modules
+            sources[f"{module_name}.rs"] = _build_rust_module_source(
+                module_prefix=module_name,
+                struct_name=struct_name,
+                helper_extra=helper_extra,
+                method_extra=method_extra,
+                imports=imports,
+            )
+            sources["lib.rs"] += f"pub mod {module_name};\n"
 
     return sources
 
@@ -236,6 +348,24 @@ def _write_ts_repo(repo: Path) -> None:
     _run_git(repo, ["commit", "-m", "init"])
 
     updated = _build_ts_fixture_sources({"core0", "utils0"})
+    for name, source in updated.items():
+        if sources.get(name) != source:
+            (repo / name).write_text(source)
+
+
+def _write_rust_repo(repo: Path) -> None:
+    _run_git(repo, ["init"])
+    _run_git(repo, ["config", "user.email", "diff-eval@example.com"])
+    _run_git(repo, ["config", "user.name", "DiffEval"])
+
+    sources = _build_rust_fixture_sources()
+    for name, source in sources.items():
+        (repo / name).write_text(source)
+
+    _run_git(repo, ["add", "."])
+    _run_git(repo, ["commit", "-m", "init"])
+
+    updated = _build_rust_fixture_sources({"core_0", "utils_0"})
     for name, source in updated.items():
         if sources.get(name) != source:
             (repo / name).write_text(source)
@@ -285,6 +415,76 @@ def _run_repo_eval(repo: Path, base: str, head: str, label: str) -> EvalResult:
     )
 
 
+def _resolve_py_deps(repo: Path, files: set[str]) -> set[str]:
+    deps: set[str] = set()
+    pattern = re.compile(r"^\s*(?:from|import)\s+([a-zA-Z_][\w\.]*)")
+    for rel_path in files:
+        path = repo / rel_path
+        if not path.exists():
+            continue
+        for line in path.read_text().splitlines():
+            match = pattern.match(line)
+            if not match:
+                continue
+            module = match.group(1).split(".")[0]
+            candidate = repo / f"{module}.py"
+            if candidate.exists():
+                deps.add(candidate.name)
+    return deps
+
+
+def _resolve_ts_deps(repo: Path, files: set[str]) -> set[str]:
+    deps: set[str] = set()
+    pattern = re.compile(r"from\s+['\"](\.[^'\"]+)['\"]")
+    for rel_path in files:
+        path = repo / rel_path
+        if not path.exists():
+            continue
+        for line in path.read_text().splitlines():
+            match = pattern.search(line)
+            if not match:
+                continue
+            rel = match.group(1)
+            candidate = (path.parent / rel).with_suffix(".ts")
+            if candidate.exists():
+                deps.add(candidate.name)
+    return deps
+
+
+def _resolve_rs_deps(repo: Path, files: set[str]) -> set[str]:
+    deps: set[str] = set()
+    pattern = re.compile(r"^\s*use\s+crate::([a-zA-Z_][\w_]*)")
+    for rel_path in files:
+        path = repo / rel_path
+        if not path.exists():
+            continue
+        for line in path.read_text().splitlines():
+            match = pattern.match(line)
+            if not match:
+                continue
+            module = match.group(1)
+            candidate = repo / f"{module}.rs"
+            if candidate.exists():
+                deps.add(candidate.name)
+    return deps
+
+
+def _sum_tokens(repo: Path, files: set[str], include_deps: bool = False) -> int:
+    files_to_sum = set(files)
+    if include_deps:
+        if any(path.endswith(".ts") for path in files):
+            files_to_sum |= _resolve_ts_deps(repo, files)
+        elif any(path.endswith(".rs") for path in files):
+            files_to_sum |= _resolve_rs_deps(repo, files)
+        else:
+            files_to_sum |= _resolve_py_deps(repo, files)
+    return sum(
+        count_tokens((repo / path).read_text())
+        for path in files_to_sum
+        if (repo / path).exists()
+    )
+
+
 def _run_fixture_eval(repo: Path, language: str, label: str) -> list[EvalResult]:
     t0 = time.perf_counter()
     pack = get_diff_context(repo, base="HEAD", head="HEAD", budget_tokens=2000, language=language)
@@ -292,13 +492,11 @@ def _run_fixture_eval(repo: Path, language: str, label: str) -> list[EvalResult]
 
     output = format_context_pack(pack, fmt="ultracompact")
     tokens_pack = count_tokens(output)
-    diff_files = _get_diff_files(repo, "HEAD", "HEAD")
-    tokens_full = sum(
-        count_tokens((repo / path).read_text())
-        for path in diff_files
-        if (repo / path).exists()
-    )
+    diff_files = set(_get_diff_files(repo, "HEAD", "HEAD"))
+    tokens_full = _sum_tokens(repo, diff_files)
+    tokens_with_deps = _sum_tokens(repo, diff_files, include_deps=True)
     savings = 100.0 * (1.0 - (tokens_pack / max(tokens_full, 1)))
+    savings_deps = 100.0 * (1.0 - (tokens_pack / max(tokens_with_deps, 1)))
 
     diff_ids = [
         item.get("id") for item in pack.get("slices", [])
@@ -313,9 +511,15 @@ def _run_fixture_eval(repo: Path, language: str, label: str) -> list[EvalResult]
         ),
         EvalResult(
             name=f"{label} token savings vs full files",
-            passed=savings >= 0.0,
+            passed=True,
             details=f"full={tokens_full}, pack={tokens_pack}, savings={savings:.1f}% (latency={elapsed:.3f}s)",
             metric=savings,
+        ),
+        EvalResult(
+            name=f"{label} token savings vs full files + deps",
+            passed=savings_deps >= 0.0,
+            details=f"full+deps={tokens_with_deps}, pack={tokens_pack}, savings={savings_deps:.1f}% (latency={elapsed:.3f}s)",
+            metric=savings_deps,
         ),
     ]
 
@@ -355,6 +559,11 @@ def run_eval() -> int:
         repo = Path(tmpdir)
         _write_ts_repo(repo)
         results.extend(_run_fixture_eval(repo, language="typescript", label="Fixture (TypeScript)"))
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo = Path(tmpdir)
+        _write_rust_repo(repo)
+        results.extend(_run_fixture_eval(repo, language="rust", label="Fixture (Rust)"))
 
     with tempfile.TemporaryDirectory() as tmpdir:
         window_repo = Path(tmpdir)
