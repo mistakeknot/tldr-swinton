@@ -11,6 +11,7 @@ class BenchInstance:
     dataset: str
     repo: str | None = None
     base_commit: str | None = None
+    split: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -25,4 +26,6 @@ class BenchInstance:
             data["base_commit"] = self.base_commit
         if self.metadata:
             data["metadata"] = dict(self.metadata)
+        if self.split:
+            data["split"] = self.split
         return data

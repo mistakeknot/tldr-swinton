@@ -1,0 +1,9 @@
+[
+  {
+    "id": "rb-1",
+    "prompt": "def foo():\n    return 1",
+    "completion": "print(foo())",
+    "split": "test",
+    "repo_name": "example/repo"
+  }
+]

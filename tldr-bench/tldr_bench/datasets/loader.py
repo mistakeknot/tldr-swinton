@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from . import commit0 as commit0_loader
+from . import longbench as longbench_loader
+from . import repobench as repobench_loader
 from . import swebench as swebench_loader
 from .schema import BenchInstance
 
@@ -31,11 +33,19 @@ def _detect_kind(path: Path, records: list[dict[str, Any]]) -> str | None:
         return "swebench"
     if "commit0" in name:
         return "commit0"
+    if "repobench" in name:
+        return "repobench"
+    if "longbench" in name:
+        return "longbench"
     for record in records:
         if "problem_statement" in record or "test_patch" in record:
             return "swebench"
         if "repo_name" in record or "function_signature" in record or "tests" in record:
             return "commit0"
+        if "completion" in record or "cross_file" in record:
+            return "repobench"
+        if "dataset" in record and ("input" in record or "output" in record):
+            return "longbench"
     return None
 
 
@@ -49,6 +59,10 @@ def load_dataset(path: Path, kind: str | None = None) -> list[BenchInstance]:
         return [swebench_loader.normalize_record(record) for record in records]
     if dataset_kind == "commit0":
         return [commit0_loader.normalize_record(record) for record in records]
+    if dataset_kind == "repobench":
+        return [repobench_loader.normalize_record(record) for record in records]
+    if dataset_kind == "longbench":
+        return [longbench_loader.normalize_record(record) for record in records]
     raise ValueError(f"Unsupported dataset kind: {dataset_kind}")
 
 
