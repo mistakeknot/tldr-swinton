@@ -27,11 +27,12 @@ This fork fixes those issues while maintaining full compatibility with the origi
 | DiffLens (avg across Python/TS/Rust) | Diff-focused context vs diff+deps baseline | **48.0% token savings** at **~0.77s** avg latency |
 | Token efficiency eval | Compact + structure savings vs raw | **93.1%** compact savings, **62.4%** structure JSON savings |
 | Semantic search eval | Retrieval + token footprint | **84.8%** token savings; top-1 auth/db, cache in top-3 |
-| Agent workflow eval | Realistic agent scenarios | **61.2%** aggregate savings |
+| Agent workflow eval | Realistic agent scenarios | **83.6%** aggregate savings (chunk-summary, budget=2000) |
 
 **Methodology highlights:**
 - DiffLens baseline uses **diff+deps** (changed files + direct local imports). Diff-only may be negative and is reported in the eval output.
 - Metrics come from the built-in eval scripts in `evals/` and are reproducible locally.
+- Agent workflow eval uses diff-context for the "context pack" step: **61.2%** (none), **77.6%** (two-stage), **83.6%** (chunk-summary) at budget=2000.
 
 **Reproduce:**
 ```bash
@@ -39,6 +40,8 @@ This fork fixes those issues while maintaining full compatibility with the origi
 .venv/bin/python evals/token_efficiency_eval.py
 .venv/bin/python evals/semantic_search_eval.py
 .venv/bin/python evals/agent_workflow_eval.py
+.venv/bin/python evals/agent_workflow_eval.py --compress two-stage
+.venv/bin/python evals/agent_workflow_eval.py --compress chunk-summary
 ```
 
 ## Installation
