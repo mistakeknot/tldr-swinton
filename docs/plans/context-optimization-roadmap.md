@@ -187,6 +187,37 @@ P0:validate_token(tok:str)->bool @45-72
 
 From Oracle review, ranked for this codebase specifically:
 
+### Research Prototypes to Evaluate (Before Full Implementation)
+
+These are research-backed compression techniques to prototype as **opt-in modes**, evaluate on our core evals, and only then decide whether to fully integrate.
+
+**Prototype candidates (add small spikes + eval gates):**
+
+1. **LongCodeZip-style dual-stage code compression** (ref: https://arxiv.org/abs/2510.00446)  
+   Coarse function-level selection + fine block-level pruning under a budget.  
+   **Why:** Designed for code; preserves relevance under high compression.  
+   **Prototype:** Add a `--compress=two-stage` option to DiffLens/ContextPack that:
+   - scores functions by relevance (diff proximity + call graph + embedding similarity)
+   - prunes within functions by block-level relevance (CFG/PDG blocks or statement windows)
+   **Eval:** DiffLens + agent workflow evals; compare diff+deps baseline.
+
+2. **SCOPE-style chunk summarization compression** (ref: https://arxiv.org/abs/2508.15813)  
+   Chunk context into semantically coherent units and rewrite into concise summaries.  
+   **Prototype:** `--compress=chunk-summary` for code bodies, with configurable ratio; preserve signatures + key identifiers.  
+   **Eval:** Agent workflow eval + manual spot checks for correctness.
+
+3. **FrugalPrompt-style token attribution pruning** (ref: https://arxiv.org/abs/2510.16439)  
+   Score tokens for salience and keep top-k% in order.  
+   **Prototype:** `--compress=salience` as a last-mile reducer on ultracompact output.  
+   **Eval:** Token efficiency + agent workflow evals; guardrails for code tasks.
+
+4. **LLMLingua-style token-level compression** (ref: https://www.microsoft.com/en-us/research/blog/large-language-model-llm-prompt-compression-and-optimization-with-llmlingua/)  
+   Use a small LM to drop low-utility tokens while preserving LLM performance.  
+   **Prototype:** Optional compression pass on text-only sections (summaries, comments), not code.  
+   **Eval:** Semantic search + agent workflow evals.
+
+**Decision gate:** Require ≥10% additional savings vs current diff+deps baseline **without** regression on workflow evals before graduating to full implementation.
+
 ### 1. PDG-Guided Minimal Slices (Best Effort/Value)
 
 Program Dependence Graph analysis to include only statements that affect the modification point. Often only 10-30% of a function body is relevant.
