@@ -25,6 +25,7 @@ def load_config(path: Path | None) -> dict[str, Any]:
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     model_map = data.get("model_map", {})
     return {
+        "host": data.get("host", "127.0.0.1"),
         "port": data.get("port", 8089),
         "timeout_seconds": data.get("timeout_seconds", 120),
         "model_map": model_map,
@@ -34,7 +35,7 @@ def load_config(path: Path | None) -> dict[str, Any]:
 
 def run_cli(prompt: str, command: list[str], timeout_seconds: int) -> str:
     result = subprocess.run(
-        [*command, prompt],
+        command,
         input=prompt,
         text=True,
         capture_output=True,
@@ -127,7 +128,11 @@ def main() -> int:
     parser.add_argument("--config", default=None)
     args = parser.parse_args()
     config = load_config(Path(args.config) if args.config else None)
-    uvicorn.run(create_app(config), host="127.0.0.1", port=int(config["port"]))
+    uvicorn.run(
+        create_app(config),
+        host=str(config.get("host", "127.0.0.1")),
+        port=int(config["port"]),
+    )
     return 0
 
 

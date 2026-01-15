@@ -100,6 +100,8 @@ def main() -> int:
                     "tokenizer_model": args.resolved_model or args.model,
                     "shim_log_path": args.shim_log_path,
                 }
+                if instance_ids:
+                    run_config["instance_ids"] = instance_ids
                 result = run_task_router(task, args.variant, run_config)
                 result.update(host_metadata)
                 if args.agent:

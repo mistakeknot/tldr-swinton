@@ -6,12 +6,18 @@ from pathlib import Path
 from typing import Any
 
 from . import baselines, cassette, coveragelens, symbolkite
+from . import cfg, dfg, difflens, pdg, slice
 
 VARIANTS = {
     "baselines": baselines,
     "symbolkite": symbolkite,
     "cassette": cassette,
     "coveragelens": coveragelens,
+    "difflens": difflens,
+    "dfg": dfg,
+    "cfg": cfg,
+    "pdg": pdg,
+    "slice": slice,
 }
 
 

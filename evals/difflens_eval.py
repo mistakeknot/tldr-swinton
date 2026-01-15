@@ -51,21 +51,73 @@ def _run_git(repo: Path, args: list[str]) -> None:
     )
 
 
-def _build_fixture_source(dummy_funcs: int = 300, bar_extra: bool = False) -> str:
-    lines = [
-        "def foo():",
-        "    return 1",
+def _build_module_source(
+    module_prefix: str,
+    class_name: str,
+    helper_extra: bool,
+    method_extra: bool,
+    method_count: int = 8,
+    func_count: int = 55,
+) -> str:
+    lines: list[str] = [
+        "from __future__ import annotations",
         "",
-        "def bar():",
-        "    value = foo()",
-        "    return value + 1" if bar_extra else "    return value",
+        f"class {class_name}:",
+        "    def __init__(self, seed: int):",
+        "        self.seed = seed",
         "",
     ]
-    for idx in range(dummy_funcs):
-        lines.append(f"def dummy_{idx:03d}():")
-        lines.append(f"    return {idx}")
+
+    method_suffix = " + 1" if method_extra else ""
+    for idx in range(method_count):
+        lines.append(f"    def method_{idx}(self, value: int) -> int:")
+        lines.append(f"        base = value + {idx}")
+        lines.append(f"        return base + self.seed{method_suffix}")
         lines.append("")
+
+    helper_suffix = " + 2" if helper_extra else " + 1"
+    lines.extend(
+        [
+            f"def {module_prefix}_helper(value: int) -> int:",
+            f"    return value{helper_suffix}",
+            "",
+            f"def {module_prefix}_pipeline(value: int) -> int:",
+            f"    obj = {class_name}(value)",
+            f"    return {module_prefix}_helper(obj.method_0(value))",
+            "",
+        ]
+    )
+
+    for idx in range(func_count):
+        lines.append(f"def {module_prefix}_{idx:02d}(value: int) -> int:")
+        lines.append(f"    temp = {module_prefix}_helper(value)")
+        lines.append(f"    return temp + {idx}")
+        lines.append("")
+
     return "\n".join(lines) + "\n"
+
+
+def _build_multifile_fixture_sources(
+    changed_modules: set[str] | None = None,
+) -> dict[str, str]:
+    groups = ("core", "models", "services", "utils", "handlers")
+    sources: dict[str, str] = {}
+    changed_modules = changed_modules or set()
+
+    for group in groups:
+        for idx in range(5):
+            module_name = f"{group}_{idx}"
+            class_name = f"{group.title()}{idx}"
+            helper_extra = module_name in changed_modules
+            method_extra = module_name in changed_modules
+            sources[f"{module_name}.py"] = _build_module_source(
+                module_prefix=module_name,
+                class_name=class_name,
+                helper_extra=helper_extra,
+                method_extra=method_extra,
+            )
+
+    return sources
 
 
 def _build_window_fixture_source() -> str:
@@ -76,17 +128,22 @@ def _build_window_fixture_source() -> str:
     return "\n".join(lines) + "\n"
 
 
-def _write_repo(repo: Path) -> None:
+def _write_multifile_repo(repo: Path) -> None:
     _run_git(repo, ["init"])
     _run_git(repo, ["config", "user.email", "diff-eval@example.com"])
     _run_git(repo, ["config", "user.name", "DiffEval"])
 
-    file_path = repo / "app.py"
-    file_path.write_text(_build_fixture_source(dummy_funcs=300, bar_extra=False))
-    _run_git(repo, ["add", "app.py"])
+    sources = _build_multifile_fixture_sources()
+    for name, source in sources.items():
+        (repo / name).write_text(source)
+
+    _run_git(repo, ["add", "."])
     _run_git(repo, ["commit", "-m", "init"])
 
-    file_path.write_text(_build_fixture_source(dummy_funcs=300, bar_extra=True))
+    updated = _build_multifile_fixture_sources({"core_0", "utils_0"})
+    for name, source in updated.items():
+        if sources.get(name) != source:
+            (repo / name).write_text(source)
 
 
 def _write_window_repo(repo: Path) -> None:
@@ -161,7 +218,7 @@ def run_eval() -> int:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         repo = Path(tmpdir)
-        _write_repo(repo)
+        _write_multifile_repo(repo)
 
         t0 = time.perf_counter()
         pack = get_diff_context(repo, base="HEAD", head="HEAD", budget_tokens=2000, language="python")
@@ -169,7 +226,12 @@ def run_eval() -> int:
 
         output = format_context_pack(pack, fmt="ultracompact")
         tokens_pack = count_tokens(output)
-        tokens_full = count_tokens((repo / "app.py").read_text())
+        diff_files = _get_diff_files(repo, "HEAD", "HEAD")
+        tokens_full = sum(
+            count_tokens((repo / path).read_text())
+            for path in diff_files
+            if (repo / path).exists()
+        )
         savings = 100.0 * (1.0 - (tokens_pack / max(tokens_full, 1)))
 
         diff_ids = [

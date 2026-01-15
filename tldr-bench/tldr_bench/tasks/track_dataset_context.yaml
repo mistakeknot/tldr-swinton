@@ -1,0 +1,8 @@
+- id: dataset-ctx-001
+  title: "Dataset context: SWE-bench sample"
+  runner: "dataset_context"
+  dataset_path: "data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/api.py:get_relevant_context"
+  depth: 1
+  context_format: "text"

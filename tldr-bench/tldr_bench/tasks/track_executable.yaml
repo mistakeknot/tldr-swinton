@@ -5,3 +5,5 @@
   benchmark: "swebench"
   llm_config: "/tmp/llm_config_codex.json"
   select: "django__django-11333"
+  max_iterations: 1
+  max_retries: 0

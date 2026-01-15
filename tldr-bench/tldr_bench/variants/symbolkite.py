@@ -2,7 +2,7 @@ VARIANT_ID = "symbolkite"
 
 
 def build_context(task: dict) -> str:
-    from tldr_swinton.api import get_relevant_context
+    from tldr_swinton.engines.symbolkite import get_relevant_context
     from tldr_swinton.output_formats import format_context
 
     from . import resolve_project_root
@@ -15,6 +15,7 @@ def build_context(task: dict) -> str:
     depth = task.get("depth", 1)
     language = task.get("language", "python")
     budget = task.get("budget")
+    fmt = task.get("context_format", "text")
 
     ctx = get_relevant_context(str(project), entry, depth=depth, language=language)
-    return format_context(ctx, fmt="text", budget_tokens=budget)
+    return format_context(ctx, fmt=fmt, budget_tokens=budget)

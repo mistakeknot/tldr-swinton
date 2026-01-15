@@ -19,5 +19,15 @@ def test_difflens_eval_exists() -> None:
 
 def test_fixture_source_size() -> None:
     module = _load_eval_module()
-    source = module._build_fixture_source(300)
-    assert source.count("\n") >= 300
+    sources = module._build_multifile_fixture_sources()
+    assert isinstance(sources, dict)
+    assert len(sources) >= 25
+    total_lines = sum(source.count("\n") for source in sources.values())
+    assert total_lines >= 5000
+
+
+def test_multifile_fixture_written(tmp_path: Path) -> None:
+    module = _load_eval_module()
+    module._write_multifile_repo(tmp_path)
+    files = sorted(p.name for p in tmp_path.iterdir() if p.suffix == ".py")
+    assert len(files) >= 25

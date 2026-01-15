@@ -42,6 +42,15 @@ def run_task(task: dict[str, Any], variant: str) -> dict[str, Any]:
         select = task.get("select")
         if select:
             command.extend(["--select", select])
+        max_iterations = task.get("max_iterations")
+        if max_iterations:
+            command.extend(["--max-iterations", str(max_iterations)])
+        num_workers = task.get("num_workers")
+        if num_workers:
+            command.extend(["--num-workers", str(num_workers)])
+        max_retries = task.get("max_retries")
+        if max_retries is not None:
+            command.extend(["--max-retries", str(max_retries)])
         result = subprocess.run(
             command,
             cwd=bench_dir,

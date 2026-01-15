@@ -48,6 +48,8 @@ Track task suites:
 - `track_context` (static/context-only)
 - `track_frontier` (CLI frontier, local Codex/Claude)
 - `track_executable` (OpenHands / executable harness)
+- `track_dataset` (dataset prompt stats only)
+- `track_dataset_context` (dataset prompt + context token stats)
 
 Token savings snapshots are tool-specific. Use your variant outputs plus the
 baseline runners to compute savings for your own strategy.
@@ -57,6 +59,22 @@ Track B (frontier/CLI) via shim:
 1) Start shim with logging enabled (see `tldr-bench/shim/README.md`).
 2) Run:
    `PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/run_bench.py --tasks track_frontier --variant baselines --allow-cli --shim-log-path /tmp/tldr-shim.jsonl --print-results`
+
+Dataset context (token-savings only):
+
+```
+PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/run_bench.py \
+  --tasks track_dataset_context --variant symbolkite --print-results \
+  --instance-ids psf__requests-2674,django__django-11333
+```
+
+Savings report (baseline vs variant):
+
+```
+PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/report_savings.py \
+  --baseline tldr-bench/results/baseline.jsonl \
+  --variant tldr-bench/results/symbolkite.jsonl
+```
 
 ## CLI Shim (Codex/Claude Code)
 

@@ -18,6 +18,10 @@ def resolve_task_file(name_or_path: str) -> Path:
         return Path(__file__).with_name("track_frontier.yaml")
     if name_or_path == "track_executable":
         return Path(__file__).with_name("track_executable.yaml")
+    if name_or_path == "track_dataset":
+        return Path(__file__).with_name("track_dataset.yaml")
+    if name_or_path == "track_dataset_context":
+        return Path(__file__).with_name("track_dataset_context.yaml")
     raise FileNotFoundError(f"Unknown task file: {name_or_path}")
 
 

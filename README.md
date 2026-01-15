@@ -305,6 +305,12 @@ tldr-swinton provides 5 layers of code analysis:
 
 Each layer can be accessed separately (ARISTODE pattern) or combined.
 
+## Engines
+
+Discrete context strategies now live under `tldr_swinton.engines.*` as stable
+entry points (SymbolKite, DiffLens, CFG, DFG, PDG, Slice). The `api.py` wrappers
+remain for backward compatibility.
+
 ## Example Output
 
 ```bash

@@ -203,7 +203,7 @@ class HybridExtractor:
             PathTraversalError: If path contains directory traversal patterns
         """
         # Security: Import and validate path containment
-        from .api import _validate_path_containment
+        from .path_utils import _validate_path_containment
         _validate_path_containment(str(file_path), base_path)
         file_path = Path(file_path)
 

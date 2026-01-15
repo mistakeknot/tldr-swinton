@@ -29,6 +29,14 @@ __original_author__ = "parcadei"
 
 # Original exports
 from .signature_extractor_pygments import SignatureExtractor
+from .engines import (
+    get_cfg_context as engine_get_cfg_context,
+    get_dfg_context as engine_get_dfg_context,
+    get_diff_context as engine_get_diff_context,
+    get_pdg_context as engine_get_pdg_context,
+    get_relevant_context as engine_get_relevant_context,
+    get_slice as engine_get_slice,
+)
 
 # Layer 1: AST
 from .ast_extractor import extract_python, extract_file
@@ -67,6 +75,13 @@ from .pdg_extractor import (
 __all__ = [
     # Original
     "SignatureExtractor",
+    # Engines (stable entry points)
+    "engine_get_cfg_context",
+    "engine_get_dfg_context",
+    "engine_get_diff_context",
+    "engine_get_pdg_context",
+    "engine_get_relevant_context",
+    "engine_get_slice",
     # Layer 1: AST
     "extract_python",
     "extract_file",

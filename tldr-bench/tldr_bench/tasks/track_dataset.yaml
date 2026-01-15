@@ -1,0 +1,5 @@
+- id: dataset-001
+  title: "Dataset: SWE-bench sample"
+  runner: "dataset"
+  dataset_path: "data/swebench_sample.jsonl"
+  dataset_kind: "swebench"

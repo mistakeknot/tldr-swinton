@@ -1,0 +1,2 @@
+2026-01-14 09:13:23,068 - INFO - Environment image sweb.env.py.arm64.2baaea72acc974f6c02079:latest found for django__django-11333
+Building instance image swebench/sweb.eval.arm64.django_1776_django-11333:latest for django__django-11333
