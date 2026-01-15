@@ -13,6 +13,8 @@ def build_context(task: dict) -> str:
     budget = task.get("budget")
     language = task.get("language", "python")
     fmt = task.get("context_format", "ultracompact")
+    if fmt == "text":
+        fmt = "ultracompact"
 
     pack = get_diff_context(project, base=base, head=head, budget_tokens=budget, language=language)
     return format_context_pack(pack, fmt=fmt)

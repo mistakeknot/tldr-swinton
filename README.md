@@ -128,6 +128,18 @@ DiffLens and VHS usage for coding agents:
 # Install tldrs-vhs (https://github.com/mistakeknot/tldrs-vhs)
 curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldrs-vhs/main/scripts/install.sh | bash
 
+# Decision guide (which tool to use when):
+# 1) Working on recent changes? -> DiffLens first:
+#    tldrs diff-context --project . --budget 2000
+# 2) Need call-graph context around a symbol? -> SymbolKite:
+#    tldrs context <entry> --project . --depth 2 --budget 2000 --format ultracompact
+# 3) Need structure of a folder/file? -> Structure/Extract:
+#    tldrs structure src/ --lang typescript
+#    tldrs extract path/to/file.ts
+# 4) Need semantic search? -> Index + Find:
+#    tldrs index .
+#    tldrs find "authentication logic"
+
 # Diff-first context for current changes
 tldrs diff-context --project . --budget 2000
 
@@ -140,6 +152,7 @@ tldrs context main --project . --include vhs://<hash>
 # Notes:
 # - diff-context defaults to merge-base(main/master) → HEAD
 # - vhs output prints ref + summary/preview (30 lines / 2 KB)
+# - ultracompact format saves tokens (`--format ultracompact`)
 # - suppress ambiguous entry warnings with TLDRS_NO_WARNINGS=1
 # - Optional overrides:
 #   - TLDRS_VHS_CMD="python -m tldrs_vhs.cli"

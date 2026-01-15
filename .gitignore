@@ -75,3 +75,4 @@ venv.bak/
 .beads/
 results/
 tldr-bench/vendor/openhands-benchmarks/
+logs/

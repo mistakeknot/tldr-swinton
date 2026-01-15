@@ -31,3 +31,19 @@ def test_multifile_fixture_written(tmp_path: Path) -> None:
     module._write_multifile_repo(tmp_path)
     files = sorted(p.name for p in tmp_path.iterdir() if p.suffix == ".py")
     assert len(files) >= 25
+
+
+def test_ts_fixture_sources() -> None:
+    module = _load_eval_module()
+    sources = module._build_ts_fixture_sources()
+    assert isinstance(sources, dict)
+    assert len(sources) >= 10
+    total_lines = sum(source.count("\n") for source in sources.values())
+    assert total_lines >= 1500
+
+
+def test_ts_fixture_written(tmp_path: Path) -> None:
+    module = _load_eval_module()
+    module._write_ts_repo(tmp_path)
+    files = sorted(p.name for p in tmp_path.iterdir() if p.suffix == ".ts")
+    assert len(files) >= 10

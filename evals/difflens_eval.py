@@ -120,6 +120,83 @@ def _build_multifile_fixture_sources(
     return sources
 
 
+def _build_ts_module_source(
+    module_prefix: str,
+    class_name: str,
+    helper_extra: bool,
+    method_extra: bool,
+    method_count: int = 6,
+    func_count: int = 35,
+) -> str:
+    lines: list[str] = [
+        "export type Payload = { value: number };",
+        "",
+        f"export class {class_name} {{",
+        "  private seed: number;",
+        "  constructor(seed: number) {",
+        "    this.seed = seed;",
+        "  }",
+        "",
+    ]
+
+    method_suffix = " + 1" if method_extra else ""
+    for idx in range(method_count):
+        lines.append(f"  method{idx}(value: number): number {{")
+        lines.append(f"    const base = value + {idx};")
+        lines.append(f"    return base + this.seed{method_suffix};")
+        lines.append("  }")
+        lines.append("")
+
+    helper_suffix = " + 2" if helper_extra else " + 1"
+    lines.extend(
+        [
+            "}",
+            "",
+            f"export function {module_prefix}Helper(value: number): number {{",
+            f"  return value{helper_suffix};",
+            "}",
+            "",
+            f"export function {module_prefix}Pipeline(payload: Payload): number {{",
+            f"  const obj = new {class_name}(payload.value);",
+            f"  return {module_prefix}Helper(obj.method0(payload.value));",
+            "}",
+            "",
+        ]
+    )
+
+    for idx in range(func_count):
+        lines.append(f"export function {module_prefix}Fn{idx}(value: number): number {{")
+        lines.append(f"  const temp = {module_prefix}Helper(value);")
+        lines.append(f"  return temp + {idx};")
+        lines.append("}")
+        lines.append("")
+
+    return "\n".join(lines) + "\n"
+
+
+def _build_ts_fixture_sources(
+    changed_modules: set[str] | None = None,
+) -> dict[str, str]:
+    groups = ("core", "models", "services", "utils")
+    sources: dict[str, str] = {}
+    changed_modules = changed_modules or set()
+
+    for group in groups:
+        for idx in range(3):
+            module_name = f"{group}{idx}"
+            class_name = f"{group.title()}{idx}"
+            helper_extra = module_name in changed_modules
+            method_extra = module_name in changed_modules
+            sources[f"{module_name}.ts"] = _build_ts_module_source(
+                module_prefix=module_name,
+                class_name=class_name,
+                helper_extra=helper_extra,
+                method_extra=method_extra,
+            )
+
+    return sources
+
+
 def _build_window_fixture_source() -> str:
     lines = ["def foo():"]
     for idx in range(1, 45):
@@ -141,6 +218,24 @@ def _write_multifile_repo(repo: Path) -> None:
     _run_git(repo, ["commit", "-m", "init"])
 
     updated = _build_multifile_fixture_sources({"core_0", "utils_0"})
+    for name, source in updated.items():
+        if sources.get(name) != source:
+            (repo / name).write_text(source)
+
+
+def _write_ts_repo(repo: Path) -> None:
+    _run_git(repo, ["init"])
+    _run_git(repo, ["config", "user.email", "diff-eval@example.com"])
+    _run_git(repo, ["config", "user.name", "DiffEval"])
+
+    sources = _build_ts_fixture_sources()
+    for name, source in sources.items():
+        (repo / name).write_text(source)
+
+    _run_git(repo, ["add", "."])
+    _run_git(repo, ["commit", "-m", "init"])
+
+    updated = _build_ts_fixture_sources({"core0", "utils0"})
     for name, source in updated.items():
         if sources.get(name) != source:
             (repo / name).write_text(source)
@@ -190,6 +285,41 @@ def _run_repo_eval(repo: Path, base: str, head: str, label: str) -> EvalResult:
     )
 
 
+def _run_fixture_eval(repo: Path, language: str, label: str) -> list[EvalResult]:
+    t0 = time.perf_counter()
+    pack = get_diff_context(repo, base="HEAD", head="HEAD", budget_tokens=2000, language=language)
+    elapsed = time.perf_counter() - t0
+
+    output = format_context_pack(pack, fmt="ultracompact")
+    tokens_pack = count_tokens(output)
+    diff_files = _get_diff_files(repo, "HEAD", "HEAD")
+    tokens_full = sum(
+        count_tokens((repo / path).read_text())
+        for path in diff_files
+        if (repo / path).exists()
+    )
+    savings = 100.0 * (1.0 - (tokens_pack / max(tokens_full, 1)))
+
+    diff_ids = [
+        item.get("id") for item in pack.get("slices", [])
+        if item.get("relevance") == "contains_diff"
+    ]
+
+    return [
+        EvalResult(
+            name=f"{label} diff symbol mapped",
+            passed=bool(diff_ids),
+            details=f"symbols={diff_ids}",
+        ),
+        EvalResult(
+            name=f"{label} token savings vs full files",
+            passed=savings >= 0.0,
+            details=f"full={tokens_full}, pack={tokens_pack}, savings={savings:.1f}% (latency={elapsed:.3f}s)",
+            metric=savings,
+        ),
+    ]
+
+
 def _get_diff_files(repo: Path, base: str, head: str) -> list[str]:
     def _run(args: list[str]) -> list[str]:
         result = subprocess.run(
@@ -219,37 +349,12 @@ def run_eval() -> int:
     with tempfile.TemporaryDirectory() as tmpdir:
         repo = Path(tmpdir)
         _write_multifile_repo(repo)
+        results.extend(_run_fixture_eval(repo, language="python", label="Fixture (Python)"))
 
-        t0 = time.perf_counter()
-        pack = get_diff_context(repo, base="HEAD", head="HEAD", budget_tokens=2000, language="python")
-        elapsed = time.perf_counter() - t0
-
-        output = format_context_pack(pack, fmt="ultracompact")
-        tokens_pack = count_tokens(output)
-        diff_files = _get_diff_files(repo, "HEAD", "HEAD")
-        tokens_full = sum(
-            count_tokens((repo / path).read_text())
-            for path in diff_files
-            if (repo / path).exists()
-        )
-        savings = 100.0 * (1.0 - (tokens_pack / max(tokens_full, 1)))
-
-        diff_ids = [
-            item.get("id") for item in pack.get("slices", [])
-            if item.get("relevance") == "contains_diff"
-        ]
-
-        results.append(EvalResult(
-            name="Fixture diff symbol mapped",
-            passed=bool(diff_ids),
-            details=f"symbols={diff_ids}",
-        ))
-        results.append(EvalResult(
-            name="Fixture token savings vs full file",
-            passed=savings >= 0.0,
-            details=f"full={tokens_full}, pack={tokens_pack}, savings={savings:.1f}% (latency={elapsed:.3f}s)",
-            metric=savings,
-        ))
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo = Path(tmpdir)
+        _write_ts_repo(repo)
+        results.extend(_run_fixture_eval(repo, language="typescript", label="Fixture (TypeScript)"))
 
     with tempfile.TemporaryDirectory() as tmpdir:
         window_repo = Path(tmpdir)

@@ -76,6 +76,13 @@ PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/report_savings.py \
   --variant tldr-bench/results/symbolkite.jsonl
 ```
 
+Sweep helper (baseline + variants):
+
+```
+PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/run_savings_sweep.py \
+  --instance-ids psf__requests-2674,django__django-11333
+```
+
 ## CLI Shim (Codex/Claude Code)
 
 See `tldr-bench/shim/README.md` for running the local OpenAI-compatible shim.
