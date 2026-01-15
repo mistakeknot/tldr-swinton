@@ -13,6 +13,7 @@ Token reduction comes from:
 This eval simulates real agent workflows and measures token usage.
 """
 
+import argparse
 import json
 import os
 import shutil
@@ -766,7 +767,25 @@ def run_tldrs(cmd: list[str], cwd: str) -> tuple[str, str, int]:
     return result.stdout, result.stderr, result.returncode
 
 
-def workflow_find_and_fix_bug(project_dir: str, all_files: dict[str, str]) -> WorkflowResult:
+def build_diff_context_args(
+    project_dir: str,
+    compress: Optional[str],
+    budget: Optional[int],
+) -> list[str]:
+    args = ["diff-context", "--project", project_dir]
+    if budget is not None:
+        args.extend(["--budget", str(budget)])
+    if compress and compress != "none":
+        args.extend(["--compress", compress])
+    return args
+
+
+def workflow_find_and_fix_bug(
+    project_dir: str,
+    all_files: dict[str, str],
+    compress: Optional[str] = None,
+    diff_context_tokens: Optional[int] = None,
+) -> WorkflowResult:
     """
     Simulate: "Fix the JWT token verification - it's not checking token type"
 
@@ -798,6 +817,8 @@ def workflow_find_and_fix_bug(project_dir: str, all_files: dict[str, str]) -> Wo
     # In real workflow, agent would read just that file
     tokens_file = all_files.get("auth/tokens.py", "")
     file_tokens = count_tokens(tokens_file)
+    if diff_context_tokens is not None:
+        file_tokens = diff_context_tokens
 
     tldr_tokens = search_tokens + file_tokens
 
@@ -812,14 +833,22 @@ def workflow_find_and_fix_bug(project_dir: str, all_files: dict[str, str]) -> Wo
     return WorkflowResult(
         "Find and fix JWT bug",
         passed,
-        f"Baseline: {baseline_tokens} tokens (all auth/), tldr: {tldr_tokens} tokens (search + relevant file)",
+        (
+            f"Baseline: {baseline_tokens} tokens (all auth/), tldr: {tldr_tokens} tokens "
+            f"(search + {'diff-context' if diff_context_tokens is not None else 'relevant file'})"
+        ),
         baseline_tokens,
         tldr_tokens,
         savings
     )
 
 
-def workflow_understand_module(project_dir: str, all_files: dict[str, str]) -> WorkflowResult:
+def workflow_understand_module(
+    project_dir: str,
+    all_files: dict[str, str],
+    compress: Optional[str] = None,
+    diff_context_tokens: Optional[int] = None,
+) -> WorkflowResult:
     """
     Simulate: "How does user management work in this codebase?"
 
@@ -849,6 +878,8 @@ def workflow_understand_module(project_dir: str, all_files: dict[str, str]) -> W
         if path.startswith("users/")
     ]
     users_tokens = sum(count_tokens(f) for f in users_files)
+    if diff_context_tokens is not None:
+        users_tokens = diff_context_tokens
 
     tldr_tokens = search_tokens + users_tokens
 
@@ -862,14 +893,22 @@ def workflow_understand_module(project_dir: str, all_files: dict[str, str]) -> W
     return WorkflowResult(
         "Understand user module",
         passed,
-        f"Baseline: {baseline_tokens} tokens (all files), tldr: {tldr_tokens} tokens (search + users/)",
+        (
+            f"Baseline: {baseline_tokens} tokens (all files), tldr: {tldr_tokens} tokens "
+            f"(search + {'diff-context' if diff_context_tokens is not None else 'users/'})"
+        ),
         baseline_tokens,
         tldr_tokens,
         savings
     )
 
 
-def workflow_add_feature(project_dir: str, all_files: dict[str, str]) -> WorkflowResult:
+def workflow_add_feature(
+    project_dir: str,
+    all_files: dict[str, str],
+    compress: Optional[str] = None,
+    diff_context_tokens: Optional[int] = None,
+) -> WorkflowResult:
     """
     Simulate: "Add password reset functionality"
 
@@ -899,6 +938,8 @@ def workflow_add_feature(project_dir: str, all_files: dict[str, str]) -> Workflo
     # 2. Read only the specific files needed
     needed_files = ["auth/passwords.py", "users/repository.py"]
     needed_tokens = sum(count_tokens(all_files.get(f, "")) for f in needed_files)
+    if diff_context_tokens is not None:
+        needed_tokens = diff_context_tokens
 
     tldr_tokens = search_tokens + needed_tokens
 
@@ -912,14 +953,22 @@ def workflow_add_feature(project_dir: str, all_files: dict[str, str]) -> Workflo
     return WorkflowResult(
         "Add password reset feature",
         passed,
-        f"Baseline: {baseline_tokens} tokens (auth/ + users/), tldr: {tldr_tokens} tokens (search + 2 files)",
+        (
+            f"Baseline: {baseline_tokens} tokens (auth/ + users/), tldr: {tldr_tokens} tokens "
+            f"(search + {'diff-context' if diff_context_tokens is not None else '2 files'})"
+        ),
         baseline_tokens,
         tldr_tokens,
         savings
     )
 
 
-def workflow_exact_symbol_lookup(project_dir: str, all_files: dict[str, str]) -> WorkflowResult:
+def workflow_exact_symbol_lookup(
+    project_dir: str,
+    all_files: dict[str, str],
+    compress: Optional[str] = None,
+    diff_context_tokens: Optional[int] = None,
+) -> WorkflowResult:
     """
     Simulate: "Show me the SessionManager class"
 
@@ -948,7 +997,10 @@ def workflow_exact_symbol_lookup(project_dir: str, all_files: dict[str, str]) ->
     search_tokens = count_tokens(search_out)
 
     # Still need to read the file to modify
-    tldr_tokens = search_tokens + baseline_tokens
+    if diff_context_tokens is not None:
+        tldr_tokens = search_tokens + diff_context_tokens
+    else:
+        tldr_tokens = search_tokens + baseline_tokens
 
     # For exact lookup, the win is in speed, not tokens
     # But search results are much smaller than full grep output
@@ -957,9 +1009,12 @@ def workflow_exact_symbol_lookup(project_dir: str, all_files: dict[str, str]) ->
     return WorkflowResult(
         "Exact symbol lookup",
         passed,
-        f"Exact match found: {has_exact_match}, search tokens: {search_tokens}",
+        (
+            f"Exact match found: {has_exact_match}, search tokens: {search_tokens} "
+            f"({compress or 'no'} compress)"
+        ),
         baseline_tokens,
-        search_tokens,  # Just search, since we'd read file anyway
+        tldr_tokens,
         0 if not has_exact_match else 90.0  # Estimate
     )
 
@@ -968,7 +1023,10 @@ def workflow_exact_symbol_lookup(project_dir: str, all_files: dict[str, str]) ->
 # Main
 # =============================================================================
 
-def run_all_workflows() -> list[WorkflowResult]:
+def run_all_workflows(
+    compress: Optional[str] = None,
+    budget: int = 2000,
+) -> list[WorkflowResult]:
     """Run all workflow evaluations."""
     results = []
 
@@ -989,11 +1047,38 @@ def run_all_workflows() -> list[WorkflowResult]:
         print("Index built successfully")
         print()
 
+        diff_context_tokens: Optional[int] = None
+        if compress:
+            diff_out, diff_err, diff_code = run_tldrs(
+                build_diff_context_args(str(project_dir), compress, budget),
+                cwd=str(project_dir),
+            )
+            if diff_code != 0:
+                print(f"ERROR: Failed to build diff-context: {diff_err}")
+                return []
+            diff_context_tokens = count_tokens(diff_out)
+
         # Run workflows
-        results.append(workflow_find_and_fix_bug(str(project_dir), all_files))
-        results.append(workflow_understand_module(str(project_dir), all_files))
-        results.append(workflow_add_feature(str(project_dir), all_files))
-        results.append(workflow_exact_symbol_lookup(str(project_dir), all_files))
+        results.append(
+            workflow_find_and_fix_bug(
+                str(project_dir), all_files, compress, diff_context_tokens
+            )
+        )
+        results.append(
+            workflow_understand_module(
+                str(project_dir), all_files, compress, diff_context_tokens
+            )
+        )
+        results.append(
+            workflow_add_feature(
+                str(project_dir), all_files, compress, diff_context_tokens
+            )
+        )
+        results.append(
+            workflow_exact_symbol_lookup(
+                str(project_dir), all_files, compress, diff_context_tokens
+            )
+        )
 
     return results
 
@@ -1036,7 +1121,28 @@ def print_results(results: list[WorkflowResult]) -> bool:
     return all_passed
 
 
+def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--compress",
+        choices=["none", "two-stage", "chunk-summary"],
+        default="none",
+        help="Experimental compression mode (default: none)",
+    )
+    parser.add_argument(
+        "--budget",
+        type=int,
+        default=2000,
+        help="Approx token budget for diff-context (default: 2000)",
+    )
+    args = parser.parse_args(argv)
+    if args.compress == "none":
+        args.compress = None
+    return args
+
+
 if __name__ == "__main__":
-    results = run_all_workflows()
+    args = parse_args()
+    results = run_all_workflows(compress=args.compress, budget=args.budget)
     all_passed = print_results(results)
     sys.exit(0 if all_passed else 1)
