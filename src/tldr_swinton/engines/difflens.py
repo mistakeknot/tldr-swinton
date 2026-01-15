@@ -243,19 +243,23 @@ def _two_stage_prune(
     if not keep_indexes:
         keep_indexes = [0]
 
-    expanded: set[int] = set()
-    for idx in keep_indexes:
-        expanded.add(idx)
-        if idx - 1 >= 0:
-            expanded.add(idx - 1)
-        if idx + 1 < block_count:
-            expanded.add(idx + 1)
+    allow_neighbors = budget_tokens is None or budget_tokens >= 2500
 
-    keep = sorted(expanded)
+    if allow_neighbors:
+        expanded: set[int] = set()
+        for idx in keep_indexes:
+            expanded.add(idx)
+            if idx - 1 >= 0:
+                expanded.add(idx - 1)
+            if idx + 1 < block_count:
+                expanded.add(idx + 1)
+        keep = sorted(expanded)
+    else:
+        keep = sorted(set(keep_indexes))
 
     max_blocks = None
     if budget_tokens is not None:
-        if budget_tokens <= 800:
+        if not allow_neighbors:
             max_blocks = 1
         elif budget_tokens <= 1600:
             max_blocks = 2
