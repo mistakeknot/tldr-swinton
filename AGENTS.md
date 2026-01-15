@@ -30,6 +30,13 @@ find . -name "*.pyc" -delete && find . -name "__pycache__" -type d -exec rm -rf 
 pip install -e .
 ```
 
+## Compression Prototype Promotion Gate
+
+Experimental compression modes (e.g., `--compress two-stage` or `--compress chunk-summary`) **must not be promoted** until they pass all of:
+- **≥10% additional savings** vs the current diff+deps baseline on `evals/difflens_eval.py`
+- **No regressions** on `evals/agent_workflow_eval.py`
+- **At least one manual spot check** on a real repo (correctness/readability)
+
 ## Architecture
 
 ### Core Extraction Pipeline
