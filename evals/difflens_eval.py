@@ -574,7 +574,7 @@ def run_eval() -> int:
     parser.add_argument(
         "--compress",
         default="none",
-        choices=["none", "two-stage"],
+        choices=["none", "two-stage", "chunk-summary"],
         help="Compression mode to evaluate",
     )
     args = parser.parse_args()

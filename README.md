@@ -202,8 +202,9 @@ tldrs diff-context --project . --format json
 # Budgeted output (approx tokens)
 tldrs diff-context --project . --budget 2000
 
-# Experimental two-stage compression (prototype)
+# Experimental compression (prototypes)
 tldrs diff-context --project . --compress two-stage
+tldrs diff-context --project . --compress chunk-summary
 ```
 
 **DiffLens JSON schema notes (2026-01-14):**
@@ -211,7 +212,8 @@ tldrs diff-context --project . --compress two-stage
 - `signatures_only` was removed; infer signature-only slices from `code == null`.
 - `diff_lines` is range-encoded (e.g., `[[1,3],[5,6]]`).
 - `code` is windowed around diffs with `...` separators.
- - Experimental compression adds `block_count` and `dropped_blocks` per slice.
+- Experimental compression adds `block_count` and `dropped_blocks` per slice.
+- Chunk-summary compression adds `summary` per slice and omits `code`.
 
 **Requirements:**
 - Python 3.10+

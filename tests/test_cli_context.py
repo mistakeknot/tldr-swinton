@@ -63,3 +63,33 @@ def test_cli_diff_context_compress(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert result.stdout.strip()
+
+
+def test_cli_diff_context_compress_chunk_summary(tmp_path: Path) -> None:
+    repo = tmp_path / "repo-summary"
+    repo.mkdir()
+    subprocess.run(["git", "-C", str(repo), "init"], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "diff-eval@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "DiffEval"], check=True)
+    (repo / "app.py").write_text("def foo():\n    return 1\n")
+    subprocess.run(["git", "-C", str(repo), "add", "app.py"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-m", "init"], check=True)
+    (repo / "app.py").write_text("def foo():\n    return 2\n")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "tldr_swinton.cli",
+            "diff-context",
+            "--project",
+            str(repo),
+            "--compress",
+            "chunk-summary",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0

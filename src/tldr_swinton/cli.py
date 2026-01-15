@@ -380,7 +380,7 @@ Semantic Search:
     diff_p.add_argument("--budget", type=int, default=None, help="Approx token budget for output")
     diff_p.add_argument(
         "--compress",
-        choices=["none", "two-stage"],
+        choices=["none", "two-stage", "chunk-summary"],
         default="none",
         help="Experimental compression mode (default: none)",
     )

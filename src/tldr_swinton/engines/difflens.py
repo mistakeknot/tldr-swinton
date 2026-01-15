@@ -279,6 +279,39 @@ def _two_stage_prune(
     return "\n".join(kept_lines), block_count, dropped_blocks
 
 
+def _build_summary(
+    signature: str,
+    code: str | None,
+    diff_lines: list[int],
+    budget_tokens: int | None,
+) -> str:
+    if not code:
+        return signature
+    lines = code.splitlines()
+    summary_lines = [signature]
+    if diff_lines:
+        summary_lines.append(f"# diff lines: {len(diff_lines)}")
+    keep_lines: list[str] = []
+    for line in lines[:12]:
+        stripped = line.strip()
+        if stripped.startswith("def ") or stripped.startswith("class "):
+            keep_lines.append(line)
+            continue
+        if "=" in line and stripped and not stripped.startswith("#"):
+            keep_lines.append(line)
+            continue
+        if stripped.startswith("return "):
+            keep_lines.append(line)
+            continue
+    if keep_lines:
+        summary_lines.append("...summary...")
+        summary_lines.extend(keep_lines[:6])
+    summary = "\n".join(summary_lines)
+    if budget_tokens is not None and len(summary) > budget_tokens * 4:
+        summary = "\n".join(summary_lines[:3])
+    return summary
+
+
 def build_diff_context_from_hunks(
     project: str | Path,
     hunks: list[tuple[str, int, int]],
@@ -479,6 +512,7 @@ def build_diff_context_from_hunks(
             lines_range = (func_info.line_number, func_info.line_number)
 
         code = None
+        summary = None
         code_scope_range = lines_range
         if compress == "two-stage" and symbol_id in symbol_diff_lines and lines_range:
             rel_part, qual_part = symbol_id.split(":", 1)
@@ -497,7 +531,7 @@ def build_diff_context_from_hunks(
                 start = max(1, start)
                 end = min(len(src_lines), end)
                 diff_line_list = sorted(symbol_diff_lines.get(symbol_id, []))
-                if compress == "two-stage":
+                if compress in ("two-stage", "chunk-summary"):
                     code = "\n".join(src_lines[start - 1:end])
                 else:
                     if diff_line_list:
@@ -514,6 +548,9 @@ def build_diff_context_from_hunks(
                 else:
                     block_count = 0
                     dropped_blocks = 0
+                if compress == "chunk-summary":
+                    summary = _build_summary(signature, code, diff_line_list, budget_tokens)
+                    code = None
         else:
             block_count = 0
             dropped_blocks = 0
@@ -540,6 +577,7 @@ def build_diff_context_from_hunks(
             "diff_lines": _to_ranges(sorted(symbol_diff_lines.get(symbol_id, []))),
             "block_count": block_count,
             "dropped_blocks": dropped_blocks,
+            "summary": summary,
         }
         slices.append(slice_entry)
 

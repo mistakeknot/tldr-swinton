@@ -230,3 +230,28 @@ def test_two_stage_does_not_pull_neighbor_blocks_under_tight_budget(tmp_path: Pa
     foo_slice = slice_map.get("app.py:foo")
     assert foo_slice and foo_slice.get("code")
     assert "alpha" not in foo_slice["code"]
+
+
+def test_chunk_summary_mode_emits_summary(tmp_path: Path) -> None:
+    from tldr_swinton.api import get_diff_context
+    repo = tmp_path / "repo-summary"
+    repo.mkdir()
+    import subprocess
+    subprocess.run(["git", "-C", str(repo), "init"], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "diff-eval@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "DiffEval"], check=True)
+    file_path = repo / "app.py"
+    file_path.write_text("def foo():\n    value = 1\n    return value\n")
+    subprocess.run(["git", "-C", str(repo), "add", "app.py"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-m", "init"], check=True)
+    file_path.write_text("def foo():\n    value = 2\n    return value\n")
+    pack = get_diff_context(
+        repo,
+        base="HEAD",
+        head="HEAD",
+        budget_tokens=500,
+        language="python",
+        compress="chunk-summary",
+    )
+    slices = pack.get("slices", [])
+    assert any(slice_.get("summary") for slice_ in slices)
