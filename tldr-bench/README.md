@@ -57,7 +57,8 @@ baseline runners to compute savings for your own strategy.
 ## Official datasets (SWE-bench / RepoBench / LongBench)
 
 The official dataset files live in the `tldr-bench/data` submodule and are
-tracked via Git LFS in that repo.
+tracked via Git LFS in that repo. The dataset files are under
+`tldr-bench/data/data/`.
 
 Setup:
 

@@ -20,7 +20,7 @@ def _resolve_encoding(model: str) -> tuple[str, tiktoken.Encoding]:
 
 def count_tokens(text: str, model: str | None = None) -> int:
     _tokenizer_id, enc = _resolve_encoding(model or "")
-    return len(enc.encode(text or ""))
+    return len(enc.encode(text or "", disallowed_special=()))
 
 
 @dataclass

@@ -30,6 +30,23 @@ find . -name "*.pyc" -delete && find . -name "__pycache__" -type d -exec rm -rf 
 pip install -e .
 ```
 
+## tldr-bench Datasets (Submodule)
+
+Official benchmark datasets live in the `tldr-bench/data` submodule and are
+stored in a separate repo: `https://github.com/mistakeknot/tldr-bench-datasets`.
+
+Setup:
+```bash
+git submodule update --init --recursive
+cd tldr-bench/data
+git lfs install
+git lfs pull
+cd -
+```
+
+Dataset files are under `tldr-bench/data/data/`. Do not add large dataset files
+directly to this repo; update the datasets repo instead and bump the submodule.
+
 ## Compression Prototype Promotion Gate
 
 Experimental compression modes (e.g., `--compress two-stage` or `--compress chunk-summary`) **must not be promoted** until they pass all of:

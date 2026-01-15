@@ -12,6 +12,7 @@ _PROMPT_KEYS = (
 )
 
 _ID_KEYS = (
+    "_id",
     "id",
     "task_id",
     "instance_id",
@@ -35,11 +36,16 @@ def normalize_record(record: Mapping[str, Any]) -> BenchInstance:
         instance_id = raw_id
 
     prompt = ""
-    for key in _PROMPT_KEYS:
-        value = record.get(key)
-        if value:
-            prompt = str(value)
-            break
+    context = record.get("context")
+    question = record.get("question")
+    if context and question:
+        prompt = f"{context}\n\n{question}"
+    else:
+        for key in _PROMPT_KEYS:
+            value = record.get(key)
+            if value:
+                prompt = str(value)
+                break
     if not prompt:
         raise ValueError(f"LongBench record {instance_id} missing prompt")
 

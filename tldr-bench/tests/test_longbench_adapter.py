@@ -13,3 +13,15 @@ def test_longbench_prompt():
     assert inst.dataset == "longbench"
     assert inst.split == "test"
     assert inst.metadata.get("output") == "It returns 1."
+
+
+def test_longbench_uses_context_and_question() -> None:
+    record = {
+        "_id": "lb-2",
+        "context": "Context blob.",
+        "question": "What is the answer?",
+        "answer": "42",
+    }
+    inst = normalize_record(record)
+    assert inst.instance_id == "lb-2"
+    assert inst.prompt == "Context blob.\n\nWhat is the answer?"

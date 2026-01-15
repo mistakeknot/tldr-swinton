@@ -1,39 +1,39 @@
 - id: swebench-lite-dev
   runner: dataset
-  dataset_path: tldr-bench/data/swebench_lite/data/dev-00000-of-00001.parquet
+  dataset_path: tldr-bench/data/data/swebench_lite/data/dev-00000-of-00001.parquet
   dataset_kind: swebench
 
 - id: swebench-lite-test
   runner: dataset
-  dataset_path: tldr-bench/data/swebench_lite/data/test-00000-of-00001.parquet
+  dataset_path: tldr-bench/data/data/swebench_lite/data/test-00000-of-00001.parquet
   dataset_kind: swebench
 
 - id: swebench-verified-test
   runner: dataset
-  dataset_path: tldr-bench/data/swebench_verified/data/test-00000-of-00001.parquet
+  dataset_path: tldr-bench/data/data/swebench_verified/data/test-00000-of-00001.parquet
   dataset_kind: swebench
 
 - id: repobench-cross-file-first-0
   runner: dataset
-  dataset_path: tldr-bench/data/repobench_python_v1.1/data/cross_file_first-00000-of-00002-baebda7f3a6e980a.parquet
+  dataset_path: tldr-bench/data/data/repobench_python_v1.1/data/cross_file_first-00000-of-00002-baebda7f3a6e980a.parquet
   dataset_kind: repobench
 
 - id: repobench-cross-file-first-1
   runner: dataset
-  dataset_path: tldr-bench/data/repobench_python_v1.1/data/cross_file_first-00001-of-00002-5780ed62c5162a3e.parquet
+  dataset_path: tldr-bench/data/data/repobench_python_v1.1/data/cross_file_first-00001-of-00002-5780ed62c5162a3e.parquet
   dataset_kind: repobench
 
 - id: repobench-cross-file-random
   runner: dataset
-  dataset_path: tldr-bench/data/repobench_python_v1.1/data/cross_file_random-00000-of-00001-523c739d72005569.parquet
+  dataset_path: tldr-bench/data/data/repobench_python_v1.1/data/cross_file_random-00000-of-00001-523c739d72005569.parquet
   dataset_kind: repobench
 
 - id: repobench-in-file
   runner: dataset
-  dataset_path: tldr-bench/data/repobench_python_v1.1/data/in_file-00000-of-00001-9721c68f6224a587.parquet
+  dataset_path: tldr-bench/data/data/repobench_python_v1.1/data/in_file-00000-of-00001-9721c68f6224a587.parquet
   dataset_kind: repobench
 
 - id: longbench-v2
   runner: dataset
-  dataset_path: tldr-bench/data/longbench_v2/data.json
+  dataset_path: tldr-bench/data/data/longbench_v2/data.json
   dataset_kind: longbench

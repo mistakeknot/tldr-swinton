@@ -12,6 +12,13 @@ from .schema import BenchInstance
 
 
 def _read_records(path: Path) -> list[dict[str, Any]]:
+    if path.suffix.lower() == ".parquet":
+        try:
+            import pyarrow.parquet as pq
+        except ImportError as exc:
+            raise RuntimeError("pyarrow is required to read parquet datasets") from exc
+        table = pq.read_table(path)
+        return table.to_pylist()
     if path.suffix.lower() == ".jsonl":
         records = []
         for line in path.read_text(encoding="utf-8").splitlines():

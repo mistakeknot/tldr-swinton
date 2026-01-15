@@ -37,3 +37,7 @@ def test_calculate_context_metrics_json_pack() -> None:
     expected_budget = 1.0 - abs(metrics.context_tokens - budget) / budget
     expected_budget = max(0.0, min(1.0, expected_budget))
     assert metrics.budget_compliance == expected_budget
+
+
+def test_count_tokens_allows_special_tokens() -> None:
+    assert count_tokens("<|endoftext|>") > 0

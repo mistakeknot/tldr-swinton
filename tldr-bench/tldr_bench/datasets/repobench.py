@@ -9,6 +9,9 @@ _PROMPT_KEYS = (
     "prompt",
     "input",
     "question",
+    "context",
+    "cropped_code",
+    "all_code",
 )
 
 _ID_KEYS = (
@@ -26,7 +29,15 @@ def normalize_record(record: Mapping[str, Any]) -> BenchInstance:
             instance_id = str(value).strip()
             break
     if not instance_id:
-        raise ValueError("RepoBench record missing id")
+        repo = str(record.get("repo_name") or "").strip()
+        path = str(record.get("file_path") or "").strip()
+        level = str(record.get("level") or "").strip()
+        next_line = str(record.get("next_line") or "").strip()
+        parts = [part for part in (repo, path, level, next_line) if part]
+        if parts:
+            instance_id = ":".join(parts)
+        else:
+            raise ValueError("RepoBench record missing id")
 
     prompt = ""
     for key in _PROMPT_KEYS:

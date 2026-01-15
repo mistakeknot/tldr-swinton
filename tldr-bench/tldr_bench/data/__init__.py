@@ -10,7 +10,14 @@ def verify_dataset_manifests(root: str | Path | None = None) -> list[str]:
     if not base.exists():
         return [f"data root not found: {base}"]
 
-    manifest_paths = sorted(base.glob("*/manifest.json"))
+    data_root = base
+    if (base / "data").is_dir():
+        data_root = base / "data"
+
+    manifest_paths = sorted(data_root.glob("*/manifest.json"))
+    if not manifest_paths and data_root != base:
+        data_root = base
+        manifest_paths = sorted(data_root.glob("*/manifest.json"))
     if not manifest_paths:
         return []
 
