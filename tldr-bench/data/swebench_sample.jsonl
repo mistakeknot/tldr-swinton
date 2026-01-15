@@ -1,2 +1,0 @@
-{"instance_id": "django__django-11333", "repo": "django/django", "base_commit": "a1b2c3d", "problem_statement": "Fix an issue where the admin changelist fails when a filter is empty."}
-{"instance_id": "psf__requests-2674", "repo": "psf/requests", "base_commit": "d4e5f6g", "problem_statement": "Ensure redirects preserve headers when allow_redirects is enabled."}

@@ -1,3 +1,6 @@
 [submodule "tldr-bench/vendor/openhands-benchmarks"]
 	path = tldr-bench/vendor/openhands-benchmarks
 	url = https://github.com/OpenHands/benchmarks
+[submodule "tldr-bench/data"]
+	path = tldr-bench/data
+	url = https://github.com/mistakeknot/tldr-bench-datasets.git
