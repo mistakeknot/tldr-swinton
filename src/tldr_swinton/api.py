@@ -738,6 +738,7 @@ def search(
     context_lines: int = 0,
     max_results: int = 100,
     max_files: int = 10000,
+    respect_gitignore: bool = False,
 ) -> list[dict]:
     """
     Search files for a regex pattern.
@@ -770,7 +771,11 @@ def search(
     compiled = re.compile(pattern)
     files_scanned = 0
 
-    for file_path in iter_workspace_files(root, extensions=extensions):
+    for file_path in iter_workspace_files(
+        root,
+        extensions=extensions,
+        respect_gitignore=respect_gitignore,
+    ):
         # Check file limit
         if max_files > 0 and files_scanned >= max_files:
             break
@@ -864,6 +869,7 @@ def get_code_structure(
     root: str | Path,
     language: str = "python",
     max_results: int = 100,
+    respect_gitignore: bool = False,
 ) -> dict:
     """
     Get code structure (codemaps) for all files in a project.
@@ -953,7 +959,11 @@ def get_code_structure(
     result = {"root": str(root), "language": language, "files": []}
 
     count = 0
-    for file_path in iter_workspace_files(root, extensions=extensions):
+    for file_path in iter_workspace_files(
+        root,
+        extensions=extensions,
+        respect_gitignore=respect_gitignore,
+    ):
         if count >= max_results:
             break
 

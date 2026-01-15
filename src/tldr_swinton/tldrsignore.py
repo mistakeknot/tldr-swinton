@@ -6,6 +6,7 @@ Uses pathspec library for gitignore-compatible pattern matching.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -118,13 +119,10 @@ def load_ignore_patterns(
     project_path = Path(project_dir)
     tldrsignore_path = project_path / ".tldrsignore"
     legacy_path = project_path / ".tldrignore"
-    gitignore_path = project_path / ".gitignore"
-
     patterns: list[str] = []
 
-    if include_gitignore and gitignore_path.exists():
-        content = gitignore_path.read_text()
-        patterns.extend(content.splitlines())
+    if include_gitignore:
+        patterns.extend(_load_gitignore_patterns(project_path))
 
     if tldrsignore_path.exists():
         content = tldrsignore_path.read_text()
@@ -137,6 +135,65 @@ def load_ignore_patterns(
         patterns.extend(DEFAULT_TEMPLATE.splitlines())
 
     return pathspec.PathSpec.from_lines("gitignore", patterns)
+
+
+def _translate_gitignore_pattern(pattern: str, prefix: str) -> str:
+    line = pattern.rstrip("\n")
+    if not line or line.lstrip().startswith("#"):
+        return line
+
+    negated = line.startswith("!")
+    body = line[1:] if negated else line
+
+    if body.startswith("\\#"):
+        body = body[1:]
+
+    if not prefix:
+        return f"!{body}" if negated else body
+
+    prefix = prefix.strip("/")
+    if body.startswith("/"):
+        body = body[1:]
+        combined = f"{prefix}/{body}"
+    elif "/" not in body:
+        combined = f"{prefix}/**/{body}"
+    else:
+        combined = f"{prefix}/{body}"
+
+    return f"!{combined}" if negated else combined
+
+
+def _load_gitignore_patterns(project_path: Path) -> list[str]:
+    patterns: list[str] = []
+    skip_dirs = {
+        ".git",
+        ".hg",
+        ".svn",
+        ".tldrs",
+        "node_modules",
+        ".venv",
+        "venv",
+        "__pycache__",
+        "dist",
+        "build",
+        "out",
+        "target",
+        "vendor",
+    }
+
+    for dirpath, dirnames, filenames in os.walk(project_path):
+        dirnames[:] = [
+            name for name in dirnames if name not in skip_dirs and not name.startswith(".git")
+        ]
+        if ".gitignore" not in filenames:
+            continue
+        gitignore_path = Path(dirpath) / ".gitignore"
+        rel_dir = os.path.relpath(dirpath, project_path)
+        prefix = "" if rel_dir == "." else rel_dir.replace(os.sep, "/")
+        for line in gitignore_path.read_text().splitlines():
+            patterns.append(_translate_gitignore_pattern(line, prefix))
+
+    return patterns
 
 
 def ensure_tldrsignore(project_dir: str | Path) -> tuple[bool, str]:

@@ -31,3 +31,25 @@ def test_workspace_iter_respects_legacy_tldrignore(tmp_path: Path) -> None:
 
     assert "src/a.py" in rels
     assert "vendor/ignore.py" not in rels
+
+
+def test_workspace_iter_respects_nested_gitignore(tmp_path: Path) -> None:
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / ".gitignore").write_text("*.log\n")
+    (tmp_path / "pkg" / "keep.py").write_text("print('ok')\n")
+    (tmp_path / "pkg" / "skip.log").write_text("nope\n")
+    (tmp_path / "pkg" / "nested").mkdir()
+    (tmp_path / "pkg" / "nested" / "skip2.log").write_text("nope\n")
+
+    files = list(
+        iter_workspace_files(
+            tmp_path,
+            extensions={".py", ".log"},
+            respect_gitignore=True,
+        )
+    )
+    rels = {str(p.relative_to(tmp_path)) for p in files}
+
+    assert "pkg/keep.py" in rels
+    assert "pkg/skip.log" not in rels
+    assert "pkg/nested/skip2.log" not in rels

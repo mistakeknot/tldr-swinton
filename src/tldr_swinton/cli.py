@@ -731,7 +731,10 @@ Semantic Search:
 
         elif args.command == "structure":
             result = get_code_structure(
-                args.path, language=args.lang, max_results=args.max
+                args.path,
+                language=args.lang,
+                max_results=args.max,
+                respect_gitignore=getattr(args, "respect_gitignore", False),
             )
             print(json.dumps(result, indent=2))
 
@@ -743,6 +746,7 @@ Semantic Search:
                 context_lines=args.context,
                 max_results=args.max,
                 max_files=args.max_files,
+                respect_gitignore=getattr(args, "respect_gitignore", False),
             )
             print(json.dumps(result, indent=2))
 
