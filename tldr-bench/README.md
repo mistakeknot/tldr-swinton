@@ -106,6 +106,14 @@ PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/report_savings.py \
   --variant tldr-bench/results/symbolkite.jsonl
 ```
 
+Compare results (baseline vs many variants):
+
+```
+PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/compare_results.py \
+  --baseline tldr-bench/results/baseline.jsonl \
+  --variants tldr-bench/results/symbolkite.jsonl tldr-bench/results/coveragelens.jsonl
+```
+
 Sweep helper (baseline + variants):
 
 ```
