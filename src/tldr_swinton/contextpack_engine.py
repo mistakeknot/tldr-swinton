@@ -9,6 +9,12 @@ from .symbol_registry import SymbolRegistry
 class Candidate:
     symbol_id: str
     relevance: int
+    relevance_label: str | None = None
+    order: int = 0
+    signature: str | None = None
+    code: str | None = None
+    lines: tuple[int, int] | None = None
+    meta: dict[str, object] | None = None
 
 
 @dataclass
@@ -18,6 +24,7 @@ class ContextSlice:
     code: str | None
     lines: tuple[int, int] | None
     relevance: str | None = None
+    meta: dict[str, object] | None = None
 
 
 @dataclass
@@ -38,19 +45,24 @@ class ContextPackEngine:
     ) -> ContextPack:
         if not candidates:
             return ContextPack(slices=[], signatures_only=[])
-        if self._registry is None:
-            raise ValueError("ContextPackEngine requires a SymbolRegistry")
-
-        ordered = sorted(candidates, key=lambda c: (-c.relevance, c.symbol_id))
+        ordered = sorted(candidates, key=lambda c: (-c.relevance, c.order, c.symbol_id))
         slices: list[ContextSlice] = []
         signatures_only: list[str] = []
         used = 0
 
         for candidate in ordered:
-            info = self._registry.get(candidate.symbol_id)
-            signature = info.signature
-            code = info.code
-            lines = info.lines
+            info = None
+            if candidate.signature is None:
+                if self._registry is None:
+                    raise ValueError("ContextPackEngine requires a SymbolRegistry for missing signatures")
+                info = self._registry.get(candidate.symbol_id)
+            signature = candidate.signature or (info.signature if info else "")
+            if candidate.code is None and self._registry is not None and info is None:
+                info = self._registry.get(candidate.symbol_id)
+            code = candidate.code if candidate.code is not None else (info.code if info else None)
+            if candidate.lines is None and self._registry is not None and info is None:
+                info = self._registry.get(candidate.symbol_id)
+            lines = candidate.lines if candidate.lines is not None else (info.lines if info else None)
 
             sig_cost = _estimate_tokens(signature)
             full_cost = sig_cost
@@ -64,6 +76,8 @@ class ContextPackEngine:
                         signature=signature,
                         code=code,
                         lines=lines,
+                        relevance=candidate.relevance_label,
+                        meta=candidate.meta,
                     )
                 )
                 used += full_cost

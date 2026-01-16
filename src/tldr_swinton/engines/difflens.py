@@ -9,6 +9,7 @@ from ..ast_extractor import FunctionInfo
 from ..cross_file_calls import build_project_call_graph
 from ..hybrid_extractor import HybridExtractor
 from ..workspace import iter_workspace_files
+from ..contextpack_engine import Candidate, ContextPackEngine
 
 DIFF_CONTEXT_LINES = 6
 
@@ -477,9 +478,6 @@ def build_diff_context_from_hunks(
                 relevance[caller] = "caller"
                 ordered.append(caller)
 
-    def _estimate_tokens(text: str) -> int:
-        return max(1, len(text) // 4)
-
     def _to_ranges(lines: list[int]) -> list[list[int]]:
         if not lines:
             return []
@@ -495,10 +493,11 @@ def build_diff_context_from_hunks(
         ranges.append([start, end])
         return ranges
 
-    slices: list[dict] = []
-    budget_used = 0
+    candidates: list[Candidate] = []
 
-    for symbol_id in ordered:
+    relevance_score = {"contains_diff": 3, "caller": 2, "callee": 2, "adjacent": 1}
+
+    for order_idx, symbol_id in enumerate(ordered):
         func_info = symbol_index.get(symbol_id)
         signature = signature_overrides.get(symbol_id)
         if not signature:
@@ -555,37 +554,49 @@ def build_diff_context_from_hunks(
             block_count = 0
             dropped_blocks = 0
 
-        sig_cost = _estimate_tokens(signature)
-        code_cost = _estimate_tokens(code) if code else 0
-        total_cost = sig_cost + code_cost
+        label = relevance.get(symbol_id, "adjacent")
+        candidates.append(
+            Candidate(
+                symbol_id=symbol_id,
+                relevance=relevance_score.get(label, 1),
+                relevance_label=label,
+                order=order_idx,
+                signature=signature,
+                code=code,
+                lines=code_scope_range or lines_range,
+                meta={
+                    "diff_lines": _to_ranges(sorted(symbol_diff_lines.get(symbol_id, []))),
+                    "block_count": block_count,
+                    "dropped_blocks": dropped_blocks,
+                    "summary": summary,
+                },
+            )
+        )
 
-        if budget_tokens is not None and budget_used + total_cost > budget_tokens:
-            if code and budget_used + sig_cost <= budget_tokens:
-                code = None
-                total_cost = sig_cost
-            else:
-                break
+    pack = ContextPackEngine(registry=None).build_context_pack(
+        candidates,
+        budget_tokens=budget_tokens,
+    )
 
-        budget_used += total_cost
-
-        slice_entry = {
-            "id": symbol_id,
-            "relevance": relevance.get(symbol_id, "adjacent"),
-            "signature": signature,
-            "code": code,
-            "lines": list(code_scope_range) if code_scope_range else (list(lines_range) if lines_range else []),
-            "diff_lines": _to_ranges(sorted(symbol_diff_lines.get(symbol_id, []))),
-            "block_count": block_count,
-            "dropped_blocks": dropped_blocks,
-            "summary": summary,
+    slices: list[dict] = []
+    for item in pack.slices:
+        entry = {
+            "id": item.id,
+            "relevance": item.relevance,
+            "signature": item.signature,
+            "code": item.code,
+            "lines": list(item.lines) if item.lines else [],
         }
-        slices.append(slice_entry)
+        if item.meta:
+            entry.update(item.meta)
+        slices.append(entry)
 
     return {
         "base": None,
         "head": None,
-        "budget_used": budget_used,
+        "budget_used": pack.budget_used,
         "slices": slices,
+        "signatures_only": pack.signatures_only,
     }
 
 
