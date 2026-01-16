@@ -50,6 +50,8 @@ class RelevantContext:
     entry_point: str
     depth: int
     functions: list[FunctionContext] = field(default_factory=list)
+    ambiguous: bool = False
+    candidates: list[str] = field(default_factory=list)
 
     def to_llm_string(self) -> str:
         """Format for LLM injection."""
@@ -57,6 +59,11 @@ class RelevantContext:
             f"## Code Context: {self.entry_point} (depth={self.depth})",
             "",
         ]
+        if self.ambiguous and self.candidates:
+            lines.append("Ambiguous entry point. Candidates:")
+            for cand in self.candidates:
+                lines.append(f"- {cand}")
+            return "\n".join(lines)
 
         for func in self.functions:
             indent = "  " * min(func.depth, self.depth)
@@ -168,6 +175,7 @@ def get_relevant_context(
     depth: int = 2,
     language: str = "python",
     include_docstrings: bool = False,
+    disambiguate: bool = True,
 ) -> RelevantContext:
     """
     Get token-efficient context for an LLM starting from an entry point.
@@ -327,31 +335,31 @@ def get_relevant_context(
         for caller_symbol in caller_symbols:
             adjacency[caller_symbol].extend(callee_symbols)
 
-    def resolve_entry_symbols(name: str) -> list[str]:
+    def resolve_entry_symbols(name: str, allow_ambiguous: bool) -> tuple[list[str], list[str]]:
         if ":" in name:
             file_part, sym_part = name.split(":", 1)
             symbol_id = f"{file_part}:{sym_part}"
             if symbol_id in symbol_index:
-                return [symbol_id]
+                return [symbol_id], []
             symbol_id = f"{_to_rel_path(file_part)}:{sym_part}"
             if symbol_id in symbol_index:
-                return [symbol_id]
+                return [symbol_id], []
             matches = []
             for rel_path, names in file_name_index.items():
                 if rel_path == file_part or rel_path.endswith(file_part):
                     matches.extend(names.get(sym_part, []))
             if matches:
-                return matches
+                return matches, []
 
         if "." in name:
             matches = qualified_index.get(name, [])
             if matches:
-                return matches
+                return matches, []
 
         matches = name_index.get(name, [])
         if matches:
             if len(matches) == 1:
-                return matches
+                return matches, []
 
             def score_match(symbol_id: str) -> tuple[int, int, int, str]:
                 rel_path, sym = (
@@ -364,15 +372,17 @@ def get_relevant_context(
                 path_depth = rel_path.count("/") if rel_path else 0
                 return (-basename_match, -exact_match, path_depth, rel_path)
 
+            if not allow_ambiguous:
+                return [], matches
             chosen = sorted(matches, key=score_match)[0]
             if not os.environ.get("TLDRS_NO_WARNINGS"):
                 warnings.warn(
                     f"Ambiguous entry point '{name}' matched {len(matches)} symbols; using {chosen}",
                     stacklevel=2,
                 )
-            return [chosen]
+            return [chosen], matches
 
-        return [name]
+        return [name], []
 
     def _dedupe_sorted(values: list[str]) -> list[str]:
         return sorted(set(values))
@@ -381,7 +391,16 @@ def get_relevant_context(
         adjacency[key] = _dedupe_sorted(values)
 
     visited: set[str] = set()
-    queue = [(symbol_id, 0) for symbol_id in resolve_entry_symbols(entry_point)]
+    resolved, candidates = resolve_entry_symbols(entry_point, disambiguate)
+    if candidates and not resolved:
+        return RelevantContext(
+            entry_point=entry_point,
+            depth=depth,
+            functions=[],
+            ambiguous=True,
+            candidates=candidates,
+        )
+    queue = [(symbol_id, 0) for symbol_id in resolved]
     result_functions: list[FunctionContext] = []
 
     while queue:
@@ -455,6 +474,7 @@ def get_context_pack(
     language: str = "python",
     budget_tokens: int | None = None,
     include_docstrings: bool = False,
+    disambiguate: bool = False,
 ) -> dict:
     ctx = get_relevant_context(
         project,
@@ -462,7 +482,15 @@ def get_context_pack(
         depth=depth,
         language=language,
         include_docstrings=include_docstrings,
+        disambiguate=disambiguate,
     )
+    if ctx.ambiguous:
+        return {
+            "ambiguous": True,
+            "candidates": ctx.candidates,
+            "slices": [],
+            "signatures_only": [],
+        }
     candidates: list[Candidate] = []
     for order_idx, func in enumerate(ctx.functions):
         score = max(1, (depth - func.depth) + 1)

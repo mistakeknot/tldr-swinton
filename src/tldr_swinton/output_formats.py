@@ -71,6 +71,16 @@ def format_context_pack(pack: dict | ContextPack, fmt: str = "ultracompact") -> 
     """Format a DiffLens-style ContextPack."""
     if isinstance(pack, ContextPack):
         pack = _contextpack_to_dict(pack)
+    if isinstance(pack, dict) and pack.get("ambiguous"):
+        if fmt == "json":
+            return json.dumps(pack, separators=(",", ":"), ensure_ascii=False)
+        if fmt == "json-pretty":
+            return json.dumps(pack, indent=2, ensure_ascii=False)
+        candidates = pack.get("candidates", [])
+        lines = ["Ambiguous entry point. Candidates:"]
+        for cand in candidates:
+            lines.append(f"- {cand}")
+        return "\n".join(lines)
     if fmt == "json":
         return json.dumps(pack, separators=(",", ":"), ensure_ascii=False)
     if fmt == "json-pretty":
