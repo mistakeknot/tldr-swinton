@@ -19,6 +19,7 @@ def _dedupe_preserve(items: list[str]) -> list[str]:
     return deduped
 
 from .api import RelevantContext
+from .contextpack_engine import ContextPack, ContextSlice
 
 
 def format_context(
@@ -47,8 +48,27 @@ def format_context(
     raise ValueError(f"Unknown format: {fmt}")
 
 
-def format_context_pack(pack: dict, fmt: str = "ultracompact") -> str:
+def _contextpack_to_dict(pack: ContextPack) -> dict:
+    return {
+        "budget_used": pack.budget_used,
+        "slices": [
+            {
+                "id": item.id,
+                "signature": item.signature,
+                "code": item.code,
+                "lines": list(item.lines) if item.lines else None,
+                "relevance": item.relevance,
+            }
+            for item in pack.slices
+        ],
+        "signatures_only": list(pack.signatures_only),
+    }
+
+
+def format_context_pack(pack: dict | ContextPack, fmt: str = "ultracompact") -> str:
     """Format a DiffLens-style ContextPack."""
+    if isinstance(pack, ContextPack):
+        pack = _contextpack_to_dict(pack)
     if fmt == "json":
         return json.dumps(pack, separators=(",", ":"), ensure_ascii=False)
     if fmt == "json-pretty":

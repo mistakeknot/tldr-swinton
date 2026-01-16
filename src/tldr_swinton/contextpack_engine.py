@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .output_formats import _estimate_tokens
 from .symbol_registry import SymbolRegistry
 
 
@@ -79,3 +78,13 @@ class ContextPackEngine:
             signatures_only=signatures_only,
             budget_used=used,
         )
+
+
+def _estimate_tokens(text: str) -> int:
+    try:
+        import tiktoken
+
+        encoding = tiktoken.get_encoding("cl100k_base")
+        return len(encoding.encode(text))
+    except Exception:
+        return max(1, len(text) // 4)
