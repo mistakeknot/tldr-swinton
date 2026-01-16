@@ -44,6 +44,47 @@ export TLDRS_VHS_CMD="$HOME/tldrs-vhs/.venv/bin/tldrs-vhs"
    - `tldrs cfg <file> <function>`
    - `tldrs dfg <file> <function>`
 
+## Entry Syntax and Discovery
+
+- Entry formats: `file.py:func`, `Class.method`, `module:func`
+- Example: `tldrs context src/app.py:handle_request --project .`
+- If unsure, discover names first: `tldrs structure src/`
+
+## Language Flags
+
+- Use `--lang` for non-Python repos.
+- Example: `tldrs structure src/ --lang typescript`
+- Example: `tldrs context src/main.rs:run --lang rust`
+
+## Budget and Depth Tuning
+
+- If context is thin, increase depth: `--depth 3`
+- If output is large, reduce budget or use ultracompact:
+  - `tldrs context <entry> --depth 3 --budget 1500 --format ultracompact`
+
+## DiffLens Compression
+
+- Two-stage compression:
+  - `tldrs diff-context --project . --budget 1500 --compress two-stage`
+- Chunk-summary compression:
+  - `tldrs diff-context --project . --budget 1500 --compress chunk-summary`
+
+## Impact / Test Selection
+
+- Git diff to affected tests:
+  - `tldrs change-impact --git --git-base HEAD~1`
+- Session-modified files (run tests):
+  - `tldrs change-impact --session --run`
+
+## Call Graph and Import Helpers
+
+- Call graph:
+  - `tldrs calls . --lang python`
+- Reverse call graph (callers):
+  - `tldrs impact authenticate --depth 3 --lang python`
+- Importers:
+  - `tldrs importers tldr_swinton.api --lang python`
+
 ## Output Handling
 
 - Use budgets to cap output size: `--budget 2000`.
@@ -55,6 +96,8 @@ tldrs context main --project . --output vhs
 # Later:
 tldrs context main --project . --include vhs://<hash>
 ```
+
+- `--output vhs` prints a ref plus a short summary/preview; the ref is what saves tokens.
 
 ## Troubleshooting
 
