@@ -11,10 +11,12 @@ class SymbolInfo:
         signature: str,
         file: str,
         lines: tuple[int, int] | None,
+        code: str | None,
     ) -> None:
         self.signature = signature
         self.file = file
         self.lines = lines
+        self.code = code
 
 
 class SymbolRegistry:
@@ -29,8 +31,13 @@ class SymbolRegistry:
         file_path = self.root / file_part
         extractor = HybridExtractor()
         info = extractor.extract(str(file_path))
+        code = None
+        try:
+            code = file_path.read_text()
+        except OSError:
+            code = None
         for func in info.functions:
             if func.name == name:
                 line = func.line_number or 0
-                return SymbolInfo(func.signature(), file_part, (line, line))
+                return SymbolInfo(func.signature(), file_part, (line, line), code)
         raise KeyError(symbol_id)
