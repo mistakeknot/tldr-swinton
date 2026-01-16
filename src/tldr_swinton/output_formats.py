@@ -59,6 +59,7 @@ def _contextpack_to_dict(pack: ContextPack) -> dict:
                 "lines": list(item.lines) if item.lines else None,
                 "relevance": item.relevance,
                 "meta": item.meta,
+                "etag": item.etag,
             }
             for item in pack.slices
         ],

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 
 from .symbol_registry import SymbolRegistry
 
@@ -25,6 +26,7 @@ class ContextSlice:
     lines: tuple[int, int] | None
     relevance: str | None = None
     meta: dict[str, object] | None = None
+    etag: str | None = None
 
 
 @dataclass
@@ -70,6 +72,7 @@ class ContextPackEngine:
                 full_cost += _estimate_tokens(code)
 
             if budget_tokens is None or used + full_cost <= budget_tokens:
+                etag = _compute_etag(signature, code)
                 slices.append(
                     ContextSlice(
                         id=candidate.symbol_id,
@@ -78,6 +81,7 @@ class ContextPackEngine:
                         lines=lines,
                         relevance=candidate.relevance_label,
                         meta=candidate.meta,
+                        etag=etag,
                     )
                 )
                 used += full_cost
@@ -102,3 +106,10 @@ def _estimate_tokens(text: str) -> int:
         return len(encoding.encode(text))
     except Exception:
         return max(1, len(text) // 4)
+
+
+def _compute_etag(signature: str, code: str | None) -> str:
+    payload = signature
+    if code:
+        payload = f"{signature}\n{code}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
