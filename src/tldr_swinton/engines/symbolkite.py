@@ -23,6 +23,7 @@ from ..cfg_extractor import (
     extract_typescript_cfg,
 )
 from ..cross_file_calls import build_project_call_graph
+from ..contextpack_engine import Candidate, ContextPackEngine
 from ..hybrid_extractor import HybridExtractor
 from ..workspace import iter_workspace_files
 
@@ -447,4 +448,59 @@ def get_relevant_context(
     )
 
 
-__all__ = ["FunctionContext", "RelevantContext", "get_relevant_context"]
+def get_context_pack(
+    project: str | Path,
+    entry_point: str,
+    depth: int = 2,
+    language: str = "python",
+    budget_tokens: int | None = None,
+    include_docstrings: bool = False,
+) -> dict:
+    ctx = get_relevant_context(
+        project,
+        entry_point,
+        depth=depth,
+        language=language,
+        include_docstrings=include_docstrings,
+    )
+    candidates: list[Candidate] = []
+    for order_idx, func in enumerate(ctx.functions):
+        score = max(1, (depth - func.depth) + 1)
+        candidates.append(
+            Candidate(
+                symbol_id=func.name,
+                relevance=score,
+                relevance_label=f"depth_{func.depth}",
+                order=order_idx,
+                signature=func.signature,
+                lines=(func.line, func.line) if func.line else None,
+                meta={"calls": func.calls},
+            )
+        )
+
+    pack = ContextPackEngine(registry=None).build_context_pack(
+        candidates,
+        budget_tokens=budget_tokens,
+    )
+
+    slices: list[dict] = []
+    for item in pack.slices:
+        entry = {
+            "id": item.id,
+            "relevance": item.relevance,
+            "signature": item.signature,
+            "code": item.code,
+            "lines": list(item.lines) if item.lines else [],
+        }
+        if item.meta:
+            entry.update(item.meta)
+        slices.append(entry)
+
+    return {
+        "budget_used": pack.budget_used,
+        "slices": slices,
+        "signatures_only": pack.signatures_only,
+    }
+
+
+__all__ = ["FunctionContext", "RelevantContext", "get_relevant_context", "get_context_pack"]

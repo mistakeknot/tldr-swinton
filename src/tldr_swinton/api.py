@@ -179,6 +179,7 @@ __all__ = [
     # Main API
     "get_relevant_context",
     "get_diff_context",
+    "get_symbol_context_pack",
     "query",
     "FunctionContext",
     "RelevantContext",
@@ -195,7 +196,12 @@ __all__ = [
 ]
 
 
-from .engines.symbolkite import FunctionContext, RelevantContext, get_relevant_context
+from .engines.symbolkite import (
+    FunctionContext,
+    RelevantContext,
+    get_relevant_context,
+    get_context_pack as _get_symbol_context_pack,
+)
 from .path_utils import PathTraversalError, _resolve_source, _validate_path_containment
 
 
@@ -989,6 +995,24 @@ def get_code_structure(
             pass
 
     return result
+
+
+def get_symbol_context_pack(
+    project: str | Path,
+    entry_point: str,
+    depth: int = 2,
+    language: str = "python",
+    budget_tokens: int | None = None,
+    include_docstrings: bool = False,
+) -> dict:
+    return _get_symbol_context_pack(
+        project,
+        entry_point,
+        depth=depth,
+        language=language,
+        budget_tokens=budget_tokens,
+        include_docstrings=include_docstrings,
+    )
 
 
 # CLI entry point
