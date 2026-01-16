@@ -6,6 +6,8 @@
 
 All architecture, commands, critical rules, debugging, and testing instructions are in **AGENTS.md** (shared across all AI agents).
 
+Full workflow guide: see `docs/agent-workflow.md`.
+
 ## Claude Code-Specific Notes
 
 None currently - all instructions apply to all agents.

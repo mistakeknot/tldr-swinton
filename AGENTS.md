@@ -30,6 +30,8 @@ find . -name "*.pyc" -delete && find . -name "__pycache__" -type d -exec rm -rf 
 pip install -e .
 ```
 
+Full workflow guide: see `docs/agent-workflow.md`.
+
 ## tldr-bench Datasets (Submodule)
 
 Official benchmark datasets live in the `tldr-bench/data` submodule and are

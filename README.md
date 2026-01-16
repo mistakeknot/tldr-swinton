@@ -149,6 +149,8 @@ tldrs context main --project . --include vhs://<hash>
 Copy/paste this into a project’s `AGENTS.md` or `CLAUDE.md` to enable
 DiffLens and VHS usage for coding agents:
 
+Full workflow guide: see `docs/agent-workflow.md`.
+
 ```md
 ## DiffLens + VHS (Agent Context)
 
