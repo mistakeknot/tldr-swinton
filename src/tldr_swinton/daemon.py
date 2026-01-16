@@ -125,6 +125,20 @@ def cached_context(
     include_docstrings: bool,
 ) -> dict:
     """Cached relevant context - memoized by SalsaDB."""
+    if fmt == "ultracompact":
+        from .api import get_symbol_context_pack
+        from .output_formats import format_context_pack
+
+        pack = get_symbol_context_pack(
+            project,
+            entry,
+            language=language,
+            depth=depth,
+            budget_tokens=budget,
+            include_docstrings=include_docstrings,
+        )
+        return {"status": "ok", "result": format_context_pack(pack, fmt="ultracompact")}
+
     from .api import get_relevant_context
     from .output_formats import format_context
 

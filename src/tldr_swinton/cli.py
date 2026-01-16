@@ -646,6 +646,7 @@ Semantic Search:
         get_file_tree,
         get_imports,
         get_relevant_context,
+        get_symbol_context_pack,
         get_slice,
         scan_project_files,
         search as api_search,
@@ -805,15 +806,27 @@ Semantic Search:
             print(json.dumps(result, indent=2))
 
         elif args.command == "context":
-            from .output_formats import format_context
-            ctx = get_relevant_context(
-                args.project,
-                args.entry,
-                depth=args.depth,
-                language=args.lang,
-                include_docstrings=args.with_docs,
-            )
-            output = format_context(ctx, fmt=args.format, budget_tokens=args.budget)
+            if args.format == "ultracompact":
+                from .output_formats import format_context_pack
+                pack = get_symbol_context_pack(
+                    args.project,
+                    args.entry,
+                    depth=args.depth,
+                    language=args.lang,
+                    budget_tokens=args.budget,
+                    include_docstrings=args.with_docs,
+                )
+                output = format_context_pack(pack, fmt="ultracompact")
+            else:
+                from .output_formats import format_context
+                ctx = get_relevant_context(
+                    args.project,
+                    args.entry,
+                    depth=args.depth,
+                    language=args.lang,
+                    include_docstrings=args.with_docs,
+                )
+                output = format_context(ctx, fmt=args.format, budget_tokens=args.budget)
             if args.include:
                 for ref in args.include:
                     try:
