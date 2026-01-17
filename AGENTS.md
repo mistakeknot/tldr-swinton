@@ -49,6 +49,14 @@ cd -
 Dataset files are under `tldr-bench/data/data/`. Do not add large dataset files
 directly to this repo; update the datasets repo instead and bump the submodule.
 
+## Agent Workflow Checklist
+
+- Read `docs/agent-workflow.md` first.
+- Start with `tldrs diff-context --project . --budget 2000`.
+- Use `tldrs context <entry>` with `--format ultracompact` and a budget.
+- Use `tldrs structure` or `tldrs extract` to discover symbols before context.
+- Only open full files when making edits.
+
 ## Module Selection (Agents)
 
 Preferred order when gathering context:
