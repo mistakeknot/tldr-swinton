@@ -6,6 +6,17 @@ from pathlib import Path
 
 from tldr_bench.compare_results import compare_results
 
+PRESET_TRACKS = {
+    "dataset-context": {
+        "baseline": "official_datasets_context_baselines.jsonl",
+        "variants": [
+            "official_datasets_context_symbolkite.jsonl",
+            "official_datasets_context_cassette.jsonl",
+            "official_datasets_context_coveragelens.jsonl",
+        ],
+    },
+}
+
 
 def _format_line(values: list[str], widths: list[int]) -> str:
     return "  ".join(value.ljust(widths[i]) for i, value in enumerate(values))
@@ -13,14 +24,27 @@ def _format_line(values: list[str], widths: list[int]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--baseline", required=True)
-    parser.add_argument("--variants", nargs="+", required=True)
+    parser.add_argument("--baseline")
+    parser.add_argument("--variants", nargs="+")
+    parser.add_argument("--track", choices=sorted(PRESET_TRACKS))
+    parser.add_argument("--results-dir", default="tldr-bench/results")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
+    if args.track and not (args.baseline or args.variants):
+        preset = PRESET_TRACKS[args.track]
+        results_dir = Path(args.results_dir)
+        baseline_path = results_dir / preset["baseline"]
+        variant_paths = [results_dir / name for name in preset["variants"]]
+    else:
+        if not args.baseline or not args.variants:
+            parser.error("the following arguments are required: --baseline, --variants")
+        baseline_path = Path(args.baseline)
+        variant_paths = [Path(path) for path in args.variants]
+
     results = compare_results(
-        Path(args.baseline),
-        [Path(path) for path in args.variants],
+        baseline_path,
+        variant_paths,
     )
 
     if args.json:
