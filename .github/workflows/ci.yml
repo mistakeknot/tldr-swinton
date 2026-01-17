@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install deps
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uv sync --extra semantic-ollama
+      - name: Smoke tests (tldr-bench helpers)
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          PYTHONPATH=tldr-bench uv run python -m pytest \
+            tldr-bench/tests/test_compare_results_cli.py \
+            tldr-bench/tests/test_cassette_variant.py -q
