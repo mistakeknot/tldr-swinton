@@ -16,9 +16,24 @@ import sys
 import time
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+try:
+    from mcp.server.fastmcp import FastMCP
+    _MCP_AVAILABLE = True
+except Exception:  # pragma: no cover - optional dependency
+    FastMCP = None
+    _MCP_AVAILABLE = False
 
-mcp = FastMCP("tldr-code")
+
+class _NoMCP:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def tool(self):
+        def decorator(fn):
+            return fn
+        return decorator
+
+mcp = FastMCP("tldr-code") if _MCP_AVAILABLE else _NoMCP("tldr-code")
 
 
 def _get_socket_path(project: str) -> Path:
@@ -94,6 +109,18 @@ def _send_command(project: str, command: dict) -> dict:
     """Send command to daemon, auto-starting if needed."""
     _ensure_daemon(project)
     return _send_raw(project, command)
+
+
+def _format_context_result(result: dict, fmt: str) -> str:
+    if result.get("status") != "ok":
+        return str(result)
+    ctx = result.get("result", {})
+    if isinstance(ctx, str):
+        return ctx
+    if fmt in ("ultracompact", "json", "json-pretty"):
+        from .output_formats import format_context_pack
+        return format_context_pack(ctx, fmt=fmt)
+    return str(ctx)
 
 
 # === NAVIGATION TOOLS ===
@@ -200,13 +227,7 @@ def context(
             "with_docs": with_docs,
         },
     )
-    # Return formatted string for LLM consumption
-    if result.get("status") == "ok":
-        ctx = result.get("result", {})
-        if isinstance(ctx, str):
-            return ctx
-        return str(ctx)
-    return str(result)
+    return _format_context_result(result, format)
 
 
 # === FLOW ANALYSIS TOOLS ===
