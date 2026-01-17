@@ -475,6 +475,7 @@ def get_context_pack(
     budget_tokens: int | None = None,
     include_docstrings: bool = False,
     disambiguate: bool = False,
+    etag: str | None = None,
 ) -> dict:
     ctx = get_relevant_context(
         project,
@@ -513,12 +514,15 @@ def get_context_pack(
 
     slices: list[dict] = []
     for item in pack.slices:
+        if etag and item.etag == etag:
+            return "UNCHANGED"
         entry = {
             "id": item.id,
             "relevance": item.relevance,
             "signature": item.signature,
             "code": item.code,
             "lines": list(item.lines) if item.lines else [],
+            "etag": item.etag,
         }
         if item.meta:
             entry.update(item.meta)

@@ -69,6 +69,8 @@ def _contextpack_to_dict(pack: ContextPack) -> dict:
 
 def format_context_pack(pack: dict | ContextPack, fmt: str = "ultracompact") -> str:
     """Format a DiffLens-style ContextPack."""
+    if pack == "UNCHANGED":
+        return json.dumps("UNCHANGED")
     if isinstance(pack, ContextPack):
         pack = _contextpack_to_dict(pack)
     if isinstance(pack, dict) and pack.get("ambiguous"):

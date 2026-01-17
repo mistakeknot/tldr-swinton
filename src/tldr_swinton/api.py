@@ -1004,6 +1004,7 @@ def get_symbol_context_pack(
     language: str = "python",
     budget_tokens: int | None = None,
     include_docstrings: bool = False,
+    etag: str | None = None,
 ) -> dict:
     return _get_symbol_context_pack(
         project,
@@ -1012,6 +1013,7 @@ def get_symbol_context_pack(
         language=language,
         budget_tokens=budget_tokens,
         include_docstrings=include_docstrings,
+        etag=etag,
     )
 
 
