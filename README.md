@@ -107,7 +107,7 @@ tldr-mcp --project .
 ### Optional: Codex/Claude Skills
 
 - **Codex**: repo-scoped skill lives at `.codex/skills/tldrs-agent-workflow/` (uses the CLI workflow).
-- **Claude**: create a custom skill with the same steps from `docs/agent-workflow.md`.
+- **Claude**: copy/paste `docs/claude-skill.md` into a Claude custom skill.
 
 ### Manual Setup (Step-by-Step)
 

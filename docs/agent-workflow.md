@@ -7,6 +7,7 @@ This guide helps coding agents use tldr-swinton to minimize tokens while keeping
 - Use tldrs for reconnaissance (context selection) before reading full files.
 - Prefer compact outputs with explicit budgets.
 - Codex users: repo-scoped skill at `./.codex/skills/tldrs-agent-workflow/`.
+- Claude users: copy `docs/claude-skill.md` into a Claude custom skill.
 
 ## Install
 
