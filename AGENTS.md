@@ -32,6 +32,17 @@ pip install -e .
 
 Full workflow guide: see `docs/agent-workflow.md`.
 
+## Dev Quickstart
+
+```bash
+# From repo root
+pip install -e ".[full]"
+tldrs --help
+
+# Smoke check
+tldrs extract src/tldr_swinton/embeddings.py
+```
+
 ## tldr-bench Datasets (Submodule)
 
 Official benchmark datasets live in the `tldr-bench/data` submodule and are
@@ -63,6 +74,11 @@ directly to this repo; update the datasets repo instead and bump the submodule.
 - Each ContextPack slice now includes `etag` (signature + code hash).
 - Ambiguous entries return candidate lists; re-run with `file.py:func`.
 - For API tests, use `get_symbol_context_pack(..., etag=...)` to get `"UNCHANGED"`.
+
+## MCP (Optional)
+
+- MCP server requires `pip install mcp`.
+- MCP context uses ContextPack for `json/json-pretty/ultracompact` formats.
 
 ## Module Selection (Agents)
 

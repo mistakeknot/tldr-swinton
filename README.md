@@ -60,6 +60,12 @@ This installs everything automatically:
 - Sets up Ollama embedding model (if Ollama is installed)
 - Adds a `tldrs` shell alias
 
+Quick verify after install:
+```bash
+tldrs --help
+tldrs context main --project . --depth 1 --budget 200 --format ultracompact
+```
+
 Options:
 ```bash
 # Skip prompts (for automation)
@@ -84,6 +90,18 @@ This removes the installation directory, shell alias, and pip packages. Project 
 
 ```bash
 pip install tldr-swinton
+```
+
+### Optional: MCP Server
+
+The MCP server is optional. If you want MCP tools, install the MCP dependency:
+```bash
+pip install mcp
+```
+
+Then run:
+```bash
+tldr-mcp --project .
 ```
 
 ### Manual Setup (Step-by-Step)

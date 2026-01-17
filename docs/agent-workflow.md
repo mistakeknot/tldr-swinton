@@ -23,6 +23,12 @@ If non-interactive shells do not load aliases:
 export TLDRS_VHS_CMD="$HOME/tldrs-vhs/.venv/bin/tldrs-vhs"
 ```
 
+Verify install:
+```bash
+tldrs --help
+tldrs context main --project . --depth 1 --budget 200 --format ultracompact
+```
+
 ## Decision Tree
 
 1) Working on recent changes? Use diff-first context:
@@ -101,6 +107,7 @@ tldrs context main --project . --include vhs://<hash>
 
 - `--output vhs` prints a ref plus a short summary/preview; the ref is what saves tokens.
 - Programmatic note: ContextPack JSON includes `etag` per slice for conditional fetch in the API.
+  - For API usage: `get_symbol_context_pack(..., etag=...)` returns `"UNCHANGED"` when the symbol is unchanged.
 
 ## Troubleshooting
 
