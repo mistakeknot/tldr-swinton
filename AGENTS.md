@@ -43,6 +43,13 @@ tldrs --help
 tldrs extract src/tldr_swinton/embeddings.py
 ```
 
+## Codex Skill (Repo-Scoped)
+
+The repo includes a Codex skill at:
+`./.codex/skills/tldrs-agent-workflow/`
+
+This skill mirrors `docs/agent-workflow.md` and is intended for agent onboarding.
+
 ## tldr-bench Datasets (Submodule)
 
 Official benchmark datasets live in the `tldr-bench/data` submodule and are
