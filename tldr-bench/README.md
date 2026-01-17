@@ -114,6 +114,13 @@ PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/compare_results.py \
   --variants tldr-bench/results/symbolkite.jsonl tldr-bench/results/coveragelens.jsonl
 ```
 
+Preset (dataset-context):
+
+```
+PYTHONPATH=tldr-bench uv run python tldr-bench/scripts/compare_results.py \
+  --track dataset-context --json
+```
+
 Sweep helper (baseline + variants):
 
 ```
