@@ -1,0 +1,10 @@
+{
+  "name": "tldrs",
+  "version": "0.1.0",
+  "description": "Token-efficient code reconnaissance using tldr-swinton (diff-context, symbol context, budgets, VHS refs).",
+  "author": {
+    "name": "MK",
+    "email": "mistakeknot@vibeguider.org"
+  },
+  "skills": ["./skills/tldrs-agent-workflow"]
+}
