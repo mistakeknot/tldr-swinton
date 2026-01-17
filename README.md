@@ -182,6 +182,8 @@ tldrs context main --project . --include vhs://<hash>
 # - diff-context defaults to merge-base(main/master) → HEAD
 # - vhs output prints ref + summary/preview (30 lines / 2 KB)
 # - ultracompact format saves tokens (`--format ultracompact`)
+# - `context --format json` returns ContextPack JSON for tooling
+# - ambiguous entries return candidate lists (re-run with file-qualified entry)
 # - suppress ambiguous entry warnings with TLDRS_NO_WARNINGS=1
 # - Optional overrides:
 #   - TLDRS_VHS_CMD="python -m tldrs_vhs.cli"

@@ -49,6 +49,7 @@ export TLDRS_VHS_CMD="$HOME/tldrs-vhs/.venv/bin/tldrs-vhs"
 - Entry formats: `file.py:func`, `Class.method`, `module:func`
 - Example: `tldrs context src/app.py:handle_request --project .`
 - If unsure, discover names first: `tldrs structure src/`
+- If ambiguous, the context command returns candidates; re-run with `file.py:func`.
 
 ## Language Flags
 
@@ -89,6 +90,7 @@ export TLDRS_VHS_CMD="$HOME/tldrs-vhs/.venv/bin/tldrs-vhs"
 
 - Use budgets to cap output size: `--budget 2000`.
 - Prefer compact output: `--format ultracompact` where supported.
+- For tooling, use JSON: `tldrs context <entry> --format json`.
 - Store large outputs as refs:
 
 ```bash
@@ -98,6 +100,7 @@ tldrs context main --project . --include vhs://<hash>
 ```
 
 - `--output vhs` prints a ref plus a short summary/preview; the ref is what saves tokens.
+- Programmatic note: ContextPack JSON includes `etag` per slice for conditional fetch in the API.
 
 ## Troubleshooting
 

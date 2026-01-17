@@ -10,4 +10,4 @@ Full workflow guide: see `docs/agent-workflow.md`.
 
 ## Claude Code-Specific Notes
 
-None currently - all instructions apply to all agents.
+None currently - all instructions apply to all agents. See AGENTS.md for ContextPack JSON, ETag, and ambiguity notes.

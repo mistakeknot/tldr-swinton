@@ -57,6 +57,13 @@ directly to this repo; update the datasets repo instead and bump the submodule.
 - Use `tldrs structure` or `tldrs extract` to discover symbols before context.
 - Only open full files when making edits.
 
+## ContextPack Notes (Dev)
+
+- `tldrs context --format json` returns ContextPack JSON (slices + signatures_only).
+- Each ContextPack slice now includes `etag` (signature + code hash).
+- Ambiguous entries return candidate lists; re-run with `file.py:func`.
+- For API tests, use `get_symbol_context_pack(..., etag=...)` to get `"UNCHANGED"`.
+
 ## Module Selection (Agents)
 
 Preferred order when gathering context:
