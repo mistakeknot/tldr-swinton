@@ -15,12 +15,15 @@ Usage:
     tldrs slice <file> <func> <line>     Program slice
 """
 import argparse
+import io
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 from . import __version__
+from .state_store import StateStore
 
 
 def _get_subprocess_detach_kwargs():
@@ -56,37 +59,22 @@ def _vhs_available() -> bool:
     return shutil.which("tldrs-vhs") is not None
 
 
-def _vhs_put(text: str) -> str:
-    import subprocess
-    if not _vhs_available():
-        raise RuntimeError("tldrs-vhs not found in PATH")
-    env = _vhs_env()
-    result = subprocess.run(
-        _vhs_command() + ["put", "-"],
-        input=text,
-        text=True,
-        capture_output=True,
-        env=env,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or "tldrs-vhs put failed")
-    return result.stdout.strip().splitlines()[-1]
+def _get_state_store(project_root: Path) -> StateStore:
+    return StateStore(project_root)
 
 
-def _vhs_get(ref: str) -> str:
-    import subprocess
-    if not _vhs_available():
-        raise RuntimeError("tldrs-vhs not found in PATH")
-    env = _vhs_env()
-    result = subprocess.run(
-        _vhs_command() + ["get", ref],
-        text=True,
-        capture_output=True,
-        env=env,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or f"tldrs-vhs get failed for {ref}")
-    return result.stdout
+def _vhs_put(text: str, project_root: Path) -> str:
+    store = _get_state_store(project_root)
+    data = text.encode("utf-8")
+    return store.vhs.put(io.BytesIO(data))
+
+
+def _vhs_get(ref: str, project_root: Path) -> str:
+    store = _get_state_store(project_root)
+    with tempfile.NamedTemporaryFile() as tmp:
+        store.vhs.get(ref, out=Path(tmp.name))
+        tmp.seek(0)
+        return tmp.read().decode("utf-8")
 
 
 def _make_vhs_summary(ctx) -> str:
@@ -806,6 +794,7 @@ Semantic Search:
             print(json.dumps(result, indent=2))
 
         elif args.command == "context":
+            project_root = Path(args.project).resolve()
             if args.format == "ultracompact":
                 from .output_formats import format_context_pack
                 pack = get_symbol_context_pack(
@@ -830,14 +819,14 @@ Semantic Search:
             if args.include:
                 for ref in args.include:
                     try:
-                        included = _vhs_get(ref)
+                        included = _vhs_get(ref, project_root)
                     except Exception as exc:
                         print(f"Error: {exc}", file=sys.stderr)
                         sys.exit(1)
                     output += f"\n\n# Included {ref}\n{included.rstrip()}\n"
             if args.output == "vhs":
                 try:
-                    ref = _vhs_put(output)
+                    ref = _vhs_put(output, project_root)
                 except Exception as exc:
                     print(f"Error: {exc}", file=sys.stderr)
                     sys.exit(1)
