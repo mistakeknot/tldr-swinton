@@ -2,30 +2,49 @@
 
 Token-efficient context retrieval features for tldr-swinton.
 
-## Overview
+---
 
-These features build on tldr-swinton's existing infrastructure (AST parsing, call graphs, semantic search) to provide smarter, more targeted context retrieval for AI coding agents.
+## Current Priority: Next 3 Features
 
-| Phase | Feature | Effort | Token Savings | Status |
-|-------|---------|--------|---------------|--------|
-| 0 | Quick Wins (Oracle Review) | 2-4 days | 2x+ | Done |
-| 1 | ContextPack Engine + DiffLens/SymbolKite | 5-8 days | 60-80% | Done |
-| 2 | Cassette/VHS Integration | 3-7 days | 70-90% | Done |
-| 3 | CoverageLens | 4-8 days | 50-70% | Planned |
+Based on Oracle evaluation (2026-01-17), these are the highest-impact improvements:
+
+| # | Feature | Impact | Effort | Status | Plan |
+|---|---------|--------|--------|--------|------|
+| **1** | **Automatic ETag/Delta Context** | 2-5x multi-turn savings | 3-5 days | **Next** | [Plan](2026-01-17-automatic-etag-delta-context.md) |
+| **2** | Frictionless VHS Refs | 90%+ large output savings | 2-3 days | Planned | [Plan](2026-01-17-frictionless-vhs-refs.md) |
+| **3** | PDG-Guided Slicing | 30-50% function body savings | 3-4 days | Planned | [Plan](2026-01-17-pdg-guided-slicing.md) |
+
+### Why This Order
+
+1. **ETag/Delta first** - Targets the #1 token sink (multi-turn repetition). Primitives exist, need session-level automation.
+2. **VHS second** - Quick win: vendor ~330 LOC, eliminate install friction. Enables auto-switch for large outputs.
+3. **PDG third** - Requires more careful testing (edit-safety). Has promotion gate (≥10% savings, no regressions).
+
+### Backlog
+
+| Feature | Impact | Status |
+|---------|--------|--------|
+| CoverageLens | 50-70% for test failures | Planned |
+| Cost-based Query Planner | Reduces wrong-command churn | Research |
+| Incremental Semantic Search | Always-on find without explicit index | Research |
+
+---
+
+## Completed Phases
+
+| Phase | Feature | Token Savings | Status |
+|-------|---------|---------------|--------|
+| 0 | Quick Wins (Oracle Review 2026-01-13) | 2x+ | Done |
+| 1 | ContextPack Engine + DiffLens/SymbolKite | 60-80% | Done |
+| 2 | Cassette/VHS Integration | 70-90% | Done |
 
 ---
 
 ## Oracle Evaluation (2026-01-17)
 
-GPT-5.2-Pro evaluated the full codebase (~1.67M tokens) and identified top 3 priorities for further token savings:
+GPT-5.2-Pro evaluated the full codebase (~1.67M tokens) and identified the top 3 priorities above.
 
-| Priority | Feature | Expected Impact | Plan |
-|----------|---------|-----------------|------|
-| **#1** | Automatic ETag/Delta Context | 2-5x on multi-turn sessions | [2026-01-17-automatic-etag-delta-context.md](2026-01-17-automatic-etag-delta-context.md) |
-| **#2** | Frictionless VHS Refs | 90%+ for large outputs | [2026-01-17-frictionless-vhs-refs.md](2026-01-17-frictionless-vhs-refs.md) |
-| **#3** | PDG-Guided Slicing | 30-50% on function bodies | [2026-01-17-pdg-guided-slicing.md](2026-01-17-pdg-guided-slicing.md) |
-
-### Key Insights from Oracle
+### Key Insights
 
 1. **Multi-turn repetition is the biggest token sink** - Agents re-request unchanged symbols. ETag primitives exist but aren't automatic.
 
