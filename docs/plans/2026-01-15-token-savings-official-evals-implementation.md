@@ -4,162 +4,61 @@
 
 **Bead:** `tldr-swinton-gey` (Task reference)
 
-**Goal:** Vendor official eval datasets (SWE-bench Lite/Verified, RepoBench, LongBench) with Git LFS and add dataset adapters + runners for token-savings benchmarks in `tldr-bench`.
+**Goal:** Provide official eval datasets (SWE-bench Lite/Verified, RepoBench, LongBench) via a dedicated datasets repo + submodule, and add dataset adapters + runners for token-savings benchmarks in `tldr-bench`.
 
-**Architecture:** Store raw dataset files under `tldr-bench/data/` with per-dataset manifests, normalize to `BenchInstance`, and extend dataset loader + runners to support new kinds. Provide verification scripts and task configs for repeatable token-only runs.
+**Architecture:** Store raw dataset files in the `tldr-bench-datasets` repo (with LFS there), mount as the `tldr-bench/data` submodule, normalize to `BenchInstance`, and extend dataset loader + runners to support new kinds. Provide verification scripts and task configs for repeatable token-only runs.
 
-**Tech Stack:** Python 3.11, uv, Git LFS, pytest.
+**Tech Stack:** Python 3.11, uv, Git LFS (in dataset repo), pytest.
 
 ---
 
-### Task 1: Add Git LFS tracking + dataset skeletons
+### Task 1: Dataset repo + submodule (Implemented)
 
 **Files:**
-- Create: `.gitattributes`
-- Create: `tldr-bench/data/swebench_lite/README.md`
-- Create: `tldr-bench/data/swebench_lite/manifest.json`
-- Create: `tldr-bench/data/swebench_verified/README.md`
-- Create: `tldr-bench/data/swebench_verified/manifest.json`
-- Create: `tldr-bench/data/repobench_python_v1.1/README.md`
-- Create: `tldr-bench/data/repobench_python_v1.1/manifest.json`
-- Create: `tldr-bench/data/longbench_v2/README.md`
-- Create: `tldr-bench/data/longbench_v2/manifest.json`
+- Submodule: `tldr-bench/data` -> `https://github.com/mistakeknot/tldr-bench-datasets.git`
+- Dataset repo: `~/tldr-bench-datasets` (contains `.gitattributes` + `data/` + manifests)
 
-**Step 1: Add LFS patterns**
-
-Create `.gitattributes`:
-```
-tldr-bench/data/**/*.parquet filter=lfs diff=lfs merge=lfs -text
-tldr-bench/data/**/*.json filter=lfs diff=lfs merge=lfs -text
-tldr-bench/data/**/*.jsonl filter=lfs diff=lfs merge=lfs -text
-```
-
-**Step 2: Create dataset folder READMEs**
-
-Example README content:
-```
-# SWE-bench Lite (vendored)
-Source: https://huggingface.co/datasets/SWE-bench/SWE-bench_Lite
-Files: data/*.json
-Notes: Dataset files are tracked via Git LFS.
-```
-
-**Step 3: Add manifests with placeholders**
-
-Example manifest structure:
-```json
-{
-  "dataset": "swebench_lite",
-  "source": "https://huggingface.co/datasets/SWE-bench/SWE-bench_Lite",
-  "revision": "unknown",
-  "files": [
-    {"name": "data/dev-00000-of-00001.parquet", "bytes": 0, "sha256": ""},
-    {"name": "data/test-00000-of-00001.parquet", "bytes": 0, "sha256": ""}
-  ]
-}
-```
-
-**Step 4: Commit**
+**Step 1: Verify submodule wiring**
 
 ```
-git add .gitattributes tldr-bench/data/*/README.md tldr-bench/data/*/manifest.json
-git commit -m "Add LFS tracking and dataset skeletons"
+git submodule status tldr-bench/data
+git -C tldr-bench/data status -s
+```
+
+**Step 2: Verify dataset repo LFS config**
+
+```
+cat ~/tldr-bench-datasets/.gitattributes
+```
+
+**Step 3: Verify manifests present**
+
+```
+ls tldr-bench/data/data/swebench_lite
+ls tldr-bench/data/data/swebench_verified
+ls tldr-bench/data/data/repobench_python_v1.1
+ls tldr-bench/data/data/longbench_v2
 ```
 
 ---
 
-### Task 2: Vendor dataset files under Git LFS
-
-**Files:**
-- Add: `tldr-bench/data/swebench_lite/data/*.parquet`
-- Add: `tldr-bench/data/swebench_verified/data/*.parquet`
-- Add: `tldr-bench/data/repobench_python_v1.1/data/*.json` (or .parquet)
-- Add: `tldr-bench/data/longbench_v2/data.json`
-- Modify: `tldr-bench/data/*/manifest.json`
-
-**Step 1: Install Git LFS and pull pointers**
-
-Run:
-```
-git lfs install
-```
-
-**Step 2: Download dataset files**
-
-Download files into each dataset folder (use official URLs). Example:
-```
-curl -L -o tldr-bench/data/longbench_v2/data.json \
-  https://huggingface.co/datasets/THUDM/LongBench-v2/resolve/main/data.json
-```
-
-**Step 3: Update manifest sizes + hashes**
-
-Compute SHA256 and update manifests:
-```
-python - <<'PY'
-import hashlib, json, pathlib
-path = pathlib.Path("tldr-bench/data/longbench_v2/data.json")
-sha = hashlib.sha256(path.read_bytes()).hexdigest()
-print(path, sha, path.stat().st_size)
-PY
-```
-
-**Step 4: Commit**
-
-```
-git add tldr-bench/data
-git commit -m "Vendor official eval datasets"
-```
-
----
-
-### Task 3: Add dataset verification tooling
+### Task 2: Add dataset verification tooling (Implemented)
 
 **Files:**
 - Create: `tldr-bench/scripts/data/verify_datasets.py`
 - Create: `tldr-bench/scripts/data/lfs_setup.sh`
 - Modify: `tldr-bench/README.md`
 
-**Step 1: Write failing test**
-
-Create `tldr-bench/tests/test_dataset_manifest.py` with:
-```python
-from tldr_bench.data import verify_dataset_manifests
-
-def test_verify_manifests_ok(tmp_path):
-    assert verify_dataset_manifests(tmp_path) == []
-```
-
-Expected: FAIL (module missing).
-
-**Step 2: Implement manifest verification**
-
-Add `tldr_bench/data/__init__.py` and `verify_dataset_manifests()` to scan
-`tldr-bench/data/*/manifest.json`, confirm files exist, and verify sha256.
-
-**Step 3: Wire scripts**
-
-- `scripts/data/verify_datasets.py` calls `verify_dataset_manifests()`.
-- `scripts/data/lfs_setup.sh` runs `git lfs install` and validates `.gitattributes`.
-
-**Step 4: Run tests**
+**Step 1: Run tests**
 
 ```
 uv run pytest tldr-bench/tests/test_dataset_manifest.py -q
 ```
 Expected: PASS.
 
-**Step 5: Commit**
-
-```
-git add tldr-bench/scripts/data tldr-bench/tests/test_dataset_manifest.py \
-  tldr-bench/tldr_bench/data/__init__.py tldr-bench/README.md
-git commit -m "Add dataset manifest verification"
-```
-
 ---
 
-### Task 4: Implement dataset adapters + loader support
+### Task 3: Implement dataset adapters + loader support (Implemented)
 
 **Files:**
 - Create: `tldr-bench/tldr_bench/datasets/repobench.py`
@@ -168,50 +67,7 @@ git commit -m "Add dataset manifest verification"
 - Modify: `tldr-bench/tldr_bench/datasets/__init__.py`
 - Modify: `tldr-bench/tldr_bench/datasets/schema.py`
 
-**Step 1: Add split support**
-
-Update `BenchInstance` to include `split: str | None = None` and include it in
-`to_dict()` when set.
-
-**Step 2: Write adapter tests**
-
-Add fixtures under `tldr-bench/tests/fixtures/datasets/` and tests:
-- `tests/test_repobench_adapter.py`
-- `tests/test_longbench_adapter.py`
-
-Example test shape:
-```python
-from tldr_bench.datasets.repobench import normalize_record
-
-def test_repobench_prompt():
-    record = {"id": "x", "prompt": "code", "completion": "out"}
-    inst = normalize_record(record)
-    assert inst.prompt == "code"
-    assert inst.instance_id == "x"
-```
-Expected: FAIL (module missing).
-
-**Step 3: Implement adapters**
-
-`repobench.py` should:
-- Choose `instance_id` from `id` or `task_id`.
-- Use `prompt` from `prompt` or `input`.
-- Store `completion` in metadata if present.
-
-`longbench.py` should:
-- Use `dataset` + `id` to build `instance_id`.
-- Use `input` as prompt.
-- Store `output`/`answers` in metadata.
-
-**Step 4: Update loader**
-
-Extend `_detect_kind()`:
-- Detect `"repobench"` by filename or `repo_name`/`completion` keys.
-- Detect `"longbench"` by filename or `input`/`output` keys.
-
-Wire `load_dataset()` to call new adapters.
-
-**Step 5: Run tests**
+**Step 1: Run tests**
 
 ```
 uv run pytest tldr-bench/tests/test_repobench_adapter.py \
@@ -307,4 +163,3 @@ Expected: task IDs printed.
 **Step 3: Commit results note (optional)**
 
 If any changes from verification scripts: commit with a short message.
-
