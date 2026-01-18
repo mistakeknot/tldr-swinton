@@ -17,8 +17,8 @@
 **Files:**
 - Modify: `tldr-bench/pyproject.toml`
 - Create: `tldr-bench/shim/config.toml`
-- Create: `tldr-bench/shim/server.py`
-- Create: `tldr-bench/shim/__init__.py`
+- Create: `tldr-bench/tldr_bench/shim/server.py`
+- Create: `tldr-bench/tldr_bench/shim/__init__.py`
 
 **Step 1: Add dependencies (no behavior)**
 
@@ -34,12 +34,12 @@ Create `tldr-bench/shim/config.toml` with fields:
 
 **Step 3: Create module stubs**
 
-Create empty `server.py` and `__init__.py` placeholders.
+Create empty `tldr-bench/tldr_bench/shim/server.py` and `tldr-bench/tldr_bench/shim/__init__.py` placeholders.
 
 **Step 4: Commit**
 
 ```bash
-git add tldr-bench/pyproject.toml tldr-bench/shim
+git add tldr-bench/pyproject.toml tldr-bench/shim tldr-bench/tldr_bench/shim
 
 git commit -m "Add shim scaffolding"
 ```
@@ -49,7 +49,7 @@ git commit -m "Add shim scaffolding"
 ### Task 2: Prompt assembly + model routing (TDD)
 
 **Files:**
-- Create: `tldr-bench/shim/adapter.py`
+- Create: `tldr-bench/tldr_bench/shim/adapter.py`
 - Create: `tldr-bench/tests/test_shim_adapter.py`
 
 **Step 1: Write failing test**
@@ -88,7 +88,7 @@ Expected: FAIL (module not found).
 
 **Step 3: Implement minimal adapter**
 
-Create `tldr-bench/shim/adapter.py`:
+Create `tldr-bench/tldr_bench/shim/adapter.py`:
 ```python
 from __future__ import annotations
 
@@ -121,7 +121,7 @@ Expected: PASS.
 **Step 5: Commit**
 
 ```bash
-git add tldr-bench/shim/adapter.py tldr-bench/tests/test_shim_adapter.py
+git add tldr-bench/tldr_bench/shim/adapter.py tldr-bench/tests/test_shim_adapter.py
 
 git commit -m "Add shim prompt assembly"
 ```
@@ -131,7 +131,7 @@ git commit -m "Add shim prompt assembly"
 ### Task 3: HTTP server endpoints (TDD)
 
 **Files:**
-- Modify: `tldr-bench/shim/server.py`
+- Modify: `tldr-bench/tldr_bench/shim/server.py`
 - Create: `tldr-bench/tests/test_shim_server.py`
 
 **Step 1: Write failing test**
@@ -176,7 +176,7 @@ Expected: FAIL (create_app not implemented).
 
 **Step 3: Implement minimal server**
 
-Implement `create_app()` in `tldr-bench/shim/server.py` using FastAPI. Include:
+Implement `create_app()` in `tldr-bench/tldr_bench/shim/server.py` using FastAPI. Include:
 - `/v1/models` returning model IDs from config
 - `/v1/chat/completions` building prompt, routing to runner, returning OpenAI-like response
 - Reject `stream=True`
@@ -192,7 +192,7 @@ Expected: PASS.
 **Step 5: Commit**
 
 ```bash
-git add tldr-bench/shim/server.py tldr-bench/tests/test_shim_server.py
+git add tldr-bench/tldr_bench/shim/server.py tldr-bench/tests/test_shim_server.py
 
 git commit -m "Add shim HTTP server"
 ```
@@ -202,7 +202,7 @@ git commit -m "Add shim HTTP server"
 ### Task 4: CLI spawn + timeout (TDD)
 
 **Files:**
-- Modify: `tldr-bench/shim/server.py`
+- Modify: `tldr-bench/tldr_bench/shim/server.py`
 - Create: `tldr-bench/tests/test_shim_cli.py`
 
 **Step 1: Write failing test**
@@ -238,7 +238,7 @@ Expected: PASS.
 **Step 5: Commit**
 
 ```bash
-git add tldr-bench/shim/server.py tldr-bench/tests/test_shim_cli.py
+git add tldr-bench/tldr_bench/shim/server.py tldr-bench/tests/test_shim_cli.py
 
 git commit -m "Add CLI runner with timeout"
 ```
@@ -255,7 +255,7 @@ git commit -m "Add CLI runner with timeout"
 
 Document how to start the shim:
 ```bash
-PYTHONPATH=tldr-bench uv run python tldr-bench/shim/server.py --config tldr-bench/shim/config.toml
+PYTHONPATH=tldr-bench uv run python tldr-bench/tldr_bench/shim/server.py --config tldr-bench/shim/config.toml
 ```
 
 Provide example `.llm_config` snippet for OpenHands.
