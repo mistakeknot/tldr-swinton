@@ -18,4 +18,5 @@ def test_budget_allocates_full_then_signature(tmp_path: Path) -> None:
         budget_tokens=budget,
     )
     assert pack.slices[0].id.endswith("a.py:hi")
-    assert "b.py:lo" in pack.signatures_only
+    assert pack.slices[1].id.endswith("b.py:lo")
+    assert pack.slices[1].code is None

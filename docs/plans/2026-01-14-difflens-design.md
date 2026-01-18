@@ -46,6 +46,8 @@ tldrs diff-context --base main
       "diff_lines": [52, 53, 58]
     }
   ],
-  "signatures_only": ["src/routes/api.ts:handleLogin"]
+  "slices": [
+    {"id": "src/routes/api.ts:handleLogin", "signature": "function handleLogin(...)", "code": null}
+  ]
 }
 ```

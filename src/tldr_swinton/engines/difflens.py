@@ -596,7 +596,6 @@ def build_diff_context_from_hunks(
         "head": None,
         "budget_used": pack.budget_used,
         "slices": slices,
-        "signatures_only": pack.signatures_only,
     }
 
 

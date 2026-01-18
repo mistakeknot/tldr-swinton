@@ -6,7 +6,7 @@ Token-efficient context retrieval features for tldr-swinton.
 
 ## Current Priority: Next 3 Features
 
-Based on Oracle evaluation (2026-01-17), these are the highest-impact improvements:
+Based on Oracle evaluations (2026-01-17, 2026-01-18), these are the highest-impact improvements:
 
 | # | Feature | Impact | Effort | Status | Plan |
 |---|---------|--------|--------|--------|------|
@@ -14,27 +14,49 @@ Based on Oracle evaluation (2026-01-17), these are the highest-impact improvemen
 | **2** | Frictionless VHS Refs | 90%+ large output savings | 2-3 days | Planned | [Plan](2026-01-17-frictionless-vhs-refs.md) |
 | **3** | PDG-Guided Slicing | 30-50% function body savings | 3-4 days | Planned | [Plan](2026-01-17-pdg-guided-slicing.md) |
 
-### Why This Order
+### Implementation Order (Critical)
 
-1. **ETag/Delta first** - Targets the #1 token sink (multi-turn repetition). Primitives exist, need session-level automation.
-2. **VHS second** - Quick win: vendor ~330 LOC, eliminate install friction. Enables auto-switch for large outputs.
+**Oracle recommends: Do VHS vendor first, then enable delta defaults.**
+
+Delta context (#1) depends on VHS (#2) for safe rehydration. Implementation order:
+
+1. **First PRs**: Vendor VHS store + make always available (#2 Tasks 1-2)
+2. **Then**: Implement delta with rehydration manifest (#1)
+3. **Then**: PDG slicing (#3)
+
+### Unified Persistence Layer (Prerequisite)
+
+**Oracle recommends: Use SQLite, not JSON, for all state.**
+
+Create a single `tldrs_state.db` that stores:
+- Sessions (symbol deliveries: etag + representation + vhs_ref)
+- VHS blobs / references (content-addressed)
+- GC metadata
+
+This unblocks delta rehydration, safe defaults, and better metrics. Avoid separate JSON + SQLite stores.
+
+### Why This Priority Order
+
+1. **ETag/Delta first (in impact)** - Targets the #1 token sink (multi-turn repetition). Primitives exist, need session-level automation.
+2. **VHS second** - Quick win: vendor ~330 LOC, eliminate install friction. **Required for safe delta rehydration.**
 3. **PDG third** - Requires more careful testing (edit-safety). Has promotion gate (≥10% savings, no regressions).
 
 ### Full Priority Queue
 
-After top 3 features, here's the complete prioritized backlog:
+After top 3 features, here's the complete prioritized backlog (updated per Oracle 2026-01-18 review):
 
 | # | Feature | Impact | Effort | Status | Rationale |
 |---|---------|--------|--------|--------|-----------|
-| **4** | **Hybrid BM25+Embedding+Rerank** | Scale-robust retrieval | Low | Research | Sourcegraph's insight: pure embeddings fail at scale. Quick win. |
-| **5** | **Cost-based Query Planner** | Reduces wrong-command churn | Medium | Research | Oracle recommends moving earlier. Heuristic "glue layer" first. |
-| **6** | **Structural Search (ast-grep)** | Precise AST patterns | Low | Research | Embeddings weak at precise patterns. Add as retrieval lane. |
-| **7** | **Prompt Caching Integration** | Latency + cost reduction | Low | Research | Structure prompts for stable prefixes. Works with all providers. |
-| **8** | **CoverageLens** | 50-70% for test failures | Medium | Planned | Coverage-guided context for debugging. |
-| **9** | **Incremental Semantic Search** | Always-on find | Medium | Research | Remove indexing friction → fewer grep+paste fallbacks. |
-| **10** | **VoyageCode3 Embeddings** | Better search accuracy | Low | Research | Evaluate against nomic-embed-text. |
-| **11** | **LLMLingua Compression** | 5-10x additional | Medium | Research | For text-heavy sections only (not code). |
-| **12** | **Merkle Tree Indexing** | Faster incremental updates | Medium | Research | Cursor's approach. Cheap "what changed?" detection. |
+| **4** | **Structural Search (ast-grep)** | Precise AST patterns | Low | Research | Planner needs multiple lanes; embeddings weak at precise patterns. Do before planner. |
+| **5** | **Cost-based Query Planner** | Reduces wrong-command churn | Medium | Research | Routes to structural vs semantic vs diff-context. Needs #4 first. |
+| **6** | **Hybrid BM25+Embedding+Rerank** | Scale-robust retrieval | Low | Research | Sourcegraph's insight: pure embeddings fail at scale. Include CoRNStack reranker eval. |
+| **7** | **AST-aware Chunking (cAST)** | Better code chunks | Medium | Research | **Promoted from backlog.** Force multiplier for retrieval, reranking, packing. [Paper](https://aclanthology.org/2025.findings-emnlp.430/) |
+| **8** | **Incremental Semantic Search** | Always-on find | Medium | Research | Remove indexing friction. Depends on #7 for best ROI. |
+| **9** | **CoverageLens** | 50-70% for test failures | Medium | Planned | Coverage-guided context for debugging. |
+| **10** | **Prompt Caching Integration** | Latency + cost reduction | Low | Research | Structure prompts for stable prefixes. Works with all providers. |
+| **11** | **Embedding & Reranker Benchmark** | Better search accuracy | Low | Research | Expanded from VoyageCode3. Include: voyage-code-3, BGE-M3, OpenAI text-embedding-3, Jina code 0.5B. |
+| **12** | **LLMLingua-2 Compression** | 5-10x additional | Medium | Research | Task-agnostic compression. For text-heavy sections (issues, logs, docs). [Paper](https://arxiv.org/abs/2403.12968) |
+| **13** | **Merkle Tree Indexing** | Faster incremental updates | Medium | Research | Cursor's approach. May merge with #8 if using content hash manifests. |
 
 ### Research Backlog (Not Yet Prioritized)
 
@@ -48,16 +70,28 @@ These require spikes or evaluation before prioritizing:
 | **Repomix** | Codebase packing reference | Low | Tree-sitter compression (~70%). [Repo](https://github.com/yamadashy/repomix) |
 | **Moatless Tools** | SWE-bench patterns | Low | State-machine context retrieval. [Repo](https://github.com/aorwall/moatless-tools) |
 | **Agentless** | Simple 3-phase architecture | Low | Hierarchical localization. [Repo](https://github.com/OpenAutoCoder/Agentless) |
+| **LongCodeZip** | Code-specific compression | Medium | Perplexity-based chunk ranking + block selection. [Paper](https://arxiv.org/abs/2510.00446) |
+| **CodeRAG** | Query construction blueprint | Medium | Logprob-guided query construction, multi-path retrieval. [Paper](https://aclanthology.org/2025.emnlp-main.1187.pdf) |
+| **CRAG (Corrective RAG)** | Retrieval confidence | Medium | Evaluator triggers corrective actions when retrieval weak. [Paper](https://arxiv.org/abs/2401.15884) |
+| **Provence** | Context pruning | Medium | Sequence labeling for pruning/reranking. [ICLR 2025](https://iclr.cc/virtual/2025/poster/29557) |
+| **GraphRAG** | Graph-based retrieval | Medium | Over code entity graph (files/symbols/calls). [Microsoft](https://www.microsoft.com/en-us/research/project/graphrag/) |
+| **RAPTOR** | Hierarchical retrieval | Medium | Recursive summarization + multi-level retrieval. [Paper](https://arxiv.org/abs/2401.18059) |
+| **500xCompressor** | Special-token compression | High | ACL 2025. Model technique, future-looking. [Paper](https://aclanthology.org/2025.acl-long.1219/) |
+| **Activation Beacon** | KV cache compression | High | ICLR 2025. Model-side optimization. [ICLR](https://iclr.cc/virtual/2025/poster/31191) |
 | **CodeSage / Jina Reranker** | Alternative embeddings | Low | [Jina Reranker](https://jina.ai/reranker/) |
 | **CodeBERT / GraphCodeBERT** | Baseline embeddings | Low | [GraphCodeBERT](https://arxiv.org/abs/2009.08366) |
 | **ColBERT-style Late Interaction** | Multi-vector retrieval | Medium | Better for code queries. Higher indexing cost. |
 | **MemGPT** | Memory tiers | Medium | VHS as "disk tier". [Paper](https://arxiv.org/abs/2310.08560) |
 | **RAGCache / TurboRAG** | Cached retrieval states | Medium | [RAGCache](https://arxiv.org/abs/2404.12457) |
-| **CodeQL / Joern** | PDG validation reference | High | [CodeQL](https://docs.github.com/en/code-security/codeql-for-vs-code), [Joern](https://docs.joern.io/) |
+| **CodeQL / Joern** | PDG validation reference | High | [CodeQL](https://docs.github.com/en/code-security/codeql-for-vs-code), [Joern](https://docs.joern.io/). Required for #3 promotion gate. |
 | **SCIP/LSIF** | Code intelligence formats | Medium | [SCIP](https://github.com/sourcegraph/scip) |
 | **Context Distillation** | Internalize prompts | High | Used by Anthropic/Llama. |
-| **cAST (AST-aware chunking)** | Better code chunks | Medium | [Paper](https://arxiv.org/abs/2506.15655) |
 | **GNN for Code Graphs** | Learned PDG enhancements | High | GGNN, GAT. Requires model training. |
+| **SACL (Semantic-Augmented Code Reranking)** | Reranking trick | Medium | Textualize code for reranker. [EMNLP 2025](https://aclanthology.org/2025.findings-emnlp.1365.pdf) |
+| **SWE-agent ACI patterns** | Interface design | Low | Performance from tool ergonomics. [Paper](https://arxiv.org/abs/2405.15793) |
+| **SWE-Search** | Iterative refinement | Medium | Tree search / branch-and-bound retrieval. [Paper](https://arxiv.org/abs/2410.20285) |
+| **OpenHands** | Agent platform patterns | Low | Sandboxing, benchmarks, multi-task eval. [ICLR 2025](https://iclr.cc/virtual/2025/poster/29831) |
+| **NeurIPS 2024 Rate-Distortion** | Compression theory | Low | Fundamental limits of prompt compression. [Paper](https://neurips.cc/virtual/2024/poster/95021) |
 
 ### Key Insights from Research
 
@@ -120,31 +154,57 @@ Second Oracle review of the 3 implementation plans + research findings. Confirme
 
 2. **CLI default-to-delta unsafe for humans** - Humans don't retain prior output in LLM context
    - **Mitigation**: Require explicit `--session-id` for delta in CLI; MCP can default delta
+   - **MCP**: delta default-on is fine (MCP connection is natural session boundary)
+   - **CLI**: delta default-off unless `--session-id` or `TLDRS_SESSION_ID` provided
 
 3. **Session ID collisions** - Include repo fingerprint + branch/commit in session header
    - **Mitigation**: Auto-reset on large diff (if repo changed too much since last seen)
 
 4. **Use SQLite instead of JSON** - Already used for VHS; simplifies concurrency, partial updates, bounded size
 
+5. **Store delivery records, not just ETags** - Cache must track what representation was sent:
+   - `etag` - content hash
+   - `representation`: `full | signature_only | pdg_slice | vhs_ref`
+   - `vhs_ref` (if any)
+   - `token_count_estimate` (helps planner)
+   - This prevents: "UNCHANGED returned but model only saw signature-only version"
+
+6. **Add rehydration manifest to delta response** - Include `rehydrate: {symbol_id: vhs_ref}` for omitted bodies
+
 ### Priority 2: VHS Refs - Concerns
 
 1. **Preview quality is make-or-break** - First 30 lines often not the useful part
    - **Mitigation**: Compact TOC (files/symbols + line ranges) + first N lines of *highest relevance slice*
+   - **Preview format**: TOC (files, symbols, line ranges, budget/truncation) + most relevant slice preview
 
 2. **Ref sprawl & garbage collection** - Add per-repo quotas, TTL-based expiry, purge-by-repo command
 
 3. **Unify VHS with ETag** - Make VHS content-addressed (hash → blob), then ETag can reference existing blob (no duplication)
 
+4. **Privacy/security knobs** - Add governance controls:
+   - `--vhs-ttl-hours` default for non-dev repos
+   - `--vhs-scope repo|global` (default to `.tldrs/vhs/` to reduce cross-project leakage)
+   - Optional encryption key env var
+
 ### Priority 3: PDG Slicing - Concerns
 
 1. **"Exact code" vs continuity markers** - Inserting `...` violates exact source
    - **Mitigation**: Return *ranges* and render separators outside code fences
+   - **Output format**: `{ranges: [(start,end), …], code_blocks:[…]}` with separators outside fences
+   - Always preserve original line numbers (or include mapping)
 
 2. **Slicing completeness** - Always include: function signature + docstring, import/type/constant definitions, small forward slice when changes affect downstream
+   - **Completeness post-pass**: Enforce via code, not docs
+   - Required: signature + docstring, referenced imports/types/constants (at least in-file)
+   - Optional: forward slice trigger if edited line affects return value or global mutation
 
 3. **Language coverage realism** - TS/Rust/Go PDG correctness tricky (macros, generics, async). "Slice usefulness" is separate metric from "extraction success"
 
 4. **Validate against CodeQL/Joern** - Use as reference implementations to check if slices miss key dependencies
+   - **Lightweight validation first**: Before full CodeQL/Joern integration, use heuristics:
+     - "Slice must contain all identifiers used on diff lines"
+     - Ensure control parent blocks included (if/for/try)
+     - For Python, compare vs `ast` def-use analysis
 
 ### Additional Recommendations from Oracle
 
@@ -155,6 +215,22 @@ Second Oracle review of the 3 implementation plans + research findings. Confirme
 3. **Structural search as first-class retrieval lane** - Semgrep/ast-grep for precise AST patterns (embeddings are weak here)
 
 4. **Security/privacy for VHS** - Add encryption-at-rest option, redaction policies, TTL defaults for sensitive repos
+
+5. **Add capability negotiation to MCP tool output** - Include stable header:
+   - `session_id`
+   - `delta_enabled`
+   - `rehydration_supported`
+   - `schema_version`
+   - Reduces brittleness as formats evolve
+
+6. **Planner should own "progressive disclosure" by default**:
+   1. Signatures/structure first
+   2. Then targeted bodies
+   3. Then PDG slice
+   4. Then full files only if needed
+   - Aligns with Agentless/SWE-agent: fewer, better tool calls beat giant contexts
+
+7. **Add budget curve evaluation** - Test success rate at 1k / 2k / 4k token budgets for common workflows (bugfix, refactor, add test). Include SWE-bench Verified–style scenarios as regression tests.
 
 ---
 
@@ -560,9 +636,21 @@ When symbol query is ambiguous:
       "lines": [12, 45]
     }
   ],
-  "signatures_only": [
-    "src/routes/api.ts:handleLogin",
-    "src/routes/api.ts:handleLogout"
+  "slices": [
+    {
+      "id": "src/routes/api.ts:handleLogin",
+      "relevance": "signature_only",
+      "signature": "function handleLogin(...): void",
+      "code": null,
+      "lines": null
+    },
+    {
+      "id": "src/routes/api.ts:handleLogout",
+      "relevance": "signature_only",
+      "signature": "function handleLogout(...): void",
+      "code": null,
+      "lines": null
+    }
   ]
 }
 ```

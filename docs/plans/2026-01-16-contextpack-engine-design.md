@@ -10,7 +10,7 @@
 
 ### ContextPack Engine
 - Inputs: candidate list (`symbol_id`, `relevance`, `reason`, optional `depth`)
-- Outputs: `ContextPack` (ordered slices + signatures_only + metadata)
+- Outputs: `ContextPack` (ordered slices + metadata; signature-only slices use `code: null`)
 - Responsibilities:
   - Normalize and resolve symbol IDs
   - Rank candidates by relevance + depth

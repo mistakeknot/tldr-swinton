@@ -6,7 +6,7 @@
 
 **Goal:** Implement a shared ContextPack Engine that unifies DiffLens and SymbolKite outputs under one schema with shared symbol registry, budget allocation, and formatting.
 
-**Architecture:** Introduce a new engine module that accepts candidate symbols + relevance and produces a ContextPack (slices + signatures_only). Add a SymbolRegistry for metadata lookup, a BudgetAllocator to decide full-code vs signature-only, and a formatter for text/ultracompact/json outputs. Route DiffLens and SymbolKite through the engine while preserving existing behavior as defaults.
+**Architecture:** Introduce a new engine module that accepts candidate symbols + relevance and produces a ContextPack (slices with `code: null` for signature-only). Add a SymbolRegistry for metadata lookup, a BudgetAllocator to decide full-code vs signature-only, and a formatter for text/ultracompact/json outputs. Route DiffLens and SymbolKite through the engine while preserving existing behavior as defaults.
 
 **Tech Stack:** Python 3, pytest, tldr-swinton core modules (`engines/difflens.py`, `engines/symbolkite.py`, `output_formats.py`).
 
@@ -62,14 +62,13 @@ class ContextSlice:
 @dataclass
 class ContextPack:
     slices: list[ContextSlice]
-    signatures_only: list[str]
     budget_used: int = 0
 
 class ContextPackEngine:
     def build_context_pack(self, candidates, budget_tokens: int | None = None) -> ContextPack:
         # minimal stub to satisfy test (no real budget yet)
         slices = [ContextSlice(id=candidates[0].symbol_id, signature="", code=None, lines=None)]
-        return ContextPack(slices=slices, signatures_only=[])
+        return ContextPack(slices=slices)
 ```
 
 **Step 4: Run test to verify it passes**
@@ -179,7 +178,8 @@ def test_budget_allocates_full_then_signature(tmp_path: Path) -> None:
         budget_tokens=30,
     )
     assert pack.slices[0].id.endswith("a.py:hi")
-    assert "b.py:lo" in pack.signatures_only
+    assert pack.slices[1].id.endswith("b.py:lo")
+    assert pack.slices[1].code is None
 ```
 
 **Step 2: Run test to verify it fails**
@@ -191,7 +191,7 @@ Expected: FAIL (budget logic missing).
 
 - Add `ContextPackEngine(registry=SymbolRegistry)` dependency
 - Add token estimator (reuse `output_formats._estimate_tokens` or inline)
-- Allocate full code for top‑ranked candidates until budget, then signatures_only
+- Allocate full code for top‑ranked candidates until budget, then signature-only slices (`code: null`)
 
 **Step 4: Run test to verify it passes**
 
@@ -221,7 +221,7 @@ from tldr_swinton.output_formats import format_context_pack
 
 
 def test_contextpack_json_format() -> None:
-    pack = ContextPack(slices=[ContextSlice(id="a.py:hi", signature="def hi()", code=None, lines=None)], signatures_only=[])
+    pack = ContextPack(slices=[ContextSlice(id="a.py:hi", signature="def hi()", code=None, lines=None)])
     out = format_context_pack(pack, fmt="json")
     assert "a.py:hi" in out
 ```
@@ -279,7 +279,7 @@ Expected: FAIL if no ContextPack integration.
 
 - In DiffLens, build candidate list from hunks + relevance
 - Call ContextPackEngine to build pack
-- Preserve existing schema keys (`slices`, `signatures_only`)
+- Preserve existing schema keys (`slices`; infer signature-only from `code: null`)
 
 **Step 4: Run test to verify it passes**
 

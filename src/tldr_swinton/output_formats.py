@@ -63,7 +63,6 @@ def _contextpack_to_dict(pack: ContextPack) -> dict:
             }
             for item in pack.slices
         ],
-        "signatures_only": list(pack.signatures_only),
     }
 
 

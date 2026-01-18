@@ -490,7 +490,6 @@ def get_context_pack(
             "ambiguous": True,
             "candidates": ctx.candidates,
             "slices": [],
-            "signatures_only": [],
         }
     candidates: list[Candidate] = []
     for order_idx, func in enumerate(ctx.functions):
@@ -531,7 +530,6 @@ def get_context_pack(
     return {
         "budget_used": pack.budget_used,
         "slices": slices,
-        "signatures_only": pack.signatures_only,
     }
 
 

@@ -32,7 +32,6 @@ class ContextSlice:
 @dataclass
 class ContextPack:
     slices: list[ContextSlice]
-    signatures_only: list[str]
     budget_used: int = 0
 
 
@@ -46,10 +45,9 @@ class ContextPackEngine:
         budget_tokens: int | None = None,
     ) -> ContextPack:
         if not candidates:
-            return ContextPack(slices=[], signatures_only=[])
+            return ContextPack(slices=[])
         ordered = sorted(candidates, key=lambda c: (-c.relevance, c.order, c.symbol_id))
         slices: list[ContextSlice] = []
-        signatures_only: list[str] = []
         used = 0
 
         for candidate in ordered:
@@ -86,14 +84,24 @@ class ContextPackEngine:
                 )
                 used += full_cost
             elif used + sig_cost <= budget_tokens:
-                signatures_only.append(candidate.symbol_id)
+                etag = _compute_etag(signature, None)
+                slices.append(
+                    ContextSlice(
+                        id=candidate.symbol_id,
+                        signature=signature,
+                        code=None,
+                        lines=lines,
+                        relevance=candidate.relevance_label,
+                        meta=candidate.meta,
+                        etag=etag,
+                    )
+                )
                 used += sig_cost
             else:
                 break
 
         return ContextPack(
             slices=slices,
-            signatures_only=signatures_only,
             budget_used=used,
         )
 

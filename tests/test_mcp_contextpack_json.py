@@ -9,7 +9,6 @@ def test_mcp_context_returns_contextpack_json(tmp_path) -> None:
         "status": "ok",
         "result": {
             "slices": [{"id": "m.py:foo", "signature": "def foo()", "code": None}],
-            "signatures_only": [],
         },
     }
     result = mcp_server._format_context_result(fake, "json")

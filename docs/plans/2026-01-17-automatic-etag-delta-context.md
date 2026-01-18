@@ -90,7 +90,11 @@ Make delta context the DEFAULT behavior for CLI/MCP so agents don't re-request u
   "slices": [
     {"id": "src/api.py:get_context", "signature": "...", "code": "...", "etag": "abc123"}
   ],
-  "signatures_only": ["src/utils.py:helper", "src/cli.py:main", "src/cli.py:parse_args"],
+  "slices": [
+    {"id": "src/utils.py:helper", "signature": "def helper(...)", "code": null, "lines": null},
+    {"id": "src/cli.py:main", "signature": "def main(...)", "code": null, "lines": null},
+    {"id": "src/cli.py:parse_args", "signature": "def parse_args(...)", "code": null, "lines": null}
+  ],
   "unchanged": ["src/cli.py:main", "src/cli.py:parse_args"],
   "cache_stats": {
     "hit_rate": 0.67,
@@ -100,7 +104,7 @@ Make delta context the DEFAULT behavior for CLI/MCP so agents don't re-request u
 }
 ```
 
-Delta responses include `signatures_only` for unchanged symbols and for changed symbols that were truncated to signatures due to budget. `unchanged` is a subset of `signatures_only`. Code is omitted for unchanged symbols to preserve token savings while keeping agent structure/context intact.
+Delta responses include signature-only slices by setting `code: null` on those slices (unchanged symbols and truncated-by-budget symbols). `unchanged` is a subset of the signature-only set. Code is omitted for unchanged symbols to preserve token savings while keeping agent structure/context intact.
 `hit_rate` is per-session cumulative: `hits / (hits + misses)` for the current session cache.
 
 ### 5. Canonical Symbol IDs
@@ -165,7 +169,7 @@ def build_context_pack_delta(
 
 **Notes:**
 - Normalize symbol IDs (canonical format) before cache lookup
-- Populate `signatures_only` for unchanged symbols
+- Mark unchanged symbols with `code: null` (signature-only)
 
 ### Task 3: Add API delta entrypoint
 
