@@ -129,3 +129,28 @@ class StateStore:
             "last_accessed",
         ]
         return dict(zip(keys, row))
+
+    def cleanup_expired(self, ttl_seconds: int) -> dict:
+        cutoff = datetime.now(timezone.utc).timestamp() - ttl_seconds
+        deleted_sessions = 0
+        deleted_deliveries = 0
+        with self._conn() as conn:
+            rows = conn.execute("SELECT session_id, last_accessed FROM sessions").fetchall()
+            expired: list[str] = []
+            for session_id, last_accessed in rows:
+                try:
+                    ts = datetime.fromisoformat(last_accessed).timestamp()
+                except Exception:
+                    ts = 0
+                if ts < cutoff:
+                    expired.append(session_id)
+            for session_id in expired:
+                delivery_count = conn.execute(
+                    "SELECT COUNT(*) FROM deliveries WHERE session_id = ?",
+                    (session_id,),
+                ).fetchone()[0]
+                conn.execute("DELETE FROM deliveries WHERE session_id = ?", (session_id,))
+                conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+                deleted_sessions += 1
+                deleted_deliveries += int(delivery_count)
+        return {"sessions": deleted_sessions, "deliveries": deleted_deliveries}
