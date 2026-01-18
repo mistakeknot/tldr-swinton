@@ -20,13 +20,64 @@ Based on Oracle evaluation (2026-01-17), these are the highest-impact improvemen
 2. **VHS second** - Quick win: vendor ~330 LOC, eliminate install friction. Enables auto-switch for large outputs.
 3. **PDG third** - Requires more careful testing (edit-safety). Has promotion gate (≥10% savings, no regressions).
 
-### Backlog
+### Full Priority Queue
 
-| Feature | Impact | Status |
-|---------|--------|--------|
-| CoverageLens | 50-70% for test failures | Planned |
-| Cost-based Query Planner | Reduces wrong-command churn | Research |
-| Incremental Semantic Search | Always-on find without explicit index | Research |
+After top 3 features, here's the complete prioritized backlog:
+
+| # | Feature | Impact | Effort | Status | Rationale |
+|---|---------|--------|--------|--------|-----------|
+| **4** | **Hybrid BM25+Embedding+Rerank** | Scale-robust retrieval | Low | Research | Sourcegraph's insight: pure embeddings fail at scale. Quick win. |
+| **5** | **Cost-based Query Planner** | Reduces wrong-command churn | Medium | Research | Oracle recommends moving earlier. Heuristic "glue layer" first. |
+| **6** | **Structural Search (ast-grep)** | Precise AST patterns | Low | Research | Embeddings weak at precise patterns. Add as retrieval lane. |
+| **7** | **Prompt Caching Integration** | Latency + cost reduction | Low | Research | Structure prompts for stable prefixes. Works with all providers. |
+| **8** | **CoverageLens** | 50-70% for test failures | Medium | Planned | Coverage-guided context for debugging. |
+| **9** | **Incremental Semantic Search** | Always-on find | Medium | Research | Remove indexing friction → fewer grep+paste fallbacks. |
+| **10** | **VoyageCode3 Embeddings** | Better search accuracy | Low | Research | Evaluate against nomic-embed-text. |
+| **11** | **LLMLingua Compression** | 5-10x additional | Medium | Research | For text-heavy sections only (not code). |
+| **12** | **Merkle Tree Indexing** | Faster incremental updates | Medium | Research | Cursor's approach. Cheap "what changed?" detection. |
+
+### Research Backlog (Not Yet Prioritized)
+
+These require spikes or evaluation before prioritizing:
+
+| Project/Technique | Potential Impact | Integration Effort | Notes |
+|-------------------|------------------|-------------------|-------|
+| **Aider Repo Map** | Validation + optimizations | Low | Similar to tldrs `structure`. [Repo](https://github.com/paul-gauthier/aider) |
+| **Continue.dev** | MCP patterns | Low | Reference for MCP integration. [Repo](https://github.com/continuedev/continue) |
+| **SPLADE Sparse Expansion** | Bridge lexical+semantic | Medium | [Paper](https://arxiv.org/abs/2107.05720) |
+| **Repomix** | Codebase packing reference | Low | Tree-sitter compression (~70%). [Repo](https://github.com/yamadashy/repomix) |
+| **Moatless Tools** | SWE-bench patterns | Low | State-machine context retrieval. [Repo](https://github.com/aorwall/moatless-tools) |
+| **Agentless** | Simple 3-phase architecture | Low | Hierarchical localization. [Repo](https://github.com/OpenAutoCoder/Agentless) |
+| **CodeSage / Jina Reranker** | Alternative embeddings | Low | [Jina Reranker](https://jina.ai/reranker/) |
+| **CodeBERT / GraphCodeBERT** | Baseline embeddings | Low | [GraphCodeBERT](https://arxiv.org/abs/2009.08366) |
+| **ColBERT-style Late Interaction** | Multi-vector retrieval | Medium | Better for code queries. Higher indexing cost. |
+| **MemGPT** | Memory tiers | Medium | VHS as "disk tier". [Paper](https://arxiv.org/abs/2310.08560) |
+| **RAGCache / TurboRAG** | Cached retrieval states | Medium | [RAGCache](https://arxiv.org/abs/2404.12457) |
+| **CodeQL / Joern** | PDG validation reference | High | [CodeQL](https://docs.github.com/en/code-security/codeql-for-vs-code), [Joern](https://docs.joern.io/) |
+| **SCIP/LSIF** | Code intelligence formats | Medium | [SCIP](https://github.com/sourcegraph/scip) |
+| **Context Distillation** | Internalize prompts | High | Used by Anthropic/Llama. |
+| **cAST (AST-aware chunking)** | Better code chunks | Medium | [Paper](https://arxiv.org/abs/2506.15655) |
+| **GNN for Code Graphs** | Learned PDG enhancements | High | GGNN, GAT. Requires model training. |
+
+### Key Insights from Research
+
+1. **Sourcegraph moved away from pure embeddings** - They found keyword search (BM25F) more reliable at scale than embeddings alone. Now use embeddings for reranking. Validates tldrs' hybrid approach.
+
+2. **Augment Code processes 200k tokens** - Their Context Engine uses custom GPU kernels. Shows what's achievable; their blog posts describe chunking strategies worth studying.
+
+3. **LLMLingua claims 20x compression** - With minimal performance loss. Most promising for text-heavy sections (summaries, comments). Careful with code tokens.
+
+4. **Cursor's Merkle trees** - Enable efficient incremental sync of large codebases. Could improve tldrs index update performance for repos with frequent changes.
+
+5. **SWE-bench patterns (Moatless, Agentless)** - Hierarchical localization + state-machine workflows outperform pure agentic approaches. Simple 3-phase (localize → repair → validate) achieves 32%+ at low cost.
+
+6. **Provider prefix caching** - Stable prompt prefixes get cached by Claude/OpenAI. Structure context for maximal prefix stability to reduce latency + cost even before perfect delta.
+
+7. **Two-stage retrieval is standard** - BM25/embedding first-pass → cross-encoder rerank. Reranking is often the difference between "plausible" and "correct".
+
+8. **AST-aware chunking beats naive chunking** - cAST shows 5.5 points gain on RepoEval. Code should be chunked at function/class level, not arbitrary lines.
+
+9. **Context rot is real** - Chroma research (2025) shows LLM performance degrades as context grows. "Lost in the middle" effect persists. Thoughtful chunking + overlap matters.
 
 ---
 
@@ -55,6 +106,55 @@ GPT-5.2-Pro evaluated the full codebase (~1.67M tokens) and identified the top 3
 4. **Semantic search is underused** - Indexing friction causes fallback to grep + paste.
 
 5. **Cost-based query planning** - A single `tldrs plan "<task>" --budget N` could reduce wrong-command churn.
+
+---
+
+## Oracle Plan Review (2026-01-17)
+
+Second Oracle review of the 3 implementation plans + research findings. Confirmed priorities are correct with these implementation concerns:
+
+### Priority 1: ETag/Delta Context - Concerns
+
+1. **Delta assumes model retains prior code** - If conversation truncated, "unchanged" becomes incorrect
+   - **Mitigation**: Add rehydration path via VHS refs: `unchanged_refs: {symbol_id: vhs://...}`
+
+2. **CLI default-to-delta unsafe for humans** - Humans don't retain prior output in LLM context
+   - **Mitigation**: Require explicit `--session-id` for delta in CLI; MCP can default delta
+
+3. **Session ID collisions** - Include repo fingerprint + branch/commit in session header
+   - **Mitigation**: Auto-reset on large diff (if repo changed too much since last seen)
+
+4. **Use SQLite instead of JSON** - Already used for VHS; simplifies concurrency, partial updates, bounded size
+
+### Priority 2: VHS Refs - Concerns
+
+1. **Preview quality is make-or-break** - First 30 lines often not the useful part
+   - **Mitigation**: Compact TOC (files/symbols + line ranges) + first N lines of *highest relevance slice*
+
+2. **Ref sprawl & garbage collection** - Add per-repo quotas, TTL-based expiry, purge-by-repo command
+
+3. **Unify VHS with ETag** - Make VHS content-addressed (hash → blob), then ETag can reference existing blob (no duplication)
+
+### Priority 3: PDG Slicing - Concerns
+
+1. **"Exact code" vs continuity markers** - Inserting `...` violates exact source
+   - **Mitigation**: Return *ranges* and render separators outside code fences
+
+2. **Slicing completeness** - Always include: function signature + docstring, import/type/constant definitions, small forward slice when changes affect downstream
+
+3. **Language coverage realism** - TS/Rust/Go PDG correctness tricky (macros, generics, async). "Slice usefulness" is separate metric from "extraction success"
+
+4. **Validate against CodeQL/Joern** - Use as reference implementations to check if slices miss key dependencies
+
+### Additional Recommendations from Oracle
+
+1. **Treat SymbolId + unified search as non-negotiable prerequisites** - Identity collisions break all 3 features
+
+2. **Move query planner earlier** - Heuristic planner as "glue layer" that decides lexical vs embedding vs structural, diff-context vs symbol slice, signature-only vs body vs PDG slice
+
+3. **Structural search as first-class retrieval lane** - Semgrep/ast-grep for precise AST patterns (embeddings are weak here)
+
+4. **Security/privacy for VHS** - Add encryption-at-rest option, redaction policies, TTL defaults for sensitive repos
 
 ---
 
