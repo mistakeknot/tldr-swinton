@@ -8,10 +8,34 @@ These features build on tldr-swinton's existing infrastructure (AST parsing, cal
 
 | Phase | Feature | Effort | Token Savings | Status |
 |-------|---------|--------|---------------|--------|
-| 0 | Quick Wins (Oracle Review) | 2-4 days | 2x+ | **Priority** |
-| 1 | ContextPack Engine + DiffLens/SymbolKite | 5-8 days | 60-80% | Planned |
-| 2 | Cassette Integration | 3-7 days | 70-90% | Optional |
+| 0 | Quick Wins (Oracle Review) | 2-4 days | 2x+ | Done |
+| 1 | ContextPack Engine + DiffLens/SymbolKite | 5-8 days | 60-80% | Done |
+| 2 | Cassette/VHS Integration | 3-7 days | 70-90% | Done |
 | 3 | CoverageLens | 4-8 days | 50-70% | Planned |
+
+---
+
+## Oracle Evaluation (2026-01-17)
+
+GPT-5.2-Pro evaluated the full codebase (~1.67M tokens) and identified top 3 priorities for further token savings:
+
+| Priority | Feature | Expected Impact | Plan |
+|----------|---------|-----------------|------|
+| **#1** | Automatic ETag/Delta Context | 2-5x on multi-turn sessions | [2026-01-17-automatic-etag-delta-context.md](2026-01-17-automatic-etag-delta-context.md) |
+| **#2** | Frictionless VHS Refs | 90%+ for large outputs | [2026-01-17-frictionless-vhs-refs.md](2026-01-17-frictionless-vhs-refs.md) |
+| **#3** | PDG-Guided Slicing | 30-50% on function bodies | [2026-01-17-pdg-guided-slicing.md](2026-01-17-pdg-guided-slicing.md) |
+
+### Key Insights from Oracle
+
+1. **Multi-turn repetition is the biggest token sink** - Agents re-request unchanged symbols. ETag primitives exist but aren't automatic.
+
+2. **VHS adoption friction causes blob pasting** - Extra install + env vars = agents paste blobs instead of refs.
+
+3. **Include less exact code > summarize** - PDG slicing keeps exact code (edit-safe) while cutting 30-50% of function bodies.
+
+4. **Semantic search is underused** - Indexing friction causes fallback to grep + paste.
+
+5. **Cost-based query planning** - A single `tldrs plan "<task>" --budget N` could reduce wrong-command churn.
 
 ---
 
