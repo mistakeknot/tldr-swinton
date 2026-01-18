@@ -128,7 +128,7 @@ Indexes:
 - **False UNCHANGED**: representation-aware delta (only full/vhs_ref).
 - **Repo fingerprint drift**: store repo fingerprint in sessions and warn on mismatch.
 
-## Open Questions
-- Compression defaults for VHS blobs (size threshold?)
-- Token estimate source (tiktoken vs heuristic)
-- Repo fingerprint definition (git commit + branch + root hash?)
+## Defaults (Resolved)
+- **Compression**: `compress_min_bytes = 64 * 1024` (64 KB). Use compression only when size >= threshold.
+- **Token estimate**: heuristic `len(text) // 4` (fallback if tiktoken not installed). Optional tiktoken integration later.
+- **Repo fingerprint**: `sha256(git_root + HEAD_commit + branch_name)` with fallback to `sha256(git_root + .git/index mtime)` when detached/dirty.
