@@ -15,14 +15,7 @@ This guide helps coding agents use tldr-swinton to minimize tokens while keeping
 # tldrs
 curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldr-swinton/main/scripts/install.sh | bash
 
-# Optional: tldrs-vhs for large outputs
-curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldrs-vhs/main/scripts/install.sh | bash
-```
-
-If non-interactive shells do not load aliases:
-
-```bash
-export TLDRS_VHS_CMD="$HOME/tldrs-vhs/.venv/bin/tldrs-vhs"
+# VHS refs are built-in (repo-local). Large outputs are stored under `.tldrs/`.
 ```
 
 Verify install:
@@ -108,14 +101,13 @@ tldrs context main --project . --include vhs://<hash>
 ```
 
 - `--output vhs` prints a ref plus a short summary/preview; the ref is what saves tokens.
+- Repo-local VHS storage lives under `.tldrs/` by default.
 - Programmatic note: ContextPack JSON includes `etag` per slice for conditional fetch in the API.
   - For API usage: `get_symbol_context_pack(..., etag=...)` returns `"UNCHANGED"` when the symbol is unchanged.
 
 ## Troubleshooting
 
-- If tldrs-vhs is not found:
-  - `export TLDRS_VHS_CMD="$HOME/tldrs-vhs/.venv/bin/tldrs-vhs"`
-  - Or set `TLDRS_VHS_PYTHONPATH=/path/to/tldrs-vhs/src` and use `TLDRS_VHS_CMD="python -m tldrs_vhs.cli"`
+- Override VHS storage location: `export TLDRS_VHS_HOME=/path/to/store`
 - Suppress entry warnings (optional): `export TLDRS_NO_WARNINGS=1`
 
 ## Typical Agent Flow
