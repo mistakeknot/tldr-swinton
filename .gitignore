@@ -71,8 +71,10 @@ venv.bak/
 
 # Project specific
 .tldr/
+.tldrs/
 *.tldr.cache
 .beads/
 results/
 tldr-bench/vendor/openhands-benchmarks/
 logs/
+.venv311/
