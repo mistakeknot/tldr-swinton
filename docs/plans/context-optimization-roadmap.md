@@ -58,6 +58,43 @@ After top 3 features, here's the complete prioritized backlog (updated per Oracl
 | **12** | **LLMLingua-2 Compression** | 5-10x additional | Medium | Research | Task-agnostic compression. For text-heavy sections (issues, logs, docs). [Paper](https://arxiv.org/abs/2403.12968) |
 | **13** | **Merkle Tree Indexing** | Faster incremental updates | Medium | Research | Cursor's approach. May merge with #8 if using content hash manifests. |
 
+### Session Memory (Lightweight)
+
+**Oracle-validated scope (2026-01-20):** Policy/decision memory only. Not a full "agent reasoning artifact" system.
+
+This feature emerged from evaluating HyperCard-inspired architectures for LLM agents. The full vision (hypothesis ledgers, capsule capture/replay, artifact graphs) was rejected as out of scope for tldr-swinton. However, a narrow subset fits naturally:
+
+| Feature | Value | Effort | Status | Notes |
+|---------|-------|--------|--------|-------|
+| Auto-include `AGENTS.md` / `.tldrs/POLICY.md` | High | Low | Planned | Preamble slice with separate `--memory-budget` |
+| `.tldrsrc` with `always_include` + `constraints` | High | Moderate | Planned | Directory-scoped policy inheritance |
+| `tldrs decide` command | Medium | Low | Optional | Appends to POLICY.md with timestamp + optional `--refs` |
+
+**Implementation approach:**
+- Treat policy content as a "preamble slice" budgeted separately from code (`--memory-budget`)
+- Use existing etag/delivery dedupe—policy content is just another deliverable
+- Deterministic inclusion only—do NOT auto-infer relevance from embeddings
+- Store large policy content in VHS; keep SQLite as metadata index
+- Default behavior unchanged; opt-in via `--include-notes` or `.tldrsrc` presence
+
+**What was explicitly rejected (belongs in separate tools):**
+- **Hypothesis ledger**: High churn, often wrong/stale, hard to make "relevant" without second retrieval system
+- **Capsule capture/replay**: Security footguns, platform variance, "not token-efficient code analysis"
+- **Artifact graph links**: Organizational sugar; 80% achievable with `refs` on artifacts themselves
+
+These features could live in separate tools (e.g., MCP Agent Mail, Beads) that output VHS refs or text for tldr-swinton to include.
+
+**Why this fits tldr-swinton's identity:**
+- Decisions/constraints are small (< 500 tokens), stable, and directly impact code generation
+- They prevent repeated re-explanations across sessions ("we chose FastAPI because async")
+- They can be deduped via existing delivery/etag machinery
+- Positioned as "project invariants that improve token efficiency," not "agent memory"
+
+**80% solution (if full implementation is too heavy):**
+- Just auto-include `AGENTS.md` as first slice when present
+- Add `--memory-budget 200` flag to cap preamble tokens
+- Done. No new schema, no `.tldrsrc` parsing, no `tldrs decide` command.
+
 ### Research Backlog (Not Yet Prioritized)
 
 These require spikes or evaluation before prioritizing:
