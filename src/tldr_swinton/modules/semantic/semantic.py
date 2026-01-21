@@ -605,7 +605,7 @@ def _fallback_signature(func_name: str, lang: str, is_method: bool = False) -> s
 @lru_cache(maxsize=256)
 def _extract_module_info(file_path: str):
     try:
-        from .hybrid_extractor import HybridExtractor
+        from ..core.hybrid_extractor import HybridExtractor
 
         extractor = HybridExtractor()
         return extractor.extract(file_path)

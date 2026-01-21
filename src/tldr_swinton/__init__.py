@@ -74,8 +74,8 @@ from .modules.core import cross_file_calls
 from .modules.core import symbol_registry
 from .modules.core import daemon
 from .modules.core import mcp_server
-from .modules.core import index
-from .modules.core import semantic
+from .modules.semantic import index
+from .modules.semantic import semantic as semantic_mod
 from .modules.core import state_store
 from .modules.core import tldrsignore
 from .modules.core import ast_extractor
@@ -91,7 +91,7 @@ sys.modules['tldr_swinton.symbol_registry'] = symbol_registry
 sys.modules['tldr_swinton.daemon'] = daemon
 sys.modules['tldr_swinton.mcp_server'] = mcp_server
 sys.modules['tldr_swinton.index'] = index
-sys.modules['tldr_swinton.semantic'] = semantic
+sys.modules['tldr_swinton.semantic'] = semantic_mod
 sys.modules['tldr_swinton.state_store'] = state_store
 sys.modules['tldr_swinton.tldrsignore'] = tldrsignore
 sys.modules['tldr_swinton.ast_extractor'] = ast_extractor
