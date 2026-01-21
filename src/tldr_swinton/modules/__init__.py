@@ -1,7 +1,8 @@
 """TLDR-Swinton modules.
 
 Modules:
-- core: Multi-layer code intelligence (AST, CFG, DFG, PDG, semantic search)
+- core: Multi-layer code intelligence (AST, CFG, DFG, PDG)
+- semantic: Vector-based code search using embeddings
 - vhs: Content-addressed store for tool outputs
 - workbench: Session artifacts (capsules, decisions, hypotheses, links)
 - bench: Benchmarking harness for validating improvements
@@ -12,6 +13,9 @@ def __getattr__(name: str):
     if name == "core":
         from . import core
         return core
+    elif name == "semantic":
+        from . import semantic
+        return semantic
     elif name == "vhs":
         from . import vhs
         return vhs
@@ -23,4 +27,4 @@ def __getattr__(name: str):
         return bench
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-__all__ = ["core", "vhs", "workbench", "bench"]
+__all__ = ["core", "semantic", "vhs", "workbench", "bench"]

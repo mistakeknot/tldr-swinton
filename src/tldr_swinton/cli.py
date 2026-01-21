@@ -1209,7 +1209,7 @@ Semantic Search:
                 print(f"Indexed {len(files)} files, found {len(graph.edges)} edges")
 
         elif args.command == "semantic":
-            from .modules.core.index import build_index, search_index
+            from .modules.semantic.index import build_index, search_index
 
             if args.action == "index":
                 respect_ignore = not getattr(args, 'no_ignore', False)
@@ -1459,7 +1459,7 @@ Semantic Search:
                     pass
 
         elif args.command == "index":
-            from .modules.core.index import build_index, search_index, get_index_info
+            from .modules.semantic.index import build_index, search_index, get_index_info
 
             respect_ignore = not getattr(args, 'no_ignore', False)
             respect_gitignore = getattr(args, 'respect_gitignore', False)
@@ -1491,7 +1491,7 @@ Semantic Search:
                     print(f"  Unchanged: {stats.unchanged_units}")
 
         elif args.command == "find":
-            from .modules.core.index import search_index
+            from .modules.semantic.index import search_index
 
             results = search_index(
                 args.path,
