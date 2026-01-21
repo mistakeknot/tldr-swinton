@@ -23,7 +23,7 @@ import tempfile
 from pathlib import Path
 
 from . import __version__
-from .state_store import StateStore
+from .modules.core.state_store import StateStore
 
 
 def _get_subprocess_detach_kwargs():
@@ -97,6 +97,103 @@ def _make_vhs_preview(text: str, max_lines: int = 30, max_bytes: int = 2048) -> 
         lines.append(line)
         used += line_bytes
     return "\n".join(lines)
+
+
+def _get_context_pack_with_delta(
+    project: str,
+    entry_point: str,
+    session_id: str,
+    depth: int = 2,
+    language: str = "python",
+    budget_tokens: int | None = None,
+    include_docstrings: bool = False,
+) -> "ContextPack":
+    """Get context pack with delta detection against session cache.
+
+    Returns a ContextPack where unchanged symbols have code=None and are
+    listed in the `unchanged` field. Changed/new symbols include full code.
+    """
+    from .modules.core.api import get_symbol_context_pack
+    from .modules.core.contextpack_engine import ContextPack
+
+    project_root = Path(project).resolve()
+    store = _get_state_store(project_root)
+
+    # First, get the full context pack to know all candidates
+    full_pack = get_symbol_context_pack(
+        project,
+        entry_point,
+        depth=depth,
+        language=language,
+        budget_tokens=None,  # Get all symbols first
+        include_docstrings=include_docstrings,
+    )
+
+    if not full_pack.slices:
+        return full_pack
+
+    # Build etag map from full pack
+    symbol_etags = {s.id: s.etag for s in full_pack.slices if s.etag}
+
+    # Check delta against session cache
+    delta_result = store.check_delta(session_id, symbol_etags)
+
+    # Build delta-aware pack
+    from .modules.core.contextpack_engine import Candidate, ContextPackEngine
+
+    candidates = [
+        Candidate(
+            symbol_id=s.id,
+            relevance=_relevance_to_int(s.relevance),
+            relevance_label=s.relevance,
+            order=i,
+            signature=s.signature,
+            code=s.code,
+            lines=s.lines,
+            meta=s.meta,
+        )
+        for i, s in enumerate(full_pack.slices)
+    ]
+
+    engine = ContextPackEngine()
+    delta_pack = engine.build_context_pack_delta(
+        candidates,
+        delta_result,
+        budget_tokens=budget_tokens,
+    )
+
+    # Record deliveries for changed symbols (those with code)
+    deliveries = []
+    for s in delta_pack.slices:
+        if s.code is not None:  # Only record full deliveries
+            deliveries.append({
+                "symbol_id": s.id,
+                "etag": s.etag or "",
+                "representation": "full",
+                "vhs_ref": None,
+                "token_estimate": len(s.code) // 4 if s.code else 0,
+            })
+
+    if deliveries:
+        fingerprint = store.get_session_stats(session_id).get("repo_fingerprint", "unknown")
+        store.open_session(session_id, fingerprint if fingerprint else "unknown", language)
+        store.record_deliveries_batch(session_id, deliveries)
+
+    return delta_pack
+
+
+def _relevance_to_int(label: str | None) -> int:
+    """Convert relevance label to integer for sorting."""
+    if not label:
+        return 0
+    mapping = {
+        "contains_diff": 100,
+        "caller": 80,
+        "callee": 80,
+        "test": 60,
+        "signature_only": 20,
+    }
+    return mapping.get(label, 50)
 
 
 def _render_vhs_output(ref: str, summary: str, preview: str) -> str:
@@ -360,6 +457,21 @@ Semantic Search:
                  "cpp", "ruby", "php", "kotlin", "swift", "csharp", "scala", "lua", "elixir"],
         help="Language",
     )
+    ctx_p.add_argument(
+        "--session-id",
+        default=None,
+        help="Session ID for ETag caching (enables delta mode)",
+    )
+    ctx_p.add_argument(
+        "--delta",
+        action="store_true",
+        help="Enable delta mode (return UNCHANGED for cached symbols)",
+    )
+    ctx_p.add_argument(
+        "--no-delta",
+        action="store_true",
+        help="Disable delta mode even if session-id is provided",
+    )
 
     diff_p = subparsers.add_parser("diff-context", help="Diff-first context pack")
     diff_p.add_argument("--project", default=".", help="Project root directory")
@@ -621,10 +733,19 @@ Semantic Search:
         help="Embedding backend (should match index)",
     )
 
+    # Module subcommands: vhs, wb, bench
+    from .modules.vhs import cli as vhs_cli
+    from .modules.workbench import cli as wb_cli
+    from .modules.bench import cli as bench_cli
+
+    vhs_cli.add_subparser(subparsers)
+    wb_cli.add_subparser(subparsers)
+    bench_cli.add_subparser(subparsers)
+
     args = parser.parse_args()
 
     # Import here to avoid slow startup for --help
-    from .api import (
+    from .modules.core.api import (
         build_project_call_graph,
         extract_file,
         get_cfg_context,
@@ -639,14 +760,14 @@ Semantic Search:
         scan_project_files,
         search as api_search,
     )
-    from .analysis import (
+    from .modules.core.analysis import (
         analyze_architecture,
         analyze_dead_code,
         analyze_impact,
     )
-    from .dirty_flag import is_dirty, get_dirty_files, clear_dirty
-    from .patch import patch_call_graph
-    from .cross_file_calls import ProjectCallGraph
+    from .modules.core.dirty_flag import is_dirty, get_dirty_files, clear_dirty
+    from .modules.core.patch import patch_call_graph
+    from .modules.core.cross_file_calls import ProjectCallGraph
 
     def _get_or_build_graph(project_path, lang, build_fn):
         """Get cached graph with incremental patches, or build fresh.
@@ -725,22 +846,26 @@ Semantic Search:
             print(json.dumps(result, indent=2))
 
         elif args.command == "structure":
+            respect_ignore = not getattr(args, "no_ignore", False)
             result = get_code_structure(
                 args.path,
                 language=args.lang,
                 max_results=args.max,
+                respect_ignore=respect_ignore,
                 respect_gitignore=getattr(args, "respect_gitignore", False),
             )
             print(json.dumps(result, indent=2))
 
         elif args.command == "search":
             ext = set(args.ext) if args.ext else None
+            respect_ignore = not getattr(args, "no_ignore", False)
             result = api_search(
                 args.pattern, args.path,
                 extensions=ext,
                 context_lines=args.context,
                 max_results=args.max,
                 max_files=args.max_files,
+                respect_ignore=respect_ignore,
                 respect_gitignore=getattr(args, "respect_gitignore", False),
             )
             print(json.dumps(result, indent=2))
@@ -795,19 +920,41 @@ Semantic Search:
 
         elif args.command == "context":
             project_root = Path(args.project).resolve()
+
+            # Determine if delta mode should be used
+            use_delta = False
+            session_id = None
+            if args.session_id or args.delta:
+                if not args.no_delta:
+                    use_delta = True
+                    store = _get_state_store(project_root)
+                    session_id = args.session_id or store.get_or_create_default_session(args.lang)
+
             if args.format == "ultracompact":
-                from .output_formats import format_context_pack
-                pack = get_symbol_context_pack(
-                    args.project,
-                    args.entry,
-                    depth=args.depth,
-                    language=args.lang,
-                    budget_tokens=args.budget,
-                    include_docstrings=args.with_docs,
-                )
+                from .modules.core.output_formats import format_context_pack
+
+                if use_delta and session_id:
+                    pack = _get_context_pack_with_delta(
+                        args.project,
+                        args.entry,
+                        session_id,
+                        depth=args.depth,
+                        language=args.lang,
+                        budget_tokens=args.budget,
+                        include_docstrings=args.with_docs,
+                    )
+                else:
+                    pack = get_symbol_context_pack(
+                        args.project,
+                        args.entry,
+                        depth=args.depth,
+                        language=args.lang,
+                        budget_tokens=args.budget,
+                        include_docstrings=args.with_docs,
+                    )
                 output = format_context_pack(pack, fmt="ultracompact")
             else:
-                from .output_formats import format_context
+                from .modules.core.output_formats import format_context
                 ctx = get_relevant_context(
                     args.project,
                     args.entry,
@@ -836,7 +983,7 @@ Semantic Search:
             else:
                 print(output)
         elif args.command == "diff-context":
-            from .output_formats import format_context_pack
+            from .modules.core.output_formats import format_context_pack
             project = Path(args.project).resolve()
             base = args.base or _resolve_diff_base(project)
             pack = get_diff_context(
@@ -956,7 +1103,7 @@ Semantic Search:
             print(json.dumps({"module": args.module, "importers": importers}, indent=2))
 
         elif args.command == "change-impact":
-            from .change_impact import analyze_change_impact
+            from .modules.core.change_impact import analyze_change_impact
 
             result = analyze_change_impact(
                 project_path=".",
@@ -979,7 +1126,7 @@ Semantic Search:
                 print(json.dumps(result, indent=2))
 
         elif args.command == "diagnostics":
-            from .diagnostics import (
+            from .modules.core.diagnostics import (
                 get_diagnostics,
                 get_project_diagnostics,
                 format_diagnostics_for_llm,
@@ -1031,7 +1178,7 @@ Semantic Search:
                 print(f"Background indexing spawned for {project_path}")
             else:
                 # Build call graph
-                from .cross_file_calls import scan_project
+                from .modules.core.cross_file_calls import scan_project
 
                 respect_ignore = not getattr(args, 'no_ignore', False)
                 respect_gitignore = getattr(args, 'respect_gitignore', False)
@@ -1062,7 +1209,7 @@ Semantic Search:
                 print(f"Indexed {len(files)} files, found {len(graph.edges)} edges")
 
         elif args.command == "semantic":
-            from .index import build_index, search_index
+            from .modules.core.index import build_index, search_index
 
             if args.action == "index":
                 respect_ignore = not getattr(args, 'no_ignore', False)
@@ -1253,7 +1400,7 @@ Semantic Search:
                         print("All diagnostic tools installed!")
 
         elif args.command == "daemon":
-            from .daemon import start_daemon, stop_daemon, query_daemon
+            from .modules.core.daemon import start_daemon, stop_daemon, query_daemon
 
             project_path = Path(args.project).resolve()
 
@@ -1312,7 +1459,7 @@ Semantic Search:
                     pass
 
         elif args.command == "index":
-            from .index import build_index, search_index, get_index_info
+            from .modules.core.index import build_index, search_index, get_index_info
 
             respect_ignore = not getattr(args, 'no_ignore', False)
             respect_gitignore = getattr(args, 'respect_gitignore', False)
@@ -1344,7 +1491,7 @@ Semantic Search:
                     print(f"  Unchanged: {stats.unchanged_units}")
 
         elif args.command == "find":
-            from .index import search_index
+            from .modules.core.index import search_index
 
             results = search_index(
                 args.path,
@@ -1365,6 +1512,19 @@ Semantic Search:
                     if r.get('summary'):
                         print(f"      → {r['summary']}")
                     print()
+
+        # Module subcommands
+        elif args.command == "vhs":
+            from .modules.vhs import cli as vhs_cli
+            sys.exit(vhs_cli.handle(args))
+
+        elif args.command == "wb":
+            from .modules.workbench import cli as wb_cli
+            sys.exit(wb_cli.handle(args))
+
+        elif args.command == "bench":
+            from .modules.bench import cli as bench_cli
+            sys.exit(bench_cli.handle(args))
 
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)

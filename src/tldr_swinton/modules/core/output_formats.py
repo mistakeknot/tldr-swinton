@@ -49,7 +49,7 @@ def format_context(
 
 
 def _contextpack_to_dict(pack: ContextPack) -> dict:
-    return {
+    result = {
         "budget_used": pack.budget_used,
         "slices": [
             {
@@ -64,6 +64,14 @@ def _contextpack_to_dict(pack: ContextPack) -> dict:
             for item in pack.slices
         ],
     }
+    # Include delta-specific fields if present
+    if pack.unchanged:
+        result["unchanged"] = pack.unchanged
+    if pack.rehydrate:
+        result["rehydrate"] = pack.rehydrate
+    if pack.cache_stats:
+        result["cache_stats"] = pack.cache_stats
+    return result
 
 
 def format_context_pack(pack: dict | ContextPack, fmt: str = "ultracompact") -> str:
@@ -329,6 +337,15 @@ def _format_context_pack_ultracompact(pack: dict) -> list[str]:
         lines.append(f"## Diff Context: {base}..{head}")
         lines.append("")
 
+    # Show cache stats if present (delta mode)
+    cache_stats = pack.get("cache_stats")
+    if cache_stats:
+        hit_rate = cache_stats.get("hit_rate", 0)
+        hits = cache_stats.get("hits", 0)
+        misses = cache_stats.get("misses", 0)
+        lines.append(f"# Delta: {hits} unchanged, {misses} changed ({hit_rate:.0%} cache hit)")
+        lines.append("")
+
     for item in pack.get("slices", []):
         _format_symbol(item.get("id", "?"), "", path_ids)
 
@@ -336,6 +353,8 @@ def _format_context_pack_ultracompact(pack: dict) -> list[str]:
         header = " ".join([f"{pid}={path}" for path, pid in path_ids.items()])
         lines.append(header)
         lines.append("")
+
+    unchanged_set = set(pack.get("unchanged", []))
 
     for item in pack.get("slices", []):
         symbol_id = item.get("id", "?")
@@ -346,7 +365,10 @@ def _format_context_pack_ultracompact(pack: dict) -> list[str]:
         if len(lines_range) == 2:
             line_info = f"@{lines_range[0]}-{lines_range[1]}"
         relevance = item.get("relevance", "")
-        lines.append(f"{display} {signature} {line_info} [{relevance}]".rstrip())
+
+        # Mark unchanged symbols
+        unchanged_marker = " [UNCHANGED]" if symbol_id in unchanged_set else ""
+        lines.append(f"{display} {signature} {line_info} [{relevance}]{unchanged_marker}".rstrip())
 
         code = item.get("code")
         if code:
@@ -354,6 +376,14 @@ def _format_context_pack_ultracompact(pack: dict) -> list[str]:
             lines.extend(code.splitlines())
             lines.append("```")
 
+        lines.append("")
+
+    # Show rehydration info if present
+    rehydrate = pack.get("rehydrate")
+    if rehydrate:
+        lines.append("# Rehydration refs (use to fetch full code):")
+        for sym_id, vhs_ref in rehydrate.items():
+            lines.append(f"#   {sym_id}: {vhs_ref}")
         lines.append("")
 
     return lines

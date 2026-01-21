@@ -749,6 +749,7 @@ def search(
     max_results: int = 100,
     max_files: int = 10000,
     respect_gitignore: bool = False,
+    respect_ignore: bool = True,
 ) -> list[dict]:
     """
     Search files for a regex pattern.
@@ -760,6 +761,8 @@ def search(
         context_lines: Number of context lines to include (default 0)
         max_results: Maximum matches to return (default 100, 0 = unlimited)
         max_files: Maximum files to scan (default 10000, 0 = unlimited)
+        respect_gitignore: If True, respect .gitignore patterns (default False)
+        respect_ignore: If True, respect .tldrsignore patterns (default True)
 
     Returns:
         List of matches:
@@ -784,6 +787,7 @@ def search(
     for file_path in iter_workspace_files(
         root,
         extensions=extensions,
+        respect_ignore=respect_ignore,
         respect_gitignore=respect_gitignore,
     ):
         # Check file limit
@@ -880,6 +884,7 @@ def get_code_structure(
     language: str = "python",
     max_results: int = 100,
     respect_gitignore: bool = False,
+    respect_ignore: bool = True,
 ) -> dict:
     """
     Get code structure (codemaps) for all files in a project.
@@ -888,6 +893,8 @@ def get_code_structure(
         root: Root directory to analyze
         language: Language to analyze ("python", "typescript", "go", "rust")
         max_results: Maximum number of files to analyze (default 100)
+        respect_gitignore: If True, respect .gitignore patterns (default False)
+        respect_ignore: If True, respect .tldrsignore patterns (default True)
 
     Returns:
         Dict with codemap structure:
@@ -972,6 +979,7 @@ def get_code_structure(
     for file_path in iter_workspace_files(
         root,
         extensions=extensions,
+        respect_ignore=respect_ignore,
         respect_gitignore=respect_gitignore,
     ):
         if count >= max_results:

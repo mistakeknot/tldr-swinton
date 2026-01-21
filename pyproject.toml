@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tldr-swinton"
-version = "0.2.0"
-description = "Token-efficient code analysis for LLMs - Fork with improved TypeScript and Rust support"
+version = "0.3.0"
+description = "Centralized platform for improving coding agent performance - token-efficient code analysis, session artifacts, and benchmarking"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
