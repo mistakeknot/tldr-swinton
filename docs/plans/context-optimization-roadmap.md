@@ -82,7 +82,7 @@ This feature emerged from evaluating HyperCard-inspired architectures for LLM ag
 - **Capsule capture/replay**: Security footguns, platform variance, "not token-efficient code analysis"
 - **Artifact graph links**: Organizational sugar; 80% achievable with `refs` on artifacts themselves
 
-These features could live in separate tools (e.g., MCP Agent Mail, Beads) that output VHS refs or text for tldr-swinton to include.
+These features now live in **[tldrs-workbench](../../../tldrs-workbench/)** — a separate project for agent reasoning artifact persistence. It outputs VHS refs that tldr-swinton can include.
 
 **Why this fits tldr-swinton's identity:**
 - Decisions/constraints are small (< 500 tokens), stable, and directly impact code generation
