@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+import sys
 import os
 from pathlib import Path
 import warnings
@@ -204,7 +205,12 @@ def get_relevant_context(
             module_path = str(rel_path.with_suffix(""))
             return _get_module_exports(project, module_path, language, include_docstrings)
 
-    call_graph = build_project_call_graph(str(project), language=language)
+    api_module = sys.modules.get("tldr_swinton.api")
+    call_graph_builder = getattr(api_module, "build_project_call_graph", None)
+    if callable(call_graph_builder):
+        call_graph = call_graph_builder(str(project), language=language)
+    else:
+        call_graph = build_project_call_graph(str(project), language=language)
 
     extractor = HybridExtractor()
     symbol_index: dict[str, FunctionInfo] = {}
