@@ -402,3 +402,235 @@ class TestContextPackDelta:
         assert pack.cache_stats["hits"] == 1
         assert pack.cache_stats["misses"] == 1
         assert pack.cache_stats["hit_rate"] == 0.5
+
+
+class TestDiffContextDelta:
+    """Tests for CLI diff-context delta functionality.
+
+    This is where delta mode provides REAL savings - diff-context includes
+    code bodies, so skipping unchanged code saves significant tokens.
+    """
+
+    @pytest.fixture
+    def git_python_project(self, tmp_path):
+        """Create a temporary git Python project for diff-context testing."""
+        import subprocess
+
+        # Initialize git repo
+        subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create src directory
+        src = tmp_path / "src"
+        src.mkdir()
+
+        # Create initial Python file
+        main_py = src / "main.py"
+        main_py.write_text('''
+def greet(name: str) -> str:
+    """Greet a user by name."""
+    return f"Hello, {name}!"
+
+
+def process(data: list) -> list:
+    """Process input data."""
+    result = []
+    for item in data:
+        result.append(transform(item))
+    return result
+
+
+def transform(item):
+    """Transform a single item."""
+    return item.upper()
+''')
+
+        # Commit initial version
+        subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create .tldrs directory
+        tldrs_dir = tmp_path / ".tldrs"
+        tldrs_dir.mkdir()
+
+        # Make a change for diff-context to pick up
+        main_py.write_text('''
+def greet(name: str) -> str:
+    """Greet a user by name."""
+    return f"Hi there, {name}!"
+
+
+def process(data: list) -> list:
+    """Process input data."""
+    result = []
+    for item in data:
+        result.append(transform(item))
+    return result
+
+
+def transform(item):
+    """Transform a single item."""
+    return item.upper()
+
+
+def new_function():
+    """A newly added function."""
+    return 42
+''')
+
+        return tmp_path
+
+    def test_diff_context_with_session_id_first_call(self, git_python_project):
+        """First diff-context call with session_id should include full code."""
+        result = _run_tldrs(
+            [
+                "diff-context",
+                "--project", str(git_python_project),
+                "--session-id", "diff-test-session-1",
+                "--format", "ultracompact",
+                "--lang", "python",
+            ],
+        )
+
+        assert result.returncode == 0, f"CLI failed: {result.stderr}"
+        output = result.stdout
+
+        # First call should include code (in ``` blocks)
+        assert "```" in output
+        # Should NOT have [UNCHANGED] marker on first call
+        assert "[UNCHANGED]" not in output
+
+    def test_diff_context_with_session_id_second_call(self, git_python_project):
+        """Second diff-context call with same session_id should mark unchanged symbols."""
+        session_id = "diff-test-session-delta"
+
+        # First call
+        result1 = _run_tldrs(
+            [
+                "diff-context",
+                "--project", str(git_python_project),
+                "--session-id", session_id,
+                "--format", "ultracompact",
+                "--lang", "python",
+            ],
+        )
+        assert result1.returncode == 0, f"First call failed: {result1.stderr}"
+
+        # Second call with same session
+        result2 = _run_tldrs(
+            [
+                "diff-context",
+                "--project", str(git_python_project),
+                "--session-id", session_id,
+                "--format", "ultracompact",
+                "--lang", "python",
+            ],
+        )
+        assert result2.returncode == 0, f"Second call failed: {result2.stderr}"
+
+        output2 = result2.stdout
+
+        # Second call SHOULD have [UNCHANGED] markers (delta mode working)
+        assert "[UNCHANGED]" in output2
+        # Cache stats should show hits
+        assert "Delta:" in output2
+
+    def test_diff_context_delta_saves_tokens(self, git_python_project):
+        """Delta mode should save tokens by omitting unchanged code."""
+        session_id = "diff-test-token-savings"
+
+        # First call - full output
+        result1 = _run_tldrs(
+            [
+                "diff-context",
+                "--project", str(git_python_project),
+                "--session-id", session_id,
+                "--format", "ultracompact",
+                "--lang", "python",
+            ],
+        )
+        assert result1.returncode == 0, f"First call failed: {result1.stderr}"
+        first_len = len(result1.stdout)
+
+        # Second call - should be smaller due to omitted code
+        result2 = _run_tldrs(
+            [
+                "diff-context",
+                "--project", str(git_python_project),
+                "--session-id", session_id,
+                "--format", "ultracompact",
+                "--lang", "python",
+            ],
+        )
+        assert result2.returncode == 0, f"Second call failed: {result2.stderr}"
+        second_len = len(result2.stdout)
+
+        # Second call should be smaller (code omitted for unchanged)
+        # Note: Cache stats header adds some chars, but should still be net savings
+        assert second_len < first_len, (
+            f"Expected smaller output on second call "
+            f"(first={first_len}, second={second_len})"
+        )
+
+    def test_diff_context_with_delta_flag(self, git_python_project):
+        """--delta flag should auto-generate session_id."""
+        result = _run_tldrs(
+            [
+                "diff-context",
+                "--project", str(git_python_project),
+                "--delta",
+                "--format", "ultracompact",
+                "--lang", "python",
+            ],
+        )
+
+        assert result.returncode == 0, f"CLI failed: {result.stderr}"
+        # Should work even without explicit session-id
+
+    def test_diff_context_no_delta_disables_caching(self, git_python_project):
+        """--no-delta should disable delta mode even with session-id."""
+        session_id = "diff-test-no-delta"
+
+        # First call
+        _run_tldrs(
+            [
+                "diff-context",
+                "--project", str(git_python_project),
+                "--session-id", session_id,
+                "--format", "ultracompact",
+                "--lang", "python",
+            ],
+        )
+
+        # Second call with --no-delta should not show delta stats
+        result = _run_tldrs(
+            [
+                "diff-context",
+                "--project", str(git_python_project),
+                "--session-id", session_id,
+                "--no-delta",
+                "--format", "ultracompact",
+                "--lang", "python",
+            ],
+        )
+
+        assert result.returncode == 0, f"CLI failed: {result.stderr}"
+        output = result.stdout
+        # With --no-delta, should NOT have delta cache stats
+        assert "Delta:" not in output

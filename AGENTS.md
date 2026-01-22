@@ -82,6 +82,47 @@ directly to this repo; update the datasets repo instead and bump the submodule.
 - Ambiguous entries return candidate lists; re-run with `file.py:func`.
 - For API tests, use `get_symbol_context_pack(..., etag=...)` to get `"UNCHANGED"`.
 
+## Delta Context Mode (Multi-Turn Token Savings)
+
+Delta mode tracks which symbols have been delivered to an LLM session and skips
+re-sending unchanged code on subsequent calls. This provides **~60% token savings**
+in multi-turn conversations.
+
+### Where Delta Mode Works
+
+- **`diff-context`** (recommended): Full code bodies included, delta mode provides
+  real token savings. Use `--session-id <id>` or `--delta` flag.
+- **`context`**: Signatures-only by design (95% savings already), delta mode adds
+  `[UNCHANGED]` markers but doesn't reduce output size significantly.
+
+### Usage
+
+```bash
+# First call - full output, records deliveries
+tldrs diff-context --project . --session-id my-session
+
+# Second call - unchanged symbols have code omitted
+tldrs diff-context --project . --session-id my-session
+# Shows: "Delta: 134 unchanged, 0 changed (100% cache hit)"
+
+# Auto-generate session ID
+tldrs diff-context --project . --delta
+
+# Disable delta even with session-id
+tldrs diff-context --project . --session-id my-session --no-delta
+```
+
+### Design Rationale
+
+The standard `context` command returns signatures-only (that's the "95% token savings"
+claim). Adding code bodies would defeat the purpose. Delta mode is most valuable with
+`diff-context` which includes full code for changed files.
+
+Session state is stored in `.tldrs/state.sqlite3` and tracks:
+- Session ID, repo fingerprint, language
+- Per-symbol deliveries with etags (sha256 of signature+code)
+- Sessions expire after 24 hours of inactivity
+
 ## MCP (Optional)
 
 - MCP server requires `pip install mcp`.
