@@ -208,8 +208,10 @@ def context(
     Follows call graph to specified depth, returning signatures and complexity
     metrics. This is TLDR's key value - 95% token savings vs reading raw files.
 
-    Delta mode: Use session_id + delta=True to skip unchanged symbols on
-    subsequent calls, achieving further 2-5x savings in multi-turn conversations.
+    Delta mode: Use session_id + delta=True to track unchanged symbols across
+    calls. Note: For the `context` tool (signatures-only), delta mode adds
+    [UNCHANGED] markers but doesn't reduce output significantly. Use the
+    `diff-context` CLI command for ~60% token savings with delta mode.
 
     Args:
         project: Project root directory

@@ -10,7 +10,7 @@ Based on Oracle evaluations (2026-01-17, 2026-01-18), these are the highest-impa
 
 | # | Feature | Impact | Effort | Status | Plan |
 |---|---------|--------|--------|--------|------|
-| **1** | **Automatic ETag/Delta Context** | 2-5x multi-turn savings | 3-5 days | **Next** | [Plan](2026-01-17-automatic-etag-delta-context.md) |
+| **1** | **Automatic ETag/Delta Context** | ~60% multi-turn savings | 3-5 days | **Done** | [Plan](2026-01-17-automatic-etag-delta-context.md) |
 | **2** | Frictionless VHS Refs | 90%+ large output savings | 2-3 days | Planned | [Plan](2026-01-17-frictionless-vhs-refs.md) |
 | **3** | PDG-Guided Slicing | 30-50% function body savings | 3-4 days | Planned | [Plan](2026-01-17-pdg-guided-slicing.md) |
 
