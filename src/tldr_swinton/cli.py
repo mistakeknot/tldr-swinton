@@ -120,7 +120,8 @@ def _get_context_pack_with_delta(
     store = _get_state_store(project_root)
 
     # First, get the full context pack to know all candidates
-    full_pack = get_symbol_context_pack(
+    # Note: get_symbol_context_pack returns a dict, not ContextPack
+    full_pack_dict = get_symbol_context_pack(
         project,
         entry_point,
         depth=depth,
@@ -129,11 +130,16 @@ def _get_context_pack_with_delta(
         include_docstrings=include_docstrings,
     )
 
-    if not full_pack.slices:
-        return full_pack
+    # Handle ambiguous case
+    if full_pack_dict.get("ambiguous"):
+        return ContextPack(slices=[], unchanged=[], rehydrate={})
+
+    slices_data = full_pack_dict.get("slices", [])
+    if not slices_data:
+        return ContextPack(slices=[], unchanged=[], rehydrate={})
 
     # Build etag map from full pack
-    symbol_etags = {s.id: s.etag for s in full_pack.slices if s.etag}
+    symbol_etags = {s["id"]: s.get("etag", "") for s in slices_data if s.get("etag")}
 
     # Check delta against session cache
     delta_result = store.check_delta(session_id, symbol_etags)
@@ -143,16 +149,16 @@ def _get_context_pack_with_delta(
 
     candidates = [
         Candidate(
-            symbol_id=s.id,
-            relevance=_relevance_to_int(s.relevance),
-            relevance_label=s.relevance,
+            symbol_id=s["id"],
+            relevance=_relevance_to_int(s.get("relevance")),
+            relevance_label=s.get("relevance"),
             order=i,
-            signature=s.signature,
-            code=s.code,
-            lines=s.lines,
-            meta=s.meta,
+            signature=s.get("signature", ""),
+            code=s.get("code"),
+            lines=tuple(s["lines"]) if s.get("lines") else None,
+            meta=s.get("meta"),
         )
-        for i, s in enumerate(full_pack.slices)
+        for i, s in enumerate(slices_data)
     ]
 
     engine = ContextPackEngine()
@@ -162,21 +168,27 @@ def _get_context_pack_with_delta(
         budget_tokens=budget_tokens,
     )
 
-    # Record deliveries for changed symbols (those with code)
+    # Record deliveries for ALL delivered symbols (changed ones)
+    # Note: We record based on whether the symbol was changed (not unchanged),
+    # because unchanged symbols were already recorded in a previous delivery.
     deliveries = []
     for s in delta_pack.slices:
-        if s.code is not None:  # Only record full deliveries
-            deliveries.append({
-                "symbol_id": s.id,
-                "etag": s.etag or "",
-                "representation": "full",
-                "vhs_ref": None,
-                "token_estimate": len(s.code) // 4 if s.code else 0,
-            })
+        # Skip unchanged symbols - they're already in the cache
+        if s.id in (delta_pack.unchanged or []):
+            continue
+        # Record this delivery (whether it has code or just signature)
+        deliveries.append({
+            "symbol_id": s.id,
+            "etag": s.etag or "",
+            "representation": "full" if s.code else "signature",
+            "vhs_ref": None,
+            "token_estimate": len(s.code) // 4 if s.code else len(s.signature) // 4,
+        })
 
     if deliveries:
-        fingerprint = store.get_session_stats(session_id).get("repo_fingerprint", "unknown")
-        store.open_session(session_id, fingerprint if fingerprint else "unknown", language)
+        from .modules.core.state_store import _compute_repo_fingerprint
+        fingerprint = _compute_repo_fingerprint(project_root)
+        store.open_session(session_id, fingerprint, language)
         store.record_deliveries_batch(session_id, deliveries)
 
     return delta_pack
