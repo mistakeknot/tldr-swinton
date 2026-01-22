@@ -208,6 +208,100 @@ def _relevance_to_int(label: str | None) -> int:
     return mapping.get(label, 50)
 
 
+def _get_diff_context_with_delta(
+    project: Path,
+    session_id: str,
+    base: str | None = None,
+    head: str = "HEAD",
+    budget_tokens: int | None = None,
+    language: str = "python",
+    compress: str | None = None,
+) -> "ContextPack":
+    """Get diff context pack with delta detection against session cache.
+
+    Returns a ContextPack where unchanged symbols have code=None and are
+    listed in the `unchanged` field. Changed/new symbols include full code.
+
+    This is where delta mode provides real savings - diff-context includes
+    code bodies, so skipping unchanged code saves significant tokens.
+    """
+    from .modules.core.api import get_diff_context
+    from .modules.core.contextpack_engine import Candidate, ContextPack, ContextPackEngine
+
+    project_root = project.resolve()
+    store = _get_state_store(project_root)
+
+    # Get the full diff context pack
+    full_pack_dict = get_diff_context(
+        project_root,
+        base=base,
+        head=head,
+        budget_tokens=None,  # Get all symbols first
+        language=language,
+        compress=compress,
+    )
+
+    slices_data = full_pack_dict.get("slices", [])
+    if not slices_data:
+        return ContextPack(slices=[], unchanged=[], rehydrate={})
+
+    # Build etag map - for diff-context we compute etag from signature+code
+    import hashlib
+    symbol_etags = {}
+    for s in slices_data:
+        sig = s.get("signature", "")
+        code = s.get("code", "") or ""
+        content = f"{sig}\n{code}"
+        etag = hashlib.sha256(content.encode()).hexdigest()[:16]
+        symbol_etags[s["id"]] = etag
+
+    # Check delta against session cache
+    delta_result = store.check_delta(session_id, symbol_etags)
+
+    # Build candidates
+    candidates = [
+        Candidate(
+            symbol_id=s["id"],
+            relevance=_relevance_to_int(s.get("relevance")),
+            relevance_label=s.get("relevance"),
+            order=i,
+            signature=s.get("signature", ""),
+            code=s.get("code"),
+            lines=tuple(s["lines"]) if s.get("lines") and len(s["lines"]) == 2 else None,
+            meta={k: v for k, v in s.items() if k not in ("id", "relevance", "signature", "code", "lines")},
+        )
+        for i, s in enumerate(slices_data)
+    ]
+
+    engine = ContextPackEngine()
+    delta_pack = engine.build_context_pack_delta(
+        candidates,
+        delta_result,
+        budget_tokens=budget_tokens,
+    )
+
+    # Record deliveries for changed symbols
+    deliveries = []
+    for s in delta_pack.slices:
+        if s.id in (delta_pack.unchanged or []):
+            continue
+        deliveries.append({
+            "symbol_id": s.id,
+            "etag": symbol_etags.get(s.id, ""),
+            "representation": "full" if s.code else "signature",
+            "vhs_ref": None,
+            "token_estimate": len(s.code) // 4 if s.code else len(s.signature) // 4,
+        })
+
+    if deliveries:
+        from .modules.core.state_store import _compute_repo_fingerprint
+        fingerprint = _compute_repo_fingerprint(project_root)
+        store.open_session(session_id, fingerprint, language)
+        store.record_deliveries_batch(session_id, deliveries)
+
+    return delta_pack
+
+
 def _render_vhs_output(ref: str, summary: str, preview: str) -> str:
     lines = [ref, f"# Summary: {summary}", "# Preview:"]
     if preview:
@@ -508,6 +602,21 @@ Semantic Search:
         choices=["python", "typescript", "javascript", "go", "rust", "java", "c",
                  "cpp", "ruby", "php", "kotlin", "swift", "csharp", "scala", "lua", "elixir"],
         help="Language",
+    )
+    diff_p.add_argument(
+        "--session-id",
+        default=None,
+        help="Session ID for delta caching (enables delta mode)",
+    )
+    diff_p.add_argument(
+        "--delta",
+        action="store_true",
+        help="Enable delta mode with auto-generated session ID",
+    )
+    diff_p.add_argument(
+        "--no-delta",
+        action="store_true",
+        help="Disable delta mode even if session-id provided",
     )
 
     # tldr cfg <file> <function>
@@ -998,14 +1107,35 @@ Semantic Search:
             from .modules.core.output_formats import format_context_pack
             project = Path(args.project).resolve()
             base = args.base or _resolve_diff_base(project)
-            pack = get_diff_context(
-                project,
-                base=base,
-                head=args.head,
-                budget_tokens=args.budget,
-                language=args.lang,
-                compress=None if args.compress == "none" else args.compress,
-            )
+
+            # Determine session ID and delta mode
+            session_id = args.session_id
+            use_delta = not args.no_delta
+            if args.delta and not session_id:
+                # Auto-generate session ID for --delta flag
+                from .modules.core.state_store import StateStore
+                store = StateStore(project)
+                session_id = store.get_or_create_default_session()
+
+            if use_delta and session_id:
+                pack = _get_diff_context_with_delta(
+                    project,
+                    session_id,
+                    base=base,
+                    head=args.head,
+                    budget_tokens=args.budget,
+                    language=args.lang,
+                    compress=None if args.compress == "none" else args.compress,
+                )
+            else:
+                pack = get_diff_context(
+                    project,
+                    base=base,
+                    head=args.head,
+                    budget_tokens=args.budget,
+                    language=args.lang,
+                    compress=None if args.compress == "none" else args.compress,
+                )
             print(format_context_pack(pack, fmt=args.format))
 
         elif args.command == "cfg":
