@@ -661,6 +661,15 @@ class TLDRDaemon:
             fmt = command.get("format", "text")
             budget = command.get("budget")
             include_docstrings = command.get("with_docs", False)
+            use_delta = command.get("delta", False)
+            session_id = command.get("session_id")
+
+            # Delta mode bypasses cache (session-specific state)
+            if use_delta or session_id:
+                return self._handle_context_delta(
+                    entry, language, depth, fmt, budget, include_docstrings, session_id
+                )
+
             return self.salsa_db.query(
                 cached_context,
                 self.salsa_db,
@@ -675,6 +684,95 @@ class TLDRDaemon:
         except Exception as e:
             logger.exception("Relevant context failed")
             return {"status": "error", "message": str(e)}
+
+    def _handle_context_delta(
+        self,
+        entry: str,
+        language: str,
+        depth: int,
+        fmt: str,
+        budget: int | None,
+        include_docstrings: bool,
+        session_id: str | None,
+    ) -> dict:
+        """Handle context command with delta mode (uncached, session-aware)."""
+        from .state_store import StateStore
+        from .api import get_symbol_context_pack
+        from .output_formats import format_context_pack
+        from .contextpack_engine import Candidate, ContextPackEngine, ContextPack
+
+        store = StateStore(self.project)
+
+        # Get or create session ID
+        if not session_id:
+            session_id = store.get_or_create_default_session(language)
+
+        # Get full context pack
+        full_pack_dict = get_symbol_context_pack(
+            str(self.project),
+            entry,
+            depth=depth,
+            language=language,
+            budget_tokens=None,  # Get all first, then apply delta
+            include_docstrings=include_docstrings,
+        )
+
+        if full_pack_dict.get("ambiguous"):
+            return {"status": "ok", "result": format_context_pack(full_pack_dict, fmt=fmt)}
+
+        slices_data = full_pack_dict.get("slices", [])
+        if not slices_data:
+            return {"status": "ok", "result": format_context_pack(full_pack_dict, fmt=fmt)}
+
+        # Build etag map and check delta
+        symbol_etags = {s["id"]: s.get("etag", "") for s in slices_data if s.get("etag")}
+        delta_result = store.check_delta(session_id, symbol_etags)
+
+        # Build delta-aware pack
+        def _relevance_to_int(label):
+            if not label:
+                return 0
+            return {"contains_diff": 100, "caller": 80, "callee": 80, "test": 60, "signature_only": 20}.get(label, 50)
+
+        candidates = [
+            Candidate(
+                symbol_id=s["id"],
+                relevance=_relevance_to_int(s.get("relevance")),
+                relevance_label=s.get("relevance"),
+                order=i,
+                signature=s.get("signature", ""),
+                code=s.get("code"),
+                lines=tuple(s["lines"]) if s.get("lines") else None,
+                meta=s.get("meta"),
+            )
+            for i, s in enumerate(slices_data)
+        ]
+
+        engine = ContextPackEngine()
+        delta_pack = engine.build_context_pack_delta(candidates, delta_result, budget_tokens=budget)
+
+        # Record deliveries for changed symbols
+        deliveries = []
+        for s in delta_pack.slices:
+            if s.id in (delta_pack.unchanged or []):
+                continue
+            deliveries.append({
+                "symbol_id": s.id,
+                "etag": s.etag or "",
+                "representation": "full" if s.code else "signature",
+                "vhs_ref": None,
+                "token_estimate": len(s.code) // 4 if s.code else len(s.signature) // 4,
+            })
+
+        if deliveries:
+            from .state_store import _compute_repo_fingerprint
+            fingerprint = _compute_repo_fingerprint(self.project)
+            store.open_session(session_id, fingerprint, language)
+            store.record_deliveries_batch(session_id, deliveries)
+
+        # Format output
+        output = format_context_pack(delta_pack, fmt=fmt)
+        return {"status": "ok", "result": output}
 
     def _handle_imports(self, command: dict) -> dict:
         """Handle imports extraction command."""

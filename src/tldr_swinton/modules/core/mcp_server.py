@@ -200,17 +200,27 @@ def context(
     format: str = "text",
     budget: int | None = None,
     with_docs: bool = False,
+    session_id: str | None = None,
+    delta: bool = False,
 ) -> str:
     """Get token-efficient LLM context starting from an entry point.
 
     Follows call graph to specified depth, returning signatures and complexity
     metrics. This is TLDR's key value - 95% token savings vs reading raw files.
 
+    Delta mode: Use session_id + delta=True to skip unchanged symbols on
+    subsequent calls, achieving further 2-5x savings in multi-turn conversations.
+
     Args:
         project: Project root directory
         entry: Entry point (function_name or Class.method)
         depth: How deep to follow calls (default 2)
         language: Programming language
+        format: Output format (text, ultracompact, json)
+        budget: Optional token budget
+        with_docs: Include docstrings
+        session_id: Session ID for delta caching (auto-generated if delta=True)
+        delta: Enable delta mode - unchanged symbols show [UNCHANGED] marker
 
     Returns:
         LLM-ready formatted context string
@@ -225,6 +235,8 @@ def context(
             "format": format,
             "budget": budget,
             "with_docs": with_docs,
+            "session_id": session_id,
+            "delta": delta,
         },
     )
     return _format_context_result(result, format)
