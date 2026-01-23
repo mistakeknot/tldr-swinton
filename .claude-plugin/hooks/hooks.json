@@ -1,0 +1,16 @@
+{
+  "description": "tldrs plugin hooks - semantic index setup check",
+  "hooks": {
+    "Setup": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/setup.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
