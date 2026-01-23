@@ -104,7 +104,22 @@ Then run:
 tldr-mcp --project .
 ```
 
-### Optional: Codex/Claude Skills
+### Optional: Claude Code Plugin
+
+If you have Claude Code, you can use tldr-swinton as a plugin:
+
+```bash
+# In your project directory
+git clone https://github.com/mistakeknot/tldr-swinton .claude-plugins/tldrs
+```
+
+This gives you:
+- `/tldrs-find <query>` - Semantic code search
+- `/tldrs-diff` - Diff-focused context for recent changes
+- `/tldrs-context <symbol>` - Symbol-level context
+- `/tldrs-quickstart` - Quick reference guide
+
+### Optional: Codex/Claude Skills (Manual)
 
 - **Codex**: repo-scoped skill lives at `.codex/skills/tldrs-agent-workflow/` (uses the CLI workflow).
 - **Claude**: copy/paste `docs/claude-skill.md` into a Claude custom skill.
