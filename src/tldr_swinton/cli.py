@@ -854,6 +854,11 @@ Semantic Search:
         help="Embedding backend (should match index)",
     )
 
+    # tldrs quickstart - Show agent-focused quick reference
+    quickstart_p = subparsers.add_parser(
+        "quickstart", help="Show quick reference guide for AI agents"
+    )
+
     # Module subcommands: vhs, wb, bench
     from .modules.vhs import cli as vhs_cli
     from .modules.workbench import cli as wb_cli
@@ -1654,6 +1659,59 @@ Semantic Search:
                     if r.get('summary'):
                         print(f"      → {r['summary']}")
                     print()
+
+        elif args.command == "quickstart":
+            # Print the quickstart guide
+            quickstart_path = Path(__file__).parent.parent.parent / "docs" / "QUICKSTART.md"
+            if quickstart_path.exists():
+                print(quickstart_path.read_text())
+            else:
+                # Fallback inline content if docs not found (e.g., pip install)
+                print("""# tldr-swinton Quick Reference for AI Agents
+
+## Decision Tree
+
+What are you trying to do?
+
+1. "Understand recent changes"
+   → tldrs diff-context --project . --budget 2000
+
+2. "Find code related to X concept"
+   → tldrs find "X concept"
+
+3. "Get context around a function"
+   → tldrs context <func> --project . --depth 2 --format ultracompact
+
+4. "See code structure"
+   → tldrs structure src/
+
+5. "Edit a file"
+   → Read the full file (tldr is for recon, not surgery)
+
+## Essential Commands
+
+# Diff-first context (start here)
+tldrs diff-context --project . --budget 2000
+
+# Semantic search (build index first)
+tldrs index .
+tldrs find "authentication logic"
+
+# Symbol context
+tldrs context func_name --project . --depth 2 --format ultracompact
+
+# Structure overview
+tldrs structure src/
+
+## Remember
+
+- tldr is for reconnaissance - use it to find and understand code
+- Read full files when editing - tldr gives signatures, not full code
+- Use --budget to cap tokens - always for large codebases
+- Use --format ultracompact - saves tokens
+
+Full guide: https://github.com/mistakeknot/tldr-swinton/blob/main/docs/QUICKSTART.md
+""")
 
         # Module subcommands
         elif args.command == "vhs":

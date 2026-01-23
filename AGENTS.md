@@ -2,6 +2,8 @@
 
 This document provides instructions for all AI coding assistants (Claude, Codex, etc.) working with the tldr-swinton codebase.
 
+**Quick start for agents**: Run `tldrs quickstart` for a concise reference guide.
+
 ## Project Overview
 
 tldr-swinton is a token-efficient code analysis tool for LLMs. It's a fork of llm-tldr with fixes for TypeScript and Rust support.
@@ -30,7 +32,7 @@ find . -name "*.pyc" -delete && find . -name "__pycache__" -type d -exec rm -rf 
 pip install -e .
 ```
 
-Full workflow guide: see `docs/agent-workflow.md`.
+Full workflow guide: see `docs/agent-workflow.md` or run `tldrs quickstart`.
 
 ## Dev Quickstart
 

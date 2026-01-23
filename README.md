@@ -62,8 +62,8 @@ This installs everything automatically:
 
 Quick verify after install:
 ```bash
-tldrs --help
-tldrs context main --project . --depth 1 --budget 200 --format ultracompact
+tldrs quickstart                    # Quick reference for agents
+tldrs --help                        # Full command list
 ```
 
 Options:
