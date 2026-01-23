@@ -85,8 +85,8 @@ def _extract_code_units(
     Returns:
         List of CodeUnit objects with rich metadata
     """
-    from .api import extract_file
-    from .workspace import iter_workspace_files
+    from tldr_swinton.modules.core.api import extract_file
+    from tldr_swinton.modules.core.workspace import iter_workspace_files
 
     project = Path(project_path).resolve()
     units = []

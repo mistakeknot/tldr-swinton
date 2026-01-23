@@ -25,7 +25,7 @@ This fork fixes those issues while maintaining full compatibility with the origi
 | Eval | Measures | Headline |
 |------|----------|----------|
 | DiffLens (avg across Python/TS/Rust) | Diff-focused context vs diff+deps baseline | **48.0% token savings** at **~0.77s** avg latency |
-| Token efficiency eval | Compact + structure savings vs raw | **93.1%** compact savings, **62.4%** structure JSON savings |
+| Token efficiency eval | Compact + structure savings vs raw | **93.1%** compact savings, **66.0%** structure JSON savings |
 | Semantic search eval | Retrieval + token footprint | **84.8%** token savings; top-1 auth/db, cache in top-3 |
 | Agent workflow eval | Realistic agent scenarios | **83.6%** aggregate savings (chunk-summary, budget=2000) |
 
