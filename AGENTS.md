@@ -45,6 +45,22 @@ tldrs --help
 tldrs extract src/tldr_swinton/embeddings.py
 ```
 
+## Claude Code Plugin
+
+The repo includes a Claude Code plugin at `.claude-plugin/`. Available commands:
+
+| Command | Description |
+|---------|-------------|
+| `/tldrs-find <query>` | Semantic code search |
+| `/tldrs-diff` | Diff-focused context for recent changes |
+| `/tldrs-context <symbol>` | Symbol-level context |
+| `/tldrs-quickstart` | Show quick reference guide |
+
+To use as a plugin:
+```bash
+git clone https://github.com/mistakeknot/tldr-swinton .claude-plugins/tldrs
+```
+
 ## Codex Skill (Repo-Scoped)
 
 The repo includes a Codex skill at:

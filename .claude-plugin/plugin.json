@@ -1,10 +1,22 @@
 {
   "name": "tldrs",
-  "version": "0.1.0",
-  "description": "Token-efficient code reconnaissance using tldr-swinton (diff-context, symbol context, budgets, VHS refs).",
+  "version": "0.3.0",
+  "description": "Token-efficient code reconnaissance for LLMs. 85%+ token savings with semantic search, diff-context, and symbol analysis.",
   "author": {
     "name": "MK",
     "email": "mistakeknot@vibeguider.org"
   },
-  "skills": ["./skills/tldrs-agent-workflow"]
+  "repository": "https://github.com/mistakeknot/tldr-swinton",
+  "homepage": "https://github.com/mistakeknot/tldr-swinton#readme",
+  "license": "MIT",
+  "keywords": ["code-analysis", "token-efficiency", "semantic-search", "diff-context", "llm-tools"],
+  "skills": [
+    "./skills/tldrs-agent-workflow"
+  ],
+  "commands": [
+    "./commands/find.md",
+    "./commands/diff-context.md",
+    "./commands/context.md",
+    "./commands/quickstart.md"
+  ]
 }

@@ -1,129 +1,95 @@
 ---
 name: tldrs-agent-workflow
-description: Use when an agent needs token-efficient code reconnaissance (diffs, call graphs, structure discovery, semantic search, change impact) before opening full files.
+description: Token-efficient code reconnaissance using tldr-swinton. Use BEFORE opening files with Read tool to save 85%+ tokens.
 ---
 
 # Tldrs Agent Workflow
 
 Use this skill BEFORE opening files with Read tool.
 
-## Core Flow (Fast Path)
+## Core Flow
 
-1) Diff-first context for recent changes:
-```
+1. **Diff-first context** for recent changes:
+```bash
 tldrs diff-context --project . --budget 2000
 ```
 
-2) Symbol-level context around an entry:
-```
-tldrs context <entry> --project . --depth 2 --budget 2000 --format ultracompact
-```
-
-3) Structure or discovery:
-```
-tldrs structure src/ --lang typescript
-tldrs extract path/to/file.ts
-```
-
-4) Semantic search:
-```
-tldrs index .
+2. **Semantic search** to find code by concept:
+```bash
+tldrs index .                      # Once per project
 tldrs find "authentication logic"
 ```
+
+3. **Symbol context** around an entry point:
+```bash
+tldrs context <entry> --project . --depth 2 --format ultracompact
+```
+
+4. **Structure discovery**:
+```bash
+tldrs structure src/
+tldrs extract path/to/file.py
+```
+
+5. **Open full files only when editing**.
 
 ## Quick Reference
 
 | Need | Command |
-| --- | --- |
+|------|---------|
 | Recent changes | `tldrs diff-context --project . --budget 2000` |
-| Symbol context | `tldrs context <entry> --project . --depth 2 --budget 2000 --format ultracompact` |
-| Structure | `tldrs structure src/ --lang typescript` |
-| Semantic search | `tldrs index .` then `tldrs find "authentication logic"` |
-| Change impact | `tldrs change-impact --git --git-base HEAD~1` |
+| Find by concept | `tldrs find "auth logic"` |
+| Symbol context | `tldrs context func --project . --depth 2 --format ultracompact` |
+| Structure | `tldrs structure src/` |
+| Full reference | `tldrs quickstart` |
 
-## Entry Syntax
+## When NOT to Use
 
-- Prefer file-qualified entries when possible: `file.py:func`, `Class.method`, `module:func`.
-- If ambiguous, tldrs returns candidates; re-run with `file.py:func`.
+- File < 200 lines (just read it)
+- You know exactly what to edit
+- You need full implementation code (read the file)
 
-## Language Flags
+## Multi-Turn Optimization
 
-- Use `--lang` for non-Python repos.
-- Example: `tldrs structure src/ --lang typescript`
-- Example: `tldrs context src/main.rs:run --lang rust`
-
-## Output + Budgets
-
-- Always use a budget for context: `--budget 2000`.
-- For tooling, request JSON:
+Use session IDs to skip unchanged code (~60% savings):
+```bash
+tldrs diff-context --project . --session-id my-session
 ```
-tldrs context <entry> --format json
-```
-- ContextPack JSON includes `etag` per slice; if your tool supports it, use `etag` for conditional fetch (`UNCHANGED`).
-
-## Advanced / Optional
-
-### Deep Analysis Helpers
-
-```
-tldrs slice <file> <func> <line>
-tldrs cfg <file> <function>
-tldrs dfg <file> <function>
-```
-
-### DiffLens Compression
-
-- Two-stage:
-  - `tldrs diff-context --project . --budget 1500 --compress two-stage`
-- Chunk-summary:
-  - `tldrs diff-context --project . --budget 1500 --compress chunk-summary`
-
-### Change Impact / Test Selection
-
-- Git diff to affected tests:
-  - `tldrs change-impact --git --git-base HEAD~1`
-- Session-modified files (run tests):
-  - `tldrs change-impact --session --run`
-
-### Call Graph Helpers
-
-- Forward calls:
-  - `tldrs calls . --lang python`
-- Reverse (callers):
-  - `tldrs impact authenticate --depth 3 --lang python`
-- Importers:
-  - `tldrs importers tldr_swinton.api --lang python`
-
-### VHS (Large Output Refs)
-
-Store large outputs as refs to avoid token blowups:
-```
-tldrs context main --project . --output vhs
-tldrs context main --project . --include vhs://<hash>
-```
-
-## Typical Agent Flow
-
-1) `tldrs diff-context --project . --budget 2000`
-2) `tldrs context <entry> --project . --depth 2 --budget 2000 --format ultracompact`
-3) `tldrs extract path/to/file.py`
-4) Open the full file only if you must edit it
 
 ## Common Mistakes
 
-- Opening full files before running diff/context/structure commands
-- Skipping `--budget` and getting oversized outputs
-- Forgetting `--lang` in non-Python repos
-- Not re-running with file-qualified entries after ambiguous results
+- Opening full files before running diff/context/structure
+- Skipping `--budget` (causes token blowups)
+- Forgetting `--lang` for non-Python repos
 
-## Red Flags
+## Entry Syntax
 
-- "I'll just open the file first"
-- "Budget does not matter here"
+- File-qualified: `file.py:func`, `Class.method`
+- If ambiguous, re-run with qualified entry
 
-## Rationalizations vs Reality
+## Token Budgets
 
-| Excuse | Reality |
-| --- | --- |
-| "Opening full files is faster" | Diff/context is faster and cheaper for most tasks |
-| "Budgets are optional" | Budgets prevent token blowups and keep outputs usable |
+| Codebase | Budget |
+|----------|--------|
+| Small | 1500 |
+| Medium | 2000 |
+| Large | 3000 |
+
+## Advanced Commands
+
+| Need | Command |
+|------|---------|
+| Change impact | `tldrs change-impact --git --git-base HEAD~1` |
+| Forward calls | `tldrs calls . --lang python` |
+| Reverse callers | `tldrs impact func --depth 3` |
+| Control flow | `tldrs cfg <file> <function>` |
+| Data flow | `tldrs dfg <file> <function>` |
+| Program slice | `tldrs slice <file> <func> <line>` |
+
+## VHS (Large Output Refs)
+
+Store large outputs as refs to avoid token blowups:
+```bash
+tldrs context main --project . --output vhs
+tldrs context main --project . --include vhs://<hash>
+```
