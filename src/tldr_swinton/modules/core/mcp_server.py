@@ -188,7 +188,7 @@ def extract(file: str) -> dict:
     return _send_command(project, {"cmd": "extract", "file": file})
 
 
-# === CONTEXT TOOLS (Key differentiator - 95% token savings) ===
+# === CONTEXT TOOLS (Key differentiator - 93%+ token savings) ===
 
 
 @mcp.tool()
@@ -206,7 +206,7 @@ def context(
     """Get token-efficient LLM context starting from an entry point.
 
     Follows call graph to specified depth, returning signatures and complexity
-    metrics. This is TLDR's key value - 95% token savings vs reading raw files.
+    metrics. This is TLDR's key value - 93%+ token savings vs reading raw files.
 
     Delta mode: Use session_id + delta=True to track unchanged symbols across
     calls. Note: For the `context` tool (signatures-only), delta mode adds

@@ -12,7 +12,7 @@ Modules:
 
 Key features:
 - 5 layers of code analysis (ARISTODE pattern)
-- 95%+ token savings through intelligent extraction
+- 93%+ token savings through intelligent extraction
 - Semantic search with embeddings
 - Session state tracking for agent workflows
 """
@@ -107,6 +107,12 @@ from .modules.core import workspace
 sys.modules['tldr_swinton.hybrid_extractor'] = hybrid_extractor
 sys.modules['tldr_swinton.vhs_store'] = vhs_store
 sys.modules['tldr_swinton.workspace'] = workspace
+
+# Backward-compat aliases for semantic modules (moved from root to modules/semantic/)
+from .modules.semantic import embeddings
+from .modules.semantic import vector_store
+sys.modules['tldr_swinton.embeddings'] = embeddings
+sys.modules['tldr_swinton.vector_store'] = vector_store
 
 __all__ = [
     # Modules
