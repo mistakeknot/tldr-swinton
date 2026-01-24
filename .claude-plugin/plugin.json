@@ -1,7 +1,7 @@
 {
   "name": "tldrs",
-  "version": "0.3.1",
-  "description": "Token-efficient code reconnaissance for LLMs. 85%+ token savings with semantic search, diff-context, and symbol analysis.",
+  "version": "0.4.0",
+  "description": "Token-efficient code reconnaissance for LLMs. Up to 84% token savings with semantic search, diff-context, symbol analysis, and delta-first extraction.",
   "author": {
     "name": "MK",
     "email": "mistakeknot@vibeguider.org"
