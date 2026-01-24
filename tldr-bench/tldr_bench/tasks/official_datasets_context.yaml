@@ -1,0 +1,137 @@
+# Context generation tasks for measuring token savings
+# These tasks use the dataset_context runner to compare baseline vs variant strategies
+
+# SWE-bench Lite dev split - uses static entry points from this codebase
+# since per-instance repo checkout is not yet implemented
+# NOTE: For full SWE-bench evaluation, would need repo checkout infrastructure
+
+# Small files (< 100 lines) - representative of quick fixes
+- id: swebench-ctx-small-001
+  title: "Small file context: PDG engine"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/engines/pdg.py:PDGEngine"
+  depth: 1
+  context_format: "text"
+
+- id: swebench-ctx-small-002
+  title: "Small file context: Slice engine"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/engines/slice.py:SliceEngine"
+  depth: 1
+  context_format: "text"
+
+# Medium files (100-500 lines) - typical bug fixes and features
+- id: swebench-ctx-medium-001
+  title: "Medium file context: Path utils"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/path_utils.py:resolve_path"
+  depth: 1
+  context_format: "text"
+
+- id: swebench-ctx-medium-002
+  title: "Medium file context: Dedup module"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/dedup.py:ContentHasher"
+  depth: 1
+  context_format: "text"
+
+- id: swebench-ctx-medium-003
+  title: "Medium file context: Workspace"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/workspace.py:Workspace"
+  depth: 2
+  context_format: "text"
+
+- id: swebench-ctx-medium-004
+  title: "Medium file context: State store"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/state_store.py:StateStore"
+  depth: 1
+  context_format: "text"
+
+# Large files (500-1000 lines) - complex refactors
+- id: swebench-ctx-large-001
+  title: "Large file context: Symbolkite engine"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/engines/symbolkite.py:get_relevant_context"
+  depth: 2
+  context_format: "text"
+
+- id: swebench-ctx-large-002
+  title: "Large file context: Difflens engine"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/engines/difflens.py:DifflensEngine"
+  depth: 2
+  context_format: "text"
+
+- id: swebench-ctx-large-003
+  title: "Large file context: Output formats"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/output_formats.py:format_context"
+  depth: 1
+  context_format: "text"
+
+# Extra large files (1000+ lines) - major architectural work
+- id: swebench-ctx-xlarge-001
+  title: "Extra large file context: API module"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/api.py:get_context"
+  depth: 1
+  context_format: "text"
+
+- id: swebench-ctx-xlarge-002
+  title: "Extra large file context: Daemon"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/daemon.py:DaemonServer"
+  depth: 1
+  context_format: "text"
+
+- id: swebench-ctx-xlarge-003
+  title: "Extra large file context: Hybrid extractor"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/hybrid_extractor.py:extract_symbols"
+  depth: 1
+  context_format: "text"
+
+# Compact format variants (measuring format efficiency)
+- id: swebench-ctx-compact-001
+  title: "Compact format: Symbolkite"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/engines/symbolkite.py:get_relevant_context"
+  depth: 2
+  context_format: "ultracompact"
+
+- id: swebench-ctx-compact-002
+  title: "Compact format: API module"
+  runner: "dataset_context"
+  dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
+  dataset_kind: "swebench"
+  entry: "src/tldr_swinton/modules/core/api.py:get_context"
+  depth: 1
+  context_format: "ultracompact"

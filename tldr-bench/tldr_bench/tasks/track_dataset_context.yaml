@@ -3,7 +3,7 @@
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/engines/symbolkite.py:get_relevant_context"
+  entry: "src/tldr_swinton/modules/core/engines/symbolkite.py:get_relevant_context"
   depth: 1
   context_format: "text"
   slice_line: 200
