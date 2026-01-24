@@ -17,7 +17,7 @@ jobs:
       - name: Install deps
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          uv sync --extra semantic-ollama
+          uv sync --extra semantic-ollama --extra test
       - name: Smoke tests (tldr-bench helpers)
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
