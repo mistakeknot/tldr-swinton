@@ -684,7 +684,7 @@ Semantic Search:
     ctx_p.add_argument("--depth", type=int, default=2, help="Call depth (default: 2)")
     ctx_p.add_argument(
         "--format",
-        choices=["text", "ultracompact"],
+        choices=["text", "ultracompact", "cache-friendly"],
         default="text",
         help="Output format",
     )
@@ -747,7 +747,7 @@ Semantic Search:
     )
     diff_p.add_argument(
         "--format",
-        choices=["ultracompact", "json", "json-pretty"],
+        choices=["ultracompact", "json", "json-pretty", "cache-friendly"],
         default="ultracompact",
         help="Output format (default: ultracompact)",
     )

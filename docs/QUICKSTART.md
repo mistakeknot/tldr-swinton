@@ -108,6 +108,49 @@ tldrs diff-context --project . --session-id task-123
 tldrs diff-context --project . --session-id task-123
 ```
 
+## Cache-Friendly Format (Prompt Caching)
+
+Use `--format cache-friendly` to optimize for LLM provider prompt caching:
+
+```bash
+tldrs diff-context --project . --delta --format cache-friendly
+```
+
+**Output structure:**
+```
+# tldrs cache-friendly output
+
+## CACHE PREFIX (stable - cache this section)
+## 3 symbols
+
+api.py:get_user def get_user(id: int) @45 [caller]
+api.py:list_users def list_users() @62 [caller]
+models.py:User class User @10 [callee]
+
+<!-- CACHE_BREAKPOINT: ~150 tokens -->
+
+## DYNAMIC CONTENT (changes per request)
+## 1 symbols, 1 with code
+
+api.py:update_user def update_user(id, data) @82-95 [contains_diff]
+```python
+def update_user(id: int, data: dict) -> User:
+    user = get_user(id)
+    ...
+```
+
+## STATS: Prefix ~150 tokens | Dynamic ~300 tokens | Total ~450 tokens
+```
+
+**Cost savings:**
+- Anthropic: ~90% on cached prefix tokens
+- OpenAI: ~50% on cached prefix tokens
+
+**How it works:**
+1. Unchanged symbols go to CACHE PREFIX (sorted by ID for stability)
+2. Changed symbols go to DYNAMIC CONTENT (with full code)
+3. LLM providers cache the stable prefix across requests
+
 ## Language Support
 
 ```bash

@@ -70,9 +70,26 @@ def format_context(
 
     Args:
         ctx: RelevantContext instance
-        fmt: "text" or "ultracompact"
+        fmt: "text", "ultracompact", or "cache-friendly"
         budget_tokens: Optional token budget (approximate, len/4)
     """
+    # Handle cache-friendly by converting to pack-like structure
+    if fmt == "cache-friendly":
+        pack = {
+            "slices": [
+                {
+                    "id": func.name,
+                    "signature": func.signature,
+                    "code": None,  # RelevantContext doesn't have code bodies
+                    "lines": [func.line, func.line] if func.line else None,
+                    "relevance": f"depth_{func.depth}",
+                }
+                for func in ctx.functions
+            ],
+            "unchanged": [],  # No delta info in RelevantContext
+        }
+        return _format_cache_friendly(pack)
+
     if budget_tokens is None:
         if fmt == "text":
             return ctx.to_llm_string()
@@ -165,6 +182,8 @@ def format_context_pack(pack: dict | ContextPack, fmt: str = "ultracompact") -> 
         return json.dumps(pack, indent=2, ensure_ascii=False)
     if fmt == "ultracompact":
         return "\n".join(_format_context_pack_ultracompact(pack))
+    if fmt == "cache-friendly":
+        return _format_cache_friendly(pack)
     raise ValueError(f"Unknown format: {fmt}")
 
 
@@ -413,6 +432,149 @@ def _format_ultracompact_budgeted(ctx: RelevantContext, budget_tokens: int) -> s
         return "\n".join(lines)
 
     lines.extend(collected)
+    return "\n".join(lines)
+
+
+def _format_cache_friendly(pack: dict) -> str:
+    """Format context pack for LLM provider prompt caching optimization.
+
+    Separates output into:
+    1. CACHE PREFIX (stable): Unchanged symbols with signatures only, sorted by ID
+    2. CACHE_BREAKPOINT marker with token estimate
+    3. DYNAMIC CONTENT (changes): Changed symbols with full code, sorted by relevance
+
+    This format is optimized for:
+    - Anthropic prompt caching (90% cost savings on cached prefix)
+    - OpenAI prompt caching (50% cost savings on cached prefix)
+
+    Args:
+        pack: ContextPack dict with slices, unchanged list, etc.
+
+    Returns:
+        Formatted string with cache-friendly structure
+    """
+    lines: list[str] = []
+    lines.append("# tldrs cache-friendly output")
+    lines.append("")
+
+    slices = pack.get("slices", [])
+    if not slices:
+        lines.append("# No symbols to display")
+        return "\n".join(lines)
+
+    # Separate unchanged (cache prefix) from changed (dynamic)
+    # Handle both boolean (new format) and list (legacy format) for unchanged
+    unchanged_val = pack.get("unchanged", [])
+    if isinstance(unchanged_val, bool):
+        unchanged_set = set()  # Boolean format doesn't list individual IDs
+    else:
+        unchanged_set = set(unchanged_val or [])
+
+    prefix_slices: list[dict] = []
+    dynamic_slices: list[dict] = []
+
+    for item in slices:
+        symbol_id = item.get("id", "?")
+        if symbol_id in unchanged_set:
+            prefix_slices.append(item)
+        else:
+            dynamic_slices.append(item)
+
+    # Sort prefix by symbol ID for stable ordering (cache-friendly)
+    prefix_slices.sort(key=lambda s: s.get("id", ""))
+
+    # Sort dynamic by relevance (most relevant first)
+    relevance_order = {"contains_diff": 0, "caller": 1, "callee": 2, "adjacent": 3}
+    dynamic_slices.sort(key=lambda s: (relevance_order.get(s.get("relevance", ""), 99), s.get("id", "")))
+
+    # Estimate tokens for each section
+    def _est_tokens(text: str) -> int:
+        encoder = _get_tiktoken_encoder()
+        if encoder is not None:
+            return len(encoder.encode(text))
+        return max(1, len(text) // 4)
+
+    # Build cache prefix section
+    prefix_lines: list[str] = []
+    prefix_token_est = 0
+
+    if prefix_slices:
+        prefix_lines.append(f"## CACHE PREFIX (stable - cache this section)")
+        prefix_lines.append(f"## {len(prefix_slices)} symbols")
+        prefix_lines.append("")
+
+        for item in prefix_slices:
+            symbol_id = item.get("id", "?")
+            signature = item.get("signature", "")
+            lines_range = item.get("lines") or []
+            line_info = ""
+            if lines_range and len(lines_range) == 2:
+                line_info = f" @{lines_range[0]}"
+            relevance = item.get("relevance", "")
+
+            # Format: file:symbol signature @line [relevance]
+            entry = f"{symbol_id} {signature}{line_info} [{relevance}]".strip()
+            prefix_lines.append(entry)
+
+        prefix_lines.append("")
+        prefix_text = "\n".join(prefix_lines)
+        prefix_token_est = _est_tokens(prefix_text)
+
+    # Build dynamic section
+    dynamic_lines: list[str] = []
+    dynamic_token_est = 0
+
+    if dynamic_slices:
+        # Count symbols with code for summary
+        symbols_with_code = sum(1 for s in dynamic_slices if s.get("code"))
+        dynamic_lines.append(f"## DYNAMIC CONTENT (changes per request)")
+        dynamic_lines.append(f"## {len(dynamic_slices)} symbols, {symbols_with_code} with code")
+        dynamic_lines.append("")
+
+        for item in dynamic_slices:
+            symbol_id = item.get("id", "?")
+            signature = item.get("signature", "")
+            lines_range = item.get("lines") or []
+            line_info = ""
+            if lines_range and len(lines_range) == 2:
+                line_info = f" @{lines_range[0]}-{lines_range[1]}"
+            relevance = item.get("relevance", "")
+
+            entry = f"{symbol_id} {signature}{line_info} [{relevance}]".strip()
+            dynamic_lines.append(entry)
+
+            code = item.get("code")
+            if code:
+                dynamic_lines.append("```")
+                dynamic_lines.extend(code.splitlines())
+                dynamic_lines.append("```")
+
+            dynamic_lines.append("")
+
+        dynamic_text = "\n".join(dynamic_lines)
+        dynamic_token_est = _est_tokens(dynamic_text)
+
+    # Assemble output
+    if prefix_slices:
+        lines.extend(prefix_lines)
+        lines.append(f"<!-- CACHE_BREAKPOINT: ~{prefix_token_est} tokens -->")
+        lines.append("")
+
+    if dynamic_slices:
+        lines.extend(dynamic_lines)
+
+    # Stats footer
+    total_tokens = prefix_token_est + dynamic_token_est
+    lines.append(f"## STATS: Prefix ~{prefix_token_est} tokens | Dynamic ~{dynamic_token_est} tokens | Total ~{total_tokens} tokens")
+
+    # Cache stats if available
+    cache_stats = pack.get("cache_stats")
+    if cache_stats:
+        hit_rate = cache_stats.get("hit_rate", 0)
+        hits = cache_stats.get("hits", 0)
+        misses = cache_stats.get("misses", 0)
+        lines.append(f"## Cache: {hits} unchanged, {misses} changed ({hit_rate:.0%} hit rate)")
+
     return "\n".join(lines)
 
 
