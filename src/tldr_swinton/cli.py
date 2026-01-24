@@ -125,17 +125,77 @@ def _get_context_pack_with_delta(
 ) -> "ContextPack":
     """Get context pack with delta detection against session cache.
 
+    Uses delta-first extraction: gets signatures first, checks delta,
+    then only extracts code for changed symbols. This avoids wasted
+    extraction for unchanged symbols.
+
     Returns a ContextPack where unchanged symbols have code=None and are
     listed in the `unchanged` field. Changed/new symbols include full code.
     """
-    from .modules.core.api import get_symbol_context_pack
-    from .modules.core.contextpack_engine import ContextPack
+    import hashlib
+    from .modules.core.engines.symbolkite import get_signatures_for_entry
+    from .modules.core.contextpack_engine import Candidate, ContextPack, ContextPackEngine
 
     project_root = Path(project).resolve()
     store = _get_state_store(project_root)
 
-    # First, get the full context pack to know all candidates
-    # Note: get_symbol_context_pack returns a dict, not ContextPack
+    # DELTA-FIRST: Get signatures only (no code extraction yet)
+    signatures_result = get_signatures_for_entry(
+        project,
+        entry_point,
+        depth=depth,
+        language=language,
+        disambiguate=True,
+    )
+
+    # Handle error case (ambiguous)
+    if isinstance(signatures_result, dict) and signatures_result.get("error"):
+        return ContextPack(slices=[], unchanged=[], rehydrate={})
+
+    signatures = signatures_result
+    if not signatures:
+        return ContextPack(slices=[], unchanged=[], rehydrate={})
+
+    # Compute ETags from signatures only (not code)
+    # For context packs, we use signature-based ETags since code may vary
+    symbol_etags = {}
+    for sig in signatures:
+        content = sig.signature
+        etag = hashlib.sha256(content.encode()).hexdigest()
+        symbol_etags[sig.symbol_id] = etag
+
+    # Check delta against session cache
+    delta_result = store.check_delta(session_id, symbol_etags)
+
+    # Now extract code ONLY for changed symbols
+    from .modules.core.api import get_symbol_context_pack
+
+    # If all symbols unchanged, return early with signatures only
+    if not delta_result.changed:
+        candidates = [
+            Candidate(
+                symbol_id=sig.symbol_id,
+                relevance=max(1, (depth - sig.depth) + 1),
+                relevance_label=f"depth_{sig.depth}",
+                order=i,
+                signature=sig.signature,
+                code=None,  # All unchanged - no code needed
+                lines=(sig.line, sig.line) if sig.line else None,
+                meta={"calls": sig.calls},
+            )
+            for i, sig in enumerate(signatures)
+        ]
+
+        engine = ContextPackEngine()
+        pack = engine.build_context_pack_delta(
+            candidates,
+            delta_result,
+            budget_tokens=budget_tokens,
+        )
+        return pack
+
+    # Some symbols changed - need to get full pack for code extraction
+    # but we can now be selective about what we include
     full_pack_dict = get_symbol_context_pack(
         project,
         entry_point,
@@ -146,35 +206,33 @@ def _get_context_pack_with_delta(
     )
 
     # Handle ambiguous case
-    if full_pack_dict.get("ambiguous"):
+    if full_pack_dict.get("error"):
         return ContextPack(slices=[], unchanged=[], rehydrate={})
 
     slices_data = full_pack_dict.get("slices", [])
     if not slices_data:
         return ContextPack(slices=[], unchanged=[], rehydrate={})
 
-    # Build etag map from full pack
-    symbol_etags = {s["id"]: s.get("etag", "") for s in slices_data if s.get("etag")}
+    # Build candidates with code only for changed symbols
+    slice_map = {s["id"]: s for s in slices_data}
+    candidates = []
 
-    # Check delta against session cache
-    delta_result = store.check_delta(session_id, symbol_etags)
+    for i, sig in enumerate(signatures):
+        is_changed = sig.symbol_id in delta_result.changed
+        slice_data = slice_map.get(sig.symbol_id, {})
 
-    # Build delta-aware pack
-    from .modules.core.contextpack_engine import Candidate, ContextPackEngine
-
-    candidates = [
-        Candidate(
-            symbol_id=s["id"],
-            relevance=_relevance_to_int(s.get("relevance")),
-            relevance_label=s.get("relevance"),
-            order=i,
-            signature=s.get("signature", ""),
-            code=s.get("code"),
-            lines=tuple(s["lines"]) if s.get("lines") else None,
-            meta=s.get("meta"),
+        candidates.append(
+            Candidate(
+                symbol_id=sig.symbol_id,
+                relevance=_relevance_to_int(slice_data.get("relevance")) or max(1, (depth - sig.depth) + 1),
+                relevance_label=slice_data.get("relevance") or f"depth_{sig.depth}",
+                order=i,
+                signature=sig.signature,
+                code=slice_data.get("code") if is_changed else None,  # Only include code for changed
+                lines=tuple(slice_data["lines"]) if slice_data.get("lines") else None,
+                meta=slice_data.get("meta") or {"calls": sig.calls},
+            )
         )
-        for i, s in enumerate(slices_data)
-    ]
 
     engine = ContextPackEngine()
     delta_pack = engine.build_context_pack_delta(
@@ -183,18 +241,14 @@ def _get_context_pack_with_delta(
         budget_tokens=budget_tokens,
     )
 
-    # Record deliveries for ALL delivered symbols (changed ones)
-    # Note: We record based on whether the symbol was changed (not unchanged),
-    # because unchanged symbols were already recorded in a previous delivery.
+    # Record deliveries for changed symbols
     deliveries = []
     for s in delta_pack.slices:
-        # Skip unchanged symbols - they're already in the cache
         if s.id in (delta_pack.unchanged or []):
             continue
-        # Record this delivery (whether it has code or just signature)
         deliveries.append({
             "symbol_id": s.id,
-            "etag": s.etag or "",
+            "etag": symbol_etags.get(s.id, ""),
             "representation": "full" if s.code else "signature",
             "vhs_ref": None,
             "token_estimate": len(s.code) // 4 if s.code else len(s.signature) // 4,
@@ -234,19 +288,106 @@ def _get_diff_context_with_delta(
 ) -> "ContextPack":
     """Get diff context pack with delta detection against session cache.
 
+    Uses delta-first extraction: parses diff hunks, gets signatures first,
+    checks delta, then only extracts code for changed symbols. This avoids
+    wasted extraction for unchanged symbols.
+
     Returns a ContextPack where unchanged symbols have code=None and are
     listed in the `unchanged` field. Changed/new symbols include full code.
 
     This is where delta mode provides real savings - diff-context includes
     code bodies, so skipping unchanged code saves significant tokens.
     """
-    from .modules.core.api import get_diff_context
+    import hashlib
+    import subprocess
+    from .modules.core.engines.difflens import parse_unified_diff, get_diff_signatures
     from .modules.core.contextpack_engine import Candidate, ContextPack, ContextPackEngine
 
     project_root = project.resolve()
     store = _get_state_store(project_root)
 
-    # Get the full diff context pack
+    # Parse diff to get hunks
+    base_ref = base or "HEAD~1"
+    head_ref = head or "HEAD"
+
+    def _run_diff(args: list[str]) -> str:
+        result = subprocess.run(
+            ["git", "-C", str(project_root), "diff", "--unified=0"] + args,
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            return ""
+        return result.stdout
+
+    diff_text = _run_diff([f"{base_ref}..{head_ref}"])
+    diff_text += _run_diff(["--staged"])
+    diff_text += _run_diff([])
+
+    hunks = parse_unified_diff(diff_text)
+    if not hunks:
+        # Fallback to recent files
+        from .modules.core.api import get_diff_context
+        full_pack = get_diff_context(
+            project_root,
+            base=base,
+            head=head,
+            budget_tokens=budget_tokens,
+            language=language,
+            compress=compress,
+        )
+        return ContextPack(
+            slices=[],
+            unchanged=[],
+            rehydrate={},
+            budget_used=full_pack.get("budget_used", 0),
+        )
+
+    # DELTA-FIRST: Get signatures only (no code extraction yet)
+    signatures = get_diff_signatures(project_root, hunks, language=language)
+
+    if not signatures:
+        return ContextPack(slices=[], unchanged=[], rehydrate={})
+
+    # Compute ETags from signature + diff_lines (which identifies what changed)
+    symbol_etags = {}
+    for sig in signatures:
+        # Include diff lines in etag so changes to the symbol's diff portion are detected
+        content = f"{sig.signature}\n{','.join(map(str, sig.diff_lines))}"
+        etag = hashlib.sha256(content.encode()).hexdigest()
+        symbol_etags[sig.symbol_id] = etag
+
+    # Check delta against session cache
+    delta_result = store.check_delta(session_id, symbol_etags)
+
+    # If all symbols unchanged, return early with signatures only
+    if not delta_result.changed:
+        relevance_score = {"contains_diff": 100, "caller": 80, "callee": 80, "adjacent": 50}
+        candidates = [
+            Candidate(
+                symbol_id=sig.symbol_id,
+                relevance=relevance_score.get(sig.relevance_label, 50),
+                relevance_label=sig.relevance_label,
+                order=i,
+                signature=sig.signature,
+                code=None,  # All unchanged - no code needed
+                lines=(sig.line, sig.line) if sig.line else None,
+                meta={"diff_lines": sig.diff_lines},
+            )
+            for i, sig in enumerate(signatures)
+        ]
+
+        engine = ContextPackEngine()
+        pack = engine.build_context_pack_delta(
+            candidates,
+            delta_result,
+            budget_tokens=budget_tokens,
+        )
+        return pack
+
+    # Some symbols changed - need to get full pack for code extraction
+    from .modules.core.api import get_diff_context
+
     full_pack_dict = get_diff_context(
         project_root,
         base=base,
@@ -257,37 +398,30 @@ def _get_diff_context_with_delta(
     )
 
     slices_data = full_pack_dict.get("slices", [])
-    if not slices_data:
-        return ContextPack(slices=[], unchanged=[], rehydrate={})
 
-    # Build etag map - for diff-context we compute etag from signature+code
-    # Use full SHA256 hex (64 chars) to avoid collision risk with truncated hashes
-    import hashlib
-    symbol_etags = {}
-    for s in slices_data:
-        sig = s.get("signature", "")
-        code = s.get("code", "") or ""
-        content = f"{sig}\n{code}"
-        etag = hashlib.sha256(content.encode()).hexdigest()
-        symbol_etags[s["id"]] = etag
+    # Build slice lookup
+    slice_map = {s["id"]: s for s in slices_data}
 
-    # Check delta against session cache
-    delta_result = store.check_delta(session_id, symbol_etags)
+    # Build candidates with code only for changed symbols
+    relevance_score = {"contains_diff": 100, "caller": 80, "callee": 80, "adjacent": 50}
+    candidates = []
 
-    # Build candidates
-    candidates = [
-        Candidate(
-            symbol_id=s["id"],
-            relevance=_relevance_to_int(s.get("relevance")),
-            relevance_label=s.get("relevance"),
-            order=i,
-            signature=s.get("signature", ""),
-            code=s.get("code"),
-            lines=tuple(s["lines"]) if s.get("lines") and len(s["lines"]) == 2 else None,
-            meta={k: v for k, v in s.items() if k not in ("id", "relevance", "signature", "code", "lines")},
+    for i, sig in enumerate(signatures):
+        is_changed = sig.symbol_id in delta_result.changed
+        slice_data = slice_map.get(sig.symbol_id, {})
+
+        candidates.append(
+            Candidate(
+                symbol_id=sig.symbol_id,
+                relevance=_relevance_to_int(slice_data.get("relevance")) or relevance_score.get(sig.relevance_label, 50),
+                relevance_label=slice_data.get("relevance") or sig.relevance_label,
+                order=i,
+                signature=sig.signature,
+                code=slice_data.get("code") if is_changed else None,  # Only include code for changed
+                lines=tuple(slice_data["lines"]) if slice_data.get("lines") and len(slice_data["lines"]) == 2 else None,
+                meta={k: v for k, v in slice_data.items() if k not in ("id", "relevance", "signature", "code", "lines")} or {"diff_lines": sig.diff_lines},
+            )
         )
-        for i, s in enumerate(slices_data)
-    ]
 
     engine = ContextPackEngine()
     delta_pack = engine.build_context_pack_delta(

@@ -183,6 +183,11 @@ __all__ = [
     "query",
     "FunctionContext",
     "RelevantContext",
+    # Delta-first extraction (signature-only)
+    "SymbolSignature",
+    "DiffSymbolSignature",
+    "get_signatures_for_entry",
+    "get_diff_signatures",
     # Cross-file functions
     "build_project_call_graph",
     "scan_project_files",
@@ -199,8 +204,14 @@ __all__ = [
 from .engines.symbolkite import (
     FunctionContext,
     RelevantContext,
+    SymbolSignature,
     get_relevant_context,
     get_context_pack as _get_symbol_context_pack,
+    get_signatures_for_entry as _get_signatures_for_entry,
+)
+from .engines.difflens import (
+    DiffSymbolSignature,
+    get_diff_signatures as _get_diff_signatures,
 )
 from .path_utils import PathTraversalError, _resolve_source, _validate_path_containment
 
@@ -1023,6 +1034,72 @@ def get_symbol_context_pack(
         include_docstrings=include_docstrings,
         etag=etag,
     )
+
+
+def get_signatures_for_entry(
+    project: str | Path,
+    entry_point: str,
+    depth: int = 2,
+    language: str = "python",
+    disambiguate: bool = True,
+) -> list[SymbolSignature] | dict:
+    """Get symbol signatures without extracting code bodies.
+
+    This is the foundation of delta-first extraction. By getting only signatures,
+    we can compute ETags and check delta BEFORE extracting code, avoiding wasted
+    work for unchanged symbols.
+
+    Args:
+        project: Path to project root
+        entry_point: Function or method name to start from
+        depth: Call graph traversal depth (default 2)
+        language: Programming language (default "python")
+        disambiguate: If True, auto-select best match for ambiguous entries
+
+    Returns:
+        List of SymbolSignature objects, or error dict if ambiguous and not disambiguate
+
+    Example:
+        >>> sigs = get_signatures_for_entry("/project", "main", depth=2)
+        >>> for sig in sigs:
+        ...     print(f"{sig.symbol_id}: {sig.signature}")
+    """
+    return _get_signatures_for_entry(
+        project,
+        entry_point,
+        depth=depth,
+        language=language,
+        disambiguate=disambiguate,
+    )
+
+
+def get_diff_signatures(
+    project: str | Path,
+    hunks: list[tuple[str, int, int]],
+    language: str = "python",
+) -> list[DiffSymbolSignature]:
+    """Get signatures for symbols affected by diff hunks without extracting code.
+
+    This is the foundation of delta-first diff context. By getting only signatures,
+    we can compute ETags and check delta BEFORE extracting code, avoiding wasted
+    work for unchanged symbols.
+
+    Args:
+        project: Path to project root
+        hunks: List of (file_path, start_line, end_line) from parse_unified_diff
+        language: Programming language
+
+    Returns:
+        List of DiffSymbolSignature objects
+
+    Example:
+        >>> diff_text = subprocess.run(["git", "diff"], capture_output=True, text=True).stdout
+        >>> hunks = parse_unified_diff(diff_text)
+        >>> sigs = get_diff_signatures("/project", hunks)
+        >>> for sig in sigs:
+        ...     print(f"{sig.symbol_id}: {sig.relevance_label}")
+    """
+    return _get_diff_signatures(project, hunks, language=language)
 
 
 # CLI entry point
