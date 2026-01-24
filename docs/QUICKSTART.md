@@ -1,136 +1,131 @@
-# tldr-swinton Quick Reference for Agents
+# tldrs Quick Reference
 
-**TL;DR**: Use `tldrs` for reconnaissance, then read full files only when editing.
+**Rule**: Run tldrs BEFORE using Read tool on code files. Saves 85%+ tokens.
 
-## When to Use (and When Not To)
+## Quick Decision
 
-| Situation | Use tldr? | Command |
-|-----------|-----------|---------|
-| Exploring unfamiliar codebase | Yes | `tldrs structure src/` |
-| Finding code by concept | Yes | `tldrs find "auth logic"` |
-| Understanding recent changes | Yes | `tldrs diff-context --project .` |
-| Getting context for a function | Yes | `tldrs context func_name --project .` |
-| File is < 200 lines | No | Just read it directly |
-| You need to edit a file | No | Read the full file |
-| You know exactly what to change | No | Read and edit directly |
+| Task | Command | Then |
+|------|---------|------|
+| Start any coding task | `tldrs diff-context --project . --budget 2000` | Review changed symbols |
+| Find code by concept | `tldrs find "auth logic"` | Read top results |
+| Understand a function | `tldrs context func --project . --depth 2` | Read if editing |
+| Explore structure | `tldrs structure src/` | Navigate to relevant files |
 
-## Decision Tree
+## When to Skip tldrs
 
-```
-What are you trying to do?
-│
-├─ "Understand the codebase structure"
-│   └─ tldrs structure src/
-│
-├─ "Find code related to X concept"
-│   └─ tldrs find "X concept"
-│
-├─ "Understand recent changes"
-│   └─ tldrs diff-context --project . --budget 2000
-│
-├─ "Get context around a specific function"
-│   └─ tldrs context <func> --project . --depth 2 --format ultracompact
-│
-├─ "See what calls this function"
-│   └─ tldrs impact <func> --depth 2
-│
-└─ "Edit a file"
-    └─ Read the full file (tldr is for recon, not surgery)
-```
+- File < 200 lines → just Read it
+- You know exactly what to edit → Read and Edit directly
+- Simple config files → Read directly
 
-## Essential Commands
+## Core Commands
 
-### 1. Diff-First Context (Start Here for Most Tasks)
+### 1. Diff-Context (Start Here)
+
 ```bash
 tldrs diff-context --project . --budget 2000
 ```
-Shows changed symbols + their dependencies. Best for understanding what's been modified.
 
-### 2. Semantic Search (Find Code by Meaning)
-```bash
-tldrs index .                          # Build index (once per project)
-tldrs find "authentication logic"      # Search by concept
-tldrs find "database connection"       # Natural language works
+**Output:**
+```
+P0=src/auth.py P1=src/users.py
+
+P0:login def login(user, password)  [contains_diff]
+P0:verify def verify(token)  [caller_of_diff]
+P1:create_user def create_user(data)  [contains_diff]
 ```
 
-### 3. Symbol Context (Drill Into a Function)
+### 2. Semantic Search
+
+```bash
+# First time only
+tldrs index .
+
+# Search by concept
+tldrs find "authentication logic"
+```
+
+**Output:**
+```
+ 1. [0.82] verify_token (function)
+      def verify_token(token: str) -> User
+      src/auth/tokens.py:42
+```
+
+### 3. Symbol Context
+
 ```bash
 tldrs context handle_request --project . --depth 2 --format ultracompact
 ```
-Returns: signature, what it calls, what calls it, relevant types.
 
-### 4. Structure Overview (Explore a Directory)
-```bash
-tldrs structure src/                   # Directory
-tldrs structure src/auth.py            # Single file
-tldrs extract src/auth.py              # Full JSON details
+**Output:**
 ```
+handle_request(request) -> Response
+  calls: validate_input, process_data, format_response
+  called_by: main, api_handler
+```
+
+## Workflow Examples
+
+### Bug Fix
+```bash
+tldrs diff-context --project . --budget 2000    # See changes
+tldrs find "error handling"                      # Find relevant code
+tldrs context buggy_func --project . --depth 2   # Get context
+# NOW read the file to fix it
+```
+
+### Feature Implementation
+```bash
+tldrs find "user registration"                   # Find similar features
+tldrs context register_user --project . --depth 2 # Understand pattern
+tldrs structure src/features/                    # See where to add
+# Read and implement
+```
+
+## Error Handling
+
+| Error | Fix |
+|-------|-----|
+| `No index found` | Run `tldrs index .` |
+| `Ambiguous entry` | Use `file.py:func` syntax |
+| `No changes detected` | Specify `--base` and `--head` |
 
 ## Token Budgets
 
-| Codebase Size | Recommended Budget |
-|---------------|-------------------|
-| Small (< 50 files) | 1000-1500 |
-| Medium (50-200 files) | 2000-3000 |
-| Large (200+ files) | 3000-5000 |
+| Codebase | Budget |
+|----------|--------|
+| Small (<50 files) | 1500 |
+| Medium (50-200) | 2000 |
+| Large (200+) | 3000 |
 
-Use `--budget N` to cap token output.
-
-## Output Formats
-
-| Format | Use Case | Flag |
-|--------|----------|------|
-| ultracompact | Most agent workflows | `--format ultracompact` |
-| json | Tooling/parsing | `--format json` |
-| text | Human reading | (default) |
-
-## Multi-Turn Optimization (Delta Mode)
-
-For multi-turn conversations, use delta mode to skip unchanged symbols:
+## Multi-Turn Optimization
 
 ```bash
-# First call - full output
-tldrs diff-context --project . --session-id my-session
+# First turn - full output
+tldrs diff-context --project . --session-id task-123
 
-# Later calls - unchanged symbols omitted (~60% token savings)
-tldrs diff-context --project . --session-id my-session
+# Later turns - unchanged symbols omitted (~60% savings)
+tldrs diff-context --project . --session-id task-123
 ```
 
-## Common Patterns
-
-### Pattern 1: Bug Investigation
-```bash
-tldrs find "error handling"            # Find relevant code
-tldrs context handle_error --project . # Get context
-# Then read the specific file to understand/fix
-```
-
-### Pattern 2: Feature Implementation
-```bash
-tldrs diff-context --project .         # See current state
-tldrs structure src/features/          # Find where to add
-tldrs context similar_feature --project . # Understand patterns
-# Then read and edit specific files
-```
-
-### Pattern 3: Code Review
-```bash
-tldrs diff-context --project . --base main --head HEAD
-# Shows all changes with context
-```
-
-## Quick Checks
+## Language Support
 
 ```bash
-tldrs --help                           # All commands
-tldrs index --info                     # Index status
-tldrs context --help                   # Context options
+tldrs structure src/ --lang typescript
+tldrs context main --project . --lang rust
 ```
 
-## Remember
+Supported: `python`, `typescript`, `javascript`, `rust`, `go`, `java`, `c`, `cpp`
 
-1. **tldr is for reconnaissance** - Use it to find and understand code
-2. **Read files for surgery** - When editing, read the full file
-3. **Budget your tokens** - Always use `--budget` for large codebases
-4. **Use ultracompact** - `--format ultracompact` saves tokens
-5. **Delta mode for multi-turn** - `--session-id` skips unchanged code
+## Common Mistakes
+
+1. **Reading files before tldrs** → Run diff-context first
+2. **No budget on large codebases** → Always use `--budget`
+3. **Searching without index** → Run `tldrs index .` once
+4. **Ambiguous symbol names** → Use `file.py:symbol` format
+
+## Full Documentation
+
+- `tldrs quickstart` - This guide
+- `tldrs --help` - All commands
+- See `docs/agent-workflow.md` for advanced usage

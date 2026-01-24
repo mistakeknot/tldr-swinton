@@ -1,95 +1,177 @@
 ---
 name: tldrs-agent-workflow
-description: Token-efficient code reconnaissance using tldr-swinton. Use BEFORE opening files with Read tool to save 85%+ tokens.
+description: Token-efficient code reconnaissance. Use BEFORE Read tool to save 85%+ tokens. Invoke when exploring codebases, finding code by concept, or understanding changes.
 ---
 
-# Tldrs Agent Workflow
+# tldrs Agent Workflow
 
-Use this skill BEFORE opening files with Read tool.
+**Rule**: Run tldrs BEFORE using Read tool on code files.
 
-## Core Flow
+## Quick Decision
 
-1. **Diff-first context** for recent changes:
+| Task | Command | Then |
+|------|---------|------|
+| Start any coding task | `tldrs diff-context --project . --budget 2000` | Review changed symbols |
+| Find code by concept | `tldrs find "auth logic"` | Read top results |
+| Understand a function | `tldrs context func --project . --depth 2` | Read if editing |
+| Explore structure | `tldrs structure src/` | Navigate to relevant files |
+
+## When to Skip tldrs
+
+- File < 200 lines → just Read it
+- You know exactly what to edit → Read and Edit directly
+- Simple config files → Read directly
+
+## Core Commands
+
+### 1. Diff-Context (Start Here)
+
 ```bash
 tldrs diff-context --project . --budget 2000
 ```
 
-2. **Semantic search** to find code by concept:
+**Output format:**
+```
+P0=src/auth.py P1=src/users.py
+
+P0:login def login(user, password)  [contains_diff]
+P0:verify def verify(token)  [caller_of_diff]
+P1:create_user def create_user(data)  [contains_diff]
+```
+
+**What it tells you:** Changed symbols (P0, P1...), their signatures, and relationship to diff.
+
+### 2. Semantic Search
+
 ```bash
-tldrs index .                      # Once per project
+# First time only - build index
+tldrs index .
+
+# Search by concept
 tldrs find "authentication logic"
 ```
 
-3. **Symbol context** around an entry point:
-```bash
-tldrs context <entry> --project . --depth 2 --format ultracompact
+**Output format:**
+```
+ 1. [0.82] verify_token (function)
+      def verify_token(token: str) -> User
+      src/auth/tokens.py:42
+
+ 2. [0.79] login (function)
+      def login(username: str, password: str) -> Session
+      src/auth/login.py:15
 ```
 
-4. **Structure discovery**:
+**What it tells you:** Ranked results with similarity score, signature, location.
+
+### 3. Symbol Context
+
 ```bash
-tldrs structure src/
-tldrs extract path/to/file.py
+tldrs context handle_request --project . --depth 2 --format ultracompact
 ```
 
-5. **Open full files only when editing**.
-
-## Quick Reference
-
-| Need | Command |
-|------|---------|
-| Recent changes | `tldrs diff-context --project . --budget 2000` |
-| Find by concept | `tldrs find "auth logic"` |
-| Symbol context | `tldrs context func --project . --depth 2 --format ultracompact` |
-| Structure | `tldrs structure src/` |
-| Full reference | `tldrs quickstart` |
-
-## When NOT to Use
-
-- File < 200 lines (just read it)
-- You know exactly what to edit
-- You need full implementation code (read the file)
-
-## Multi-Turn Optimization
-
-Use session IDs to skip unchanged code (~60% savings):
-```bash
-tldrs diff-context --project . --session-id my-session
+**Output format:**
+```
+handle_request(request) -> Response
+  calls: validate_input, process_data, format_response
+  called_by: main, api_handler
+  types: Request, Response
 ```
 
-## Common Mistakes
+**What it tells you:** Call graph, callers, and related types.
 
-- Opening full files before running diff/context/structure
-- Skipping `--budget` (causes token blowups)
-- Forgetting `--lang` for non-Python repos
+## Workflow Examples
 
-## Entry Syntax
+### Bug Fix
 
-- File-qualified: `file.py:func`, `Class.method`
-- If ambiguous, re-run with qualified entry
+```bash
+# 1. See what changed
+tldrs diff-context --project . --budget 2000
+
+# 2. Find error handling
+tldrs find "error handling"
+
+# 3. Get context for the buggy function
+tldrs context buggy_func --project . --depth 2
+
+# 4. NOW read the file to fix it
+```
+
+### Feature Implementation
+
+```bash
+# 1. Find similar features
+tldrs find "user registration"
+
+# 2. Understand the pattern
+tldrs context register_user --project . --depth 2
+
+# 3. See structure of target directory
+tldrs structure src/features/
+
+# 4. Read and implement
+```
+
+### Code Review
+
+```bash
+# See all changes with context
+tldrs diff-context --project . --budget 3000 --base main
+```
+
+## Error Handling
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `No index found` | Semantic search needs index | Run `tldrs index .` |
+| `Ambiguous entry` | Multiple symbols match | Use `file.py:func` syntax |
+| `No changes detected` | Clean working tree | Specify `--base` and `--head` |
+| `Command not found` | tldrs not installed | See install below |
+
+## Installation Check
+
+```bash
+# Verify tldrs works
+tldrs --version
+
+# Check if index exists (for semantic search)
+ls -la .tldrs/index 2>/dev/null || echo "No index - run: tldrs index ."
+```
 
 ## Token Budgets
 
 | Codebase | Budget |
 |----------|--------|
-| Small | 1500 |
-| Medium | 2000 |
-| Large | 3000 |
+| Small (<50 files) | 1500 |
+| Medium (50-200) | 2000 |
+| Large (200+) | 3000 |
 
-## Advanced Commands
+## Multi-Turn Optimization
 
-| Need | Command |
-|------|---------|
-| Change impact | `tldrs change-impact --git --git-base HEAD~1` |
-| Forward calls | `tldrs calls . --lang python` |
-| Reverse callers | `tldrs impact func --depth 3` |
-| Control flow | `tldrs cfg <file> <function>` |
-| Data flow | `tldrs dfg <file> <function>` |
-| Program slice | `tldrs slice <file> <func> <line>` |
+Skip unchanged symbols across turns (~60% savings):
 
-## VHS (Large Output Refs)
-
-Store large outputs as refs to avoid token blowups:
 ```bash
-tldrs context main --project . --output vhs
-tldrs context main --project . --include vhs://<hash>
+# First turn
+tldrs diff-context --project . --session-id task-123
+
+# Later turns - unchanged symbols omitted
+tldrs diff-context --project . --session-id task-123
 ```
+
+## Language Support
+
+Default is Python. For other languages:
+
+```bash
+tldrs structure src/ --lang typescript
+tldrs context main --project . --lang rust
+```
+
+Supported: `python`, `typescript`, `javascript`, `rust`, `go`, `java`, `c`, `cpp`
+
+## Common Mistakes
+
+1. **Reading files before tldrs** → Run diff-context first
+2. **No budget on large codebases** → Always use `--budget`
+3. **Searching without index** → Run `tldrs index .` once
+4. **Ambiguous symbol names** → Use `file.py:symbol` format
