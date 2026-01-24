@@ -9,11 +9,14 @@ Orchestrates:
 """
 
 import json
+import logging
 import os
 import sys
 from pathlib import Path
 from typing import Optional, Literal
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 from .embeddings import (
     embed_batch,
@@ -120,7 +123,8 @@ def _extract_code_units(
         # Extract rich metadata using extract_file
         try:
             info = extract_file(str(full_path))
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to extract file %s: %s", full_path, e)
             continue
 
         rel_path = str(full_path.relative_to(project))
@@ -290,9 +294,10 @@ def _generate_summaries_ollama(
             models = [m["name"].split(":")[0] for m in data.get("models", [])]
             model_base = OLLAMA_SUMMARY_MODEL.split(":")[0]
             if model_base not in models:
-                print(f"Warning: Summary model {OLLAMA_SUMMARY_MODEL} not available, skipping summaries")
+                logger.warning("Summary model %s not available, skipping summaries", OLLAMA_SUMMARY_MODEL)
                 return {}
-    except Exception:
+    except Exception as e:
+        logger.debug("Ollama unavailable for summaries: %s", e)
         return {}
 
     # Progress handling
@@ -357,7 +362,8 @@ Summary:"""
                     summary += "."
                 return summary
 
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to generate summary for %s: %s", unit.name, e)
             return None
 
     # Generate summaries

@@ -13,12 +13,15 @@ and FAISS for fast vector similarity search.
 """
 
 import json
+import logging
 import os
 import sys
 from functools import lru_cache
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 # Lazy imports for heavy dependencies
 _model = None
@@ -99,7 +102,8 @@ def _model_exists_locally(hf_name: str) -> bool:
         # Check if model config exists in cache
         result = try_to_load_from_cache(hf_name, "config.json")
         return result is not None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to check local model cache for %s: %s", hf_name, e)
         return False
 
 
@@ -304,8 +308,9 @@ def extract_units_from_project(
             if dst_func not in called_by_map:
                 called_by_map[dst_func] = []
             called_by_map[dst_func].append(src_func)
-    except Exception:
+    except Exception as e:
         # Call graph may not be available for all projects
+        logger.debug("Failed to build call graph for %s: %s", project, e)
         calls_map = {}
         called_by_map = {}
 
@@ -479,9 +484,9 @@ def _parse_file_ast(file_path: Path, lang: str) -> dict:
                 elif isinstance(node, ast.ClassDef):
                     result["classes"][node.name] = {"line": node.lineno}
 
-    except Exception:
+    except Exception as e:
         # Return empty result on any parsing error
-        pass
+        logger.debug("Failed to parse AST for %s: %s", file_path, e)
 
     return result
 
@@ -503,7 +508,8 @@ def _get_file_dependencies(file_path: Path, lang: str) -> str:
                 modules.append(module)
 
         return ", ".join(modules) if modules else ""
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to get dependencies for %s: %s", file_path, e)
         return ""
 
 
@@ -520,8 +526,8 @@ def _get_cfg_summary(file_path: Path, func_name: str, lang: str) -> str:
             cfg = extract_python_cfg(content, func_name)
             return f"complexity:{cfg.cyclomatic_complexity}, blocks:{len(cfg.blocks)}"
         # Add other languages as needed
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to get CFG summary for %s.%s: %s", file_path, func_name, e)
 
     return ""
 
@@ -545,8 +551,8 @@ def _get_dfg_summary(file_path: Path, func_name: str, lang: str) -> str:
 
             return f"vars:{len(var_names)}, def-use chains:{len(dfg.dataflow_edges)}"
         # Add other languages as needed
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to get DFG summary for %s.%s: %s", file_path, func_name, e)
 
     return ""
 
@@ -584,7 +590,8 @@ def _get_function_signature(file_path: Path, func_name: str, lang: str) -> Optio
 
         return _fallback_signature(func_name, lang)
 
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to get signature for %s in %s: %s", func_name, file_path, e)
         return None
 
 
@@ -609,7 +616,8 @@ def _extract_module_info(file_path: str):
 
         extractor = HybridExtractor()
         return extractor.extract(file_path)
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to extract module info for %s: %s", file_path, e)
         return None
 
 
@@ -654,7 +662,8 @@ def _get_function_docstring(file_path: Path, func_name: str, lang: str) -> Optio
 
         return None
 
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to get docstring for %s in %s: %s", func_name, file_path, e)
         return None
 
 

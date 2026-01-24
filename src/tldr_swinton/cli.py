@@ -26,6 +26,21 @@ from . import __version__
 from .modules.core.state_store import StateStore
 
 
+def _machine_output(result: dict | list, args) -> None:
+    """Print result in machine-readable format if --machine flag is set.
+
+    For --machine mode, wraps result in success envelope:
+    {"success": true, "result": <result>}
+
+    Otherwise prints with standard indentation.
+    """
+    if getattr(args, "machine", False):
+        wrapped = {"success": True, "result": result}
+        print(json.dumps(wrapped, separators=(",", ":"), ensure_ascii=False))
+    else:
+        print(json.dumps(result, indent=2))
+
+
 def _get_subprocess_detach_kwargs():
     """Get platform-specific kwargs for detaching subprocess."""
     import subprocess
@@ -975,7 +990,7 @@ Semantic Search:
             result = get_file_tree(
                 args.path, extensions=ext, exclude_hidden=not args.show_hidden
             )
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "structure":
             respect_ignore = not getattr(args, "no_ignore", False)
@@ -986,7 +1001,7 @@ Semantic Search:
                 respect_ignore=respect_ignore,
                 respect_gitignore=getattr(args, "respect_gitignore", False),
             )
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "search":
             ext = set(args.ext) if args.ext else None
@@ -1000,7 +1015,7 @@ Semantic Search:
                 respect_ignore=respect_ignore,
                 respect_gitignore=getattr(args, "respect_gitignore", False),
             )
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "extract":
             result = extract_file(args.file)
@@ -1048,7 +1063,7 @@ Semantic Search:
                     if filter_class:
                         result["functions"] = []
 
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "context":
             project_root = Path(args.project).resolve()
@@ -1161,12 +1176,12 @@ Semantic Search:
         elif args.command == "cfg":
             lang = args.lang or detect_language_from_extension(args.file)
             result = get_cfg_context(args.file, args.function, language=lang)
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "dfg":
             lang = args.lang or detect_language_from_extension(args.file)
             result = get_dfg_context(args.file, args.function, language=lang)
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "slice":
             lang = args.lang or detect_language_from_extension(args.file)
@@ -1179,7 +1194,7 @@ Semantic Search:
                 language=lang,
             )
             result = {"lines": sorted(lines), "count": len(lines)}
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "calls":
             # Check for cached graph and dirty files for incremental update
@@ -1196,7 +1211,7 @@ Semantic Search:
                 ],
                 "count": len(graph.edges),
             }
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "impact":
             result = analyze_impact(
@@ -1206,7 +1221,7 @@ Semantic Search:
                 target_file=args.file,
                 language=args.lang,
             )
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "dead":
             result = analyze_dead_code(
@@ -1214,11 +1229,11 @@ Semantic Search:
                 entry_points=args.entry if args.entry else None,
                 language=args.lang,
             )
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "arch":
             result = analyze_architecture(args.path, language=args.lang)
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "imports":
             file_path = Path(args.file).resolve()
@@ -1227,7 +1242,7 @@ Semantic Search:
                 sys.exit(1)
             lang = args.lang or detect_language_from_extension(args.file)
             result = get_imports(str(file_path), language=lang)
-            print(json.dumps(result, indent=2))
+            _machine_output(result, args)
 
         elif args.command == "importers":
             # Find all files that import the given module
@@ -1262,7 +1277,7 @@ Semantic Search:
                     # Skip files that can't be parsed
                     pass
 
-            print(json.dumps({"module": args.module, "importers": importers}, indent=2))
+            _machine_output({"module": args.module, "importers": importers}, args)
 
         elif args.command == "change-impact":
             from .modules.core.change_impact import analyze_change_impact
@@ -1285,7 +1300,7 @@ Semantic Search:
                 print(f"Running: {shlex.join(cmd)}", file=sys.stderr)
                 sp.run(cmd)  # No shell=True - safe from injection
             else:
-                print(json.dumps(result, indent=2))
+                _machine_output(result, args)
 
         elif args.command == "diagnostics":
             from .modules.core.diagnostics import (
@@ -1312,10 +1327,10 @@ Semantic Search:
                     include_lint=not args.no_lint,
                 )
 
-            if args.format == "text":
+            if args.format == "text" and not getattr(args, "machine", False):
                 print(format_diagnostics_for_llm(result))
             else:
-                print(json.dumps(result, indent=2))
+                _machine_output(result, args)
 
         elif args.command == "warm":
             import os
@@ -1594,9 +1609,13 @@ Semantic Search:
             elif args.action == "query":
                 try:
                     result = query_daemon(project_path, {"cmd": args.cmd})
-                    print(json.dumps(result, indent=2))
+                    _machine_output(result, args)
                 except (ConnectionRefusedError, FileNotFoundError):
-                    print("Error: Daemon not running", file=sys.stderr)
+                    if getattr(args, "machine", False):
+                        from .modules.core.errors import make_error, ERR_DAEMON
+                        print(json.dumps(make_error(ERR_DAEMON, "Daemon not running")))
+                    else:
+                        print("Error: Daemon not running", file=sys.stderr)
                     sys.exit(1)
 
             elif args.action == "notify":
@@ -1662,7 +1681,10 @@ Semantic Search:
                 backend=args.backend,
             )
 
-            if not results:
+            if getattr(args, "machine", False):
+                # Machine output - always JSON
+                _machine_output({"results": results, "count": len(results)}, args)
+            elif not results:
                 print("No results found. Make sure you've run `tldrs index` first.")
             else:
                 for r in results:

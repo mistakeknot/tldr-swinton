@@ -492,8 +492,11 @@ def get_context_pack(
         disambiguate=disambiguate,
     )
     if ctx.ambiguous:
+        from ..errors import ERR_AMBIGUOUS
         return {
-            "ambiguous": True,
+            "error": True,
+            "code": ERR_AMBIGUOUS,
+            "message": "Ambiguous entry point. Please specify one of the candidates.",
             "candidates": ctx.candidates,
             "slices": [],
         }

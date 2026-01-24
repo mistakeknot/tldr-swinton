@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 from typing import Iterable
 
+# Cached tiktoken encoder to avoid repeated initialization
+_TIKTOKEN_ENCODER = None
+
 # Default max calls shown (for ultracompact format)
 MAX_CALLS_DEFAULT = 12
 # Minimum calls to always show
@@ -125,8 +128,21 @@ def format_context_pack(pack: dict | ContextPack, fmt: str = "ultracompact") -> 
         if fmt in ("json", "json-pretty"):
             return json.dumps(pack, indent=2 if fmt == "json-pretty" else None, ensure_ascii=False)
         return "# UNCHANGED (no changes since last request)"
+    # Handle error responses (including ambiguous)
+    if isinstance(pack, dict) and pack.get("error") is True:
+        if fmt in ("json", "json-pretty"):
+            return json.dumps(pack, indent=2 if fmt == "json-pretty" else None, ensure_ascii=False)
+        # Text format for errors
+        message = pack.get("message", "Unknown error")
+        candidates = pack.get("candidates", [])
+        if candidates:
+            lines = [message, "Candidates:"]
+            for cand in candidates:
+                lines.append(f"- {cand}")
+            return "\n".join(lines)
+        return message
+    # Handle legacy ambiguous format (for backwards compatibility)
     if isinstance(pack, dict) and pack.get("ambiguous"):
-        # Use structured error format
         from .errors import ERR_AMBIGUOUS
         candidates = pack.get("candidates", [])
         structured = {
@@ -165,19 +181,28 @@ def _apply_budget(lines: Iterable[str], budget_tokens: int) -> list[str]:
     return output
 
 
+def _get_tiktoken_encoder():
+    """Get cached tiktoken encoder to avoid repeated initialization."""
+    global _TIKTOKEN_ENCODER
+    if _TIKTOKEN_ENCODER is None:
+        try:
+            import tiktoken
+            _TIKTOKEN_ENCODER = tiktoken.get_encoding("cl100k_base")
+        except Exception:
+            pass
+    return _TIKTOKEN_ENCODER
+
+
 def _estimate_tokens(text_or_lines: str | Iterable[str]) -> int:
     if isinstance(text_or_lines, str):
         text = text_or_lines
     else:
         text = "\n".join(text_or_lines)
 
-    try:
-        import tiktoken
-
-        encoding = tiktoken.get_encoding("cl100k_base")
-        return len(encoding.encode(text))
-    except Exception:
-        return max(1, len(text) // 4)
+    encoder = _get_tiktoken_encoder()
+    if encoder is not None:
+        return len(encoder.encode(text))
+    return max(1, len(text) // 4)
 
 
 def _render_text_function(ctx: RelevantContext, func, include_details: bool) -> list[str]:

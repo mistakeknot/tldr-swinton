@@ -11,11 +11,14 @@ Use Ollama for local development, sentence-transformers for production quality.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 from pathlib import Path
 from typing import Optional, Literal
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 try:
     import numpy as np
@@ -102,7 +105,8 @@ class OllamaEmbedder:
                 models = [m["name"].split(":")[0] for m in data.get("models", [])]
                 self._available = self.model.split(":")[0] in models
                 return self._available
-        except Exception:
+        except Exception as e:
+            logger.debug("Ollama availability check failed: %s", e)
             self._available = False
             return False
 
@@ -350,6 +354,7 @@ def check_backends() -> dict:
         ollama = OllamaEmbedder()
         result["ollama"]["available"] = ollama.is_available()
     except Exception as e:
+        logger.debug("Error checking Ollama backend: %s", e)
         result["ollama"]["error"] = str(e)
 
     # Check sentence-transformers
@@ -357,6 +362,7 @@ def check_backends() -> dict:
         st = SentenceTransformerEmbedder()
         result["sentence-transformers"]["available"] = st.is_available()
     except Exception as e:
+        logger.debug("Error checking sentence-transformers backend: %s", e)
         result["sentence-transformers"]["error"] = str(e)
 
     return result

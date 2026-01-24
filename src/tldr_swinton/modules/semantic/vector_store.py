@@ -7,11 +7,14 @@ Supports FAISS for efficient similarity search with persistence.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import hashlib
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional, Any
+
+logger = logging.getLogger(__name__)
 
 try:
     import numpy as np
@@ -169,7 +172,7 @@ class VectorStore:
 
             return True
         except Exception as e:
-            print(f"Warning: Failed to load index: {e}")
+            logger.warning("Failed to load index from %s: %s", self.index_dir, e)
             return False
 
     def save(self) -> None:
@@ -327,8 +330,9 @@ class VectorStore:
         try:
             # reconstruct_n is efficient for flat indexes
             return self._index.reconstruct_n(0, len(self._units))
-        except Exception:
+        except Exception as e:
             # Fallback to per-vector reconstruction
+            logger.debug("reconstruct_n failed, falling back to per-vector: %s", e)
             vectors = []
             for i in range(len(self._units)):
                 vectors.append(self._index.reconstruct(i))
@@ -348,7 +352,8 @@ class VectorStore:
         try:
             np_local = _require_numpy()
             return self._index.reconstruct(idx).astype(np_local.float32)
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to reconstruct vector at index %d: %s", idx, e)
             return None
 
     @property
