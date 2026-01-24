@@ -1,5 +1,8 @@
 # Context generation tasks for measuring token savings
 # These tasks use the dataset_context runner to compare baseline vs variant strategies
+#
+# Entry points should be functions/methods, not classes, because symbolkite's
+# depth traversal follows call graphs which only work on callable symbols.
 
 # SWE-bench Lite dev split - uses static entry points from this codebase
 # since per-instance repo checkout is not yet implemented
@@ -11,7 +14,7 @@
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/modules/core/engines/pdg.py:PDGEngine"
+  entry: "src/tldr_swinton/modules/core/engines/pdg.py:get_pdg_context"
   depth: 1
   context_format: "text"
 
@@ -20,7 +23,7 @@
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/modules/core/engines/slice.py:SliceEngine"
+  entry: "src/tldr_swinton/modules/core/engines/slice.py:get_slice"
   depth: 1
   context_format: "text"
 
@@ -30,26 +33,26 @@
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/modules/core/path_utils.py:resolve_path"
+  entry: "src/tldr_swinton/modules/core/path_utils.py:_resolve_source"
   depth: 1
   context_format: "text"
 
 - id: swebench-ctx-medium-002
-  title: "Medium file context: Dedup module"
+  title: "Medium file context: Dedup method"
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/modules/core/dedup.py:ContentHasher"
+  entry: "src/tldr_swinton/modules/core/dedup.py:ContentHashedIndex.get_or_create_edges"
   depth: 1
   context_format: "text"
 
 - id: swebench-ctx-medium-003
-  title: "Medium file context: Workspace"
+  title: "Medium file context: Workspace config"
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/modules/core/workspace.py:Workspace"
-  depth: 2
+  entry: "src/tldr_swinton/modules/core/workspace.py:load_workspace_config"
+  depth: 1
   context_format: "text"
 
 - id: swebench-ctx-medium-004
@@ -57,7 +60,7 @@
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/modules/core/state_store.py:StateStore"
+  entry: "src/tldr_swinton/modules/core/state_store.py:_normalize_path"
   depth: 1
   context_format: "text"
 
@@ -76,8 +79,8 @@
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/modules/core/engines/difflens.py:DifflensEngine"
-  depth: 2
+  entry: "src/tldr_swinton/modules/core/engines/difflens.py:compute_adaptive_context_lines"
+  depth: 1
   context_format: "text"
 
 - id: swebench-ctx-large-003
@@ -91,20 +94,20 @@
 
 # Extra large files (1000+ lines) - major architectural work
 - id: swebench-ctx-xlarge-001
-  title: "Extra large file context: API module"
+  title: "Extra large file context: API get_context"
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/modules/core/api.py:get_context"
+  entry: "src/tldr_swinton/modules/core/api.py:parse_unified_diff"
   depth: 1
   context_format: "text"
 
 - id: swebench-ctx-xlarge-002
-  title: "Extra large file context: Daemon"
+  title: "Extra large file context: Daemon handle_request"
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/modules/core/daemon.py:DaemonServer"
+  entry: "src/tldr_swinton/modules/core/daemon.py:TLDRDaemon.handle_request"
   depth: 1
   context_format: "text"
 
@@ -113,7 +116,7 @@
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/modules/core/hybrid_extractor.py:extract_symbols"
+  entry: "src/tldr_swinton/modules/core/hybrid_extractor.py:extract_directory"
   depth: 1
   context_format: "text"
 
@@ -128,10 +131,10 @@
   context_format: "ultracompact"
 
 - id: swebench-ctx-compact-002
-  title: "Compact format: API module"
+  title: "Compact format: API parse_unified_diff"
   runner: "dataset_context"
   dataset_path: "tldr-bench/data/data/swebench_sample.jsonl"
   dataset_kind: "swebench"
-  entry: "src/tldr_swinton/modules/core/api.py:get_context"
+  entry: "src/tldr_swinton/modules/core/api.py:parse_unified_diff"
   depth: 1
   context_format: "ultracompact"

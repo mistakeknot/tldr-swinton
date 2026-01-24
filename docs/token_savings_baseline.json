@@ -5,33 +5,15 @@
     "metrics": {
       "context_tokens": {
         "baseline": 84115.0,
-        "variant": 4747.0,
-        "savings": 79368.0,
-        "savings_pct": 94.35653569517922
+        "variant": 6242.0,
+        "savings": 77873.0,
+        "savings_pct": 92.5792070379837
       },
       "total_tokens_total": {
         "baseline": 168594.0,
-        "variant": 9858.0,
-        "savings": 158736.0,
-        "savings_pct": 94.15281682622158
-      }
-    }
-  },
-  {
-    "variant": "tldr-bench/results/official_datasets_ctx_difflens.jsonl",
-    "tasks": 14,
-    "metrics": {
-      "context_tokens": {
-        "baseline": 84115.0,
-        "variant": 63294.0,
-        "savings": 20821.0,
-        "savings_pct": 24.75301670332283
-      },
-      "total_tokens_total": {
-        "baseline": 168594.0,
-        "variant": 126952.0,
-        "savings": 41642.0,
-        "savings_pct": 24.699574124820575
+        "variant": 12848.0,
+        "savings": 155746.0,
+        "savings_pct": 92.37932548014757
       }
     }
   }
