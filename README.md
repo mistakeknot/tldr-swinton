@@ -441,19 +441,28 @@ tldrs context handleAuth --project src/ > context.txt
 # - Relevant imports and types
 ```
 
-## Token Efficiency (Verified)
+## Token Efficiency
 
-Measured using tiktoken (cl100k_base encoding):
+Measured using tiktoken (cl100k_base encoding). Actual savings depend on use case:
 
-| Format | Avg. Token Savings |
-|--------|-------------------|
-| Compact (function names only) | **93%** |
-| Structure JSON | **62%** |
+| Use Case | Context | Savings |
+|----------|---------|---------|
+| Compact signatures (vs full files) | Functions names + signatures only | ~93% |
+| Semantic search (vs full repo) | Search results vs entire codebase | ~85% |
+| Delta mode (unchanged code) | Multi-turn conversations | ~60% |
+| **Real-world agent workflows** | Editing tasks with full context | **20-35%** |
 
-Run the evaluation yourself:
+**Important notes:**
+- The 93% figure compares function names/signatures to full file contents. Agents editing code need more than signatures.
+- The 85% semantic search figure compares returned results to the entire repository - not to what an agent would otherwise read.
+- Delta mode (~60% savings) only helps when code is unchanged between turns and you're using `diff-context`.
+- For realistic agent editing workflows, expect **20-35% savings** compared to naive "read all files" approaches.
+
+Run the evaluations yourself:
 ```bash
 pip install tiktoken
 python evals/token_efficiency_eval.py
+python evals/agent_workflow_eval.py  # Most realistic measure
 ```
 
 ## Credits

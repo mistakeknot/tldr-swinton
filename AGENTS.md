@@ -103,8 +103,13 @@ directly to this repo; update the datasets repo instead and bump the submodule.
 ## Delta Context Mode (Multi-Turn Token Savings)
 
 Delta mode tracks which symbols have been delivered to an LLM session and skips
-re-sending unchanged code on subsequent calls. This provides **~60% token savings**
-in multi-turn conversations.
+re-sending unchanged code on subsequent calls. This can provide **~60% token savings**
+in multi-turn conversations **when code is unchanged between calls**.
+
+**Important caveats:**
+- Delta savings collapse to near-zero if code changes between calls
+- The 60% figure is conditional on unchanged code - actual savings vary
+- Delta mode is most valuable for iterative Q&A, not active editing sessions
 
 ### Where Delta Mode Works
 
@@ -132,9 +137,13 @@ tldrs diff-context --project . --session-id my-session --no-delta
 
 ### Design Rationale
 
-The standard `context` command returns signatures-only (that's the "95% token savings"
-claim). Adding code bodies would defeat the purpose. Delta mode is most valuable with
-`diff-context` which includes full code for changed files.
+The standard `context` command returns signatures-only. Adding code bodies would
+defeat the purpose. Delta mode is most valuable with `diff-context` which includes
+full code for changed files.
+
+**Note:** The "95% token savings" claim compares signatures to full files. In practice,
+agents need full code for editing, so real-world savings for editing workflows are
+typically **20-35%** compared to naive file reading approaches.
 
 Session state is stored in `.tldrs/state.sqlite3` and tracks:
 - Session ID, repo fingerprint, language

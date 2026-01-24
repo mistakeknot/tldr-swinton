@@ -181,8 +181,8 @@ def cached_importers(db: SalsaDB, project: str, module: str, language: str) -> d
                         "file": str(Path(file_path).relative_to(project_path)),
                         "import": imp,
                     })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to get imports from {file_path}: {e}")
 
     return {"status": "ok", "module": module, "importers": importers}
 

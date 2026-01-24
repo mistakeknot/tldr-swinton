@@ -246,13 +246,14 @@ def _get_diff_context_with_delta(
         return ContextPack(slices=[], unchanged=[], rehydrate={})
 
     # Build etag map - for diff-context we compute etag from signature+code
+    # Use full SHA256 hex (64 chars) to avoid collision risk with truncated hashes
     import hashlib
     symbol_etags = {}
     for s in slices_data:
         sig = s.get("signature", "")
         code = s.get("code", "") or ""
         content = f"{sig}\n{code}"
-        etag = hashlib.sha256(content.encode()).hexdigest()[:16]
+        etag = hashlib.sha256(content.encode()).hexdigest()
         symbol_etags[s["id"]] = etag
 
     # Check delta against session cache
@@ -465,6 +466,11 @@ Semantic Search:
         "--respect-gitignore",
         action="store_true",
         help="Also respect .gitignore patterns (opt-in)",
+    )
+    parser.add_argument(
+        "--machine",
+        action="store_true",
+        help="Machine-readable output (forces JSON with consistent schema and error codes)",
     )
 
     # Shell completion support
@@ -1056,7 +1062,12 @@ Semantic Search:
                     store = _get_state_store(project_root)
                     session_id = args.session_id or store.get_or_create_default_session(args.lang)
 
-            if args.format == "ultracompact":
+            # Force ultracompact + json for --machine flag
+            fmt = args.format
+            if getattr(args, "machine", False):
+                fmt = "ultracompact"  # Use ultracompact format, will convert to JSON
+
+            if fmt == "ultracompact":
                 from .modules.core.output_formats import format_context_pack
 
                 if use_delta and session_id:
@@ -1078,7 +1089,9 @@ Semantic Search:
                         budget_tokens=args.budget,
                         include_docstrings=args.with_docs,
                     )
-                output = format_context_pack(pack, fmt="ultracompact")
+                # Use json format for --machine flag
+                out_fmt = "json" if getattr(args, "machine", False) else "ultracompact"
+                output = format_context_pack(pack, fmt=out_fmt)
             else:
                 from .modules.core.output_formats import format_context
                 ctx = get_relevant_context(
@@ -1141,7 +1154,9 @@ Semantic Search:
                     language=args.lang,
                     compress=None if args.compress == "none" else args.compress,
                 )
-            print(format_context_pack(pack, fmt=args.format))
+            # Force JSON format when --machine flag is set
+            fmt = "json" if getattr(args, "machine", False) else args.format
+            print(format_context_pack(pack, fmt=fmt))
 
         elif args.command == "cfg":
             lang = args.lang or detect_language_from_extension(args.file)
@@ -1727,13 +1742,25 @@ Full guide: https://github.com/mistakeknot/tldr-swinton/blob/main/docs/QUICKSTAR
             sys.exit(bench_cli.handle(args))
 
     except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        if getattr(args, "machine", False):
+            from .modules.core.errors import make_error, ERR_NOT_FOUND
+            print(json.dumps(make_error(ERR_NOT_FOUND, str(e))))
+        else:
+            print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        if getattr(args, "machine", False):
+            from .modules.core.errors import make_error, ERR_INTERNAL
+            print(json.dumps(make_error(ERR_INTERNAL, str(e))))
+        else:
+            print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        if getattr(args, "machine", False):
+            from .modules.core.errors import make_error, ERR_INTERNAL
+            print(json.dumps(make_error(ERR_INTERNAL, str(e))))
+        else:
+            print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
 

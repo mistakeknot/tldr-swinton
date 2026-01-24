@@ -5,6 +5,7 @@ Determines which tests to run based on changed files.
 Uses session-based tracking (dirty_flag) or explicit file list.
 """
 
+import logging
 import re
 import subprocess
 from pathlib import Path
@@ -12,6 +13,8 @@ from pathlib import Path
 from .analysis import analyze_impact
 from .api import extract_file, get_imports, scan_project_files
 from .dirty_flag import get_dirty_files
+
+logger = logging.getLogger(__name__)
 
 
 def get_changed_functions(
@@ -35,7 +38,8 @@ def get_changed_functions(
                     "file": file_path,
                 })
         return functions
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Failed to extract functions from {file_path}: {e}")
         return []
 
 
@@ -92,7 +96,8 @@ def get_module_name(file_path: str, project_path: str) -> str | None:
             parts = parts[:-1]
 
         return ".".join(parts) if parts else None
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Failed to get module name for {file_path}: {e}")
         return None
 
 
@@ -127,10 +132,11 @@ def find_tests_importing_module(
                         except ValueError:
                             importing_tests.append(test_file)
                         break
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Failed to check imports for {test_file}: {e}")
                 continue
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to scan project files for tests: {e}")
 
     return importing_tests
 
@@ -205,9 +211,9 @@ def find_affected_tests(
 
             collect_test_files(impact.get("callers", {}))
 
-        except Exception:
-            # If impact analysis fails for a function, continue
-            pass
+        except Exception as e:
+            # If impact analysis fails for a function, log and continue
+            logger.debug(f"Impact analysis failed for function {func_name}: {e}")
 
     # Also find tests that import from changed modules (backup method)
     for file_path in changed_files:
@@ -222,8 +228,8 @@ def find_affected_tests(
     try:
         all_files = scan_project_files(str(project), language=language)
         all_test_files = [f for f in all_files if is_test_file(f)]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to count total test files: {e}")
 
     affected_list = sorted(affected_tests)
     skipped_count = len(all_test_files) - len(affected_list)
@@ -275,8 +281,8 @@ def get_git_changed_files(project_path: str, base: str = "HEAD~1") -> list[str]:
         if result.returncode == 0:
             files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
             return files
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to get git changed files: {e}")
     return []
 
 

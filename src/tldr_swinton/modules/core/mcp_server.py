@@ -10,16 +10,19 @@ Usage:
 
 import hashlib
 import json
+import logging
 import socket
 import subprocess
 import sys
 import time
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 try:
     from mcp.server.fastmcp import FastMCP
     _MCP_AVAILABLE = True
-except Exception:  # pragma: no cover - optional dependency
+except ImportError:  # pragma: no cover - optional dependency
     FastMCP = None
     _MCP_AVAILABLE = False
 
@@ -52,8 +55,9 @@ def _ensure_daemon(project: str, timeout: float = 10.0) -> None:
             result = _send_raw(project, {"cmd": "ping"})
             if result.get("status") == "ok":
                 return  # Daemon is alive
-        except Exception:
+        except Exception as e:
             # Socket exists but daemon dead, clean up
+            logger.debug(f"Stale socket detected, daemon not responding: {e}")
             socket_path.unlink(missing_ok=True)
 
     # Start daemon
@@ -66,15 +70,19 @@ def _ensure_daemon(project: str, timeout: float = 10.0) -> None:
 
     # Wait for daemon to be ready
     start = time.time()
+    last_error = None
     while time.time() - start < timeout:
         if socket_path.exists():
             try:
                 result = _send_raw(project, {"cmd": "ping"})
                 if result.get("status") == "ok":
                     return
-            except Exception:
-                pass
+            except Exception as e:
+                last_error = e
         time.sleep(0.1)
+
+    if last_error:
+        logger.warning(f"Daemon startup timeout, last error: {last_error}")
 
     raise RuntimeError(f"Failed to start TLDR daemon for {project}")
 
@@ -206,7 +214,8 @@ def context(
     """Get token-efficient LLM context starting from an entry point.
 
     Follows call graph to specified depth, returning signatures and complexity
-    metrics. This is TLDR's key value - 93%+ token savings vs reading raw files.
+    metrics. Note: The 93% savings figure compares signatures to full files.
+    For editing workflows where full code is needed, expect ~20-35% savings.
 
     Delta mode: Use session_id + delta=True to track unchanged symbols across
     calls. Note: For the `context` tool (signatures-only), delta mode adds

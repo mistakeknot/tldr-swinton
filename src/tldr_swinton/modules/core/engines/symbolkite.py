@@ -520,7 +520,13 @@ def get_context_pack(
     slices: list[dict] = []
     for item in pack.slices:
         if etag and item.etag == etag:
-            return "UNCHANGED"
+            # Return structured dict instead of bare string for consistency
+            return {
+                "unchanged": True,
+                "etag": etag,
+                "budget_used": 0,
+                "slices": [],
+            }
         entry = {
             "id": item.id,
             "relevance": item.relevance,
@@ -534,6 +540,7 @@ def get_context_pack(
         slices.append(entry)
 
     return {
+        "unchanged": False,
         "budget_used": pack.budget_used,
         "slices": slices,
     }

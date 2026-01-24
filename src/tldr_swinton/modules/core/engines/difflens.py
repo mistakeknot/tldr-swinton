@@ -11,7 +11,76 @@ from ..hybrid_extractor import HybridExtractor
 from ..workspace import iter_workspace_files
 from ..contextpack_engine import Candidate, ContextPackEngine
 
-DIFF_CONTEXT_LINES = 6
+# Default context lines (used for normal-density code)
+DIFF_CONTEXT_LINES_DEFAULT = 6
+# Minimum context lines (used for very dense code)
+DIFF_CONTEXT_LINES_MIN = 2
+# Maximum context lines (used for sparse/simple code)
+DIFF_CONTEXT_LINES_MAX = 8
+
+
+def compute_adaptive_context_lines(code_lines: list[str], budget_tokens: int | None = None) -> int:
+    """Compute adaptive context window size based on code density.
+
+    Dense code (many non-empty lines, short average length) gets smaller windows.
+    Sparse code (lots of whitespace, comments) gets larger windows.
+
+    Args:
+        code_lines: Lines of code to analyze
+        budget_tokens: Optional token budget (lower budget = smaller windows)
+
+    Returns:
+        Number of context lines to use (2-8)
+    """
+    if not code_lines:
+        return DIFF_CONTEXT_LINES_DEFAULT
+
+    # Calculate density metrics
+    non_empty = [line for line in code_lines if line.strip()]
+    if not non_empty:
+        return DIFF_CONTEXT_LINES_MAX
+
+    density_ratio = len(non_empty) / len(code_lines)  # 0-1, higher = denser
+    avg_line_length = sum(len(line) for line in non_empty) / len(non_empty)
+
+    # Dense code indicators:
+    # - High density ratio (>0.8)
+    # - Long average lines (>60 chars)
+    # - Many complex lines (with multiple operators/calls)
+    complex_indicators = sum(
+        1 for line in non_empty
+        if line.count('(') > 1 or line.count(',') > 2 or len(line) > 80
+    )
+    complexity_ratio = complex_indicators / len(non_empty) if non_empty else 0
+
+    # Start with default, adjust based on metrics
+    context = DIFF_CONTEXT_LINES_DEFAULT
+
+    # Dense code: reduce context
+    if density_ratio > 0.85 or avg_line_length > 70:
+        context = DIFF_CONTEXT_LINES_MIN
+    elif density_ratio > 0.75 or avg_line_length > 55:
+        context = 4
+    # Sparse code: increase context
+    elif density_ratio < 0.5:
+        context = DIFF_CONTEXT_LINES_MAX
+
+    # High complexity: reduce further
+    if complexity_ratio > 0.3:
+        context = max(DIFF_CONTEXT_LINES_MIN, context - 2)
+
+    # Budget constraint
+    if budget_tokens is not None:
+        if budget_tokens < 1000:
+            context = DIFF_CONTEXT_LINES_MIN
+        elif budget_tokens < 2000:
+            context = min(context, 4)
+
+    return context
+
+
+# Backwards compatibility alias
+DIFF_CONTEXT_LINES = DIFF_CONTEXT_LINES_DEFAULT
 
 
 def parse_unified_diff(diff_text: str) -> list[tuple[str, int, int]]:
@@ -157,7 +226,19 @@ def _compute_symbol_ranges(info, rel_path: str, total_lines: int) -> dict[str, t
     return ranges
 
 
-def _merge_windows(diff_lines: list[int], context: int = DIFF_CONTEXT_LINES) -> list[tuple[int, int]]:
+def _merge_windows(
+    diff_lines: list[int],
+    context: int = DIFF_CONTEXT_LINES_DEFAULT,
+) -> list[tuple[int, int]]:
+    """Merge overlapping diff windows.
+
+    Args:
+        diff_lines: List of line numbers with changes
+        context: Number of context lines before/after each diff line
+
+    Returns:
+        List of (start, end) tuples representing merged windows
+    """
     if not diff_lines:
         return []
     windows: list[tuple[int, int]] = []
@@ -182,8 +263,27 @@ def _extract_windowed_code(
     diff_lines: list[int],
     symbol_start: int,
     symbol_end: int,
-    context: int = DIFF_CONTEXT_LINES,
+    context: int | None = None,
+    budget_tokens: int | None = None,
 ) -> str | None:
+    """Extract code around diff lines with context.
+
+    Args:
+        src_lines: All source code lines
+        diff_lines: Line numbers with changes
+        symbol_start: Symbol's start line
+        symbol_end: Symbol's end line
+        context: Context lines (if None, computed adaptively)
+        budget_tokens: Token budget (affects adaptive context)
+
+    Returns:
+        Windowed code with context, or None if no overlap
+    """
+    # Compute adaptive context if not specified
+    if context is None:
+        symbol_lines = src_lines[max(0, symbol_start - 1):symbol_end]
+        context = compute_adaptive_context_lines(symbol_lines, budget_tokens)
+
     windows = _merge_windows(diff_lines, context)
 
     clamped: list[tuple[int, int]] = []
@@ -534,7 +634,12 @@ def build_diff_context_from_hunks(
                     code = "\n".join(src_lines[start - 1:end])
                 else:
                     if diff_line_list:
-                        code = _extract_windowed_code(src_lines, diff_line_list, start, end)
+                        # Use adaptive context based on code density and budget
+                        code = _extract_windowed_code(
+                            src_lines, diff_line_list, start, end,
+                            context=None,  # Compute adaptively
+                            budget_tokens=budget_tokens,
+                        )
                     else:
                         code = "\n".join(src_lines[start - 1:end])
                 if code and compress == "two-stage":

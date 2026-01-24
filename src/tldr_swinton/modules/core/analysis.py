@@ -140,7 +140,12 @@ def _build_caller_tree(
     depth: int,
     visited: set,
 ) -> dict:
-    """Recursively build caller tree."""
+    """Recursively build caller tree.
+
+    Note: visited set is shared across the entire traversal to avoid
+    exponential blowup. This means each node appears only once in the
+    tree, with subsequent references marked as truncated.
+    """
     callers = reverse.get(func, [])
 
     # Base case: truncate at depth 0 or if we've seen this node
@@ -164,7 +169,8 @@ def _build_caller_tree(
     }
 
     for caller in callers:
-        subtree = _build_caller_tree(caller, reverse, depth - 1, visited.copy())
+        # Use shared visited set instead of copying (O(n) vs O(n²))
+        subtree = _build_caller_tree(caller, reverse, depth - 1, visited)
         tree["callers"].append(subtree)
 
     return tree
