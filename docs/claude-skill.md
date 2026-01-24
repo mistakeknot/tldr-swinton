@@ -5,7 +5,7 @@ description: Token-efficient code analysis workflow using tldr-swinton. Use when
 
 # tldr-swinton Workflow
 
-Use `tldrs` for **reconnaissance** before reading full files. It provides 85%+ token savings.
+Use `tldrs` for **reconnaissance** before reading full files. Token savings vary by command: semantic search ~85%, diff-context ~48%, multi-turn sessions 60%+.
 
 ## Quick Decision
 

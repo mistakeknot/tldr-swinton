@@ -1,6 +1,6 @@
 ---
 name: tldrs-agent-workflow
-description: Token-efficient code reconnaissance. Use BEFORE Read tool to save 85%+ tokens. Invoke when exploring codebases, finding code by concept, or understanding changes.
+description: Token-efficient code reconnaissance. Use BEFORE Read tool. Saves 48-85% tokens depending on command (diff-context 48%, semantic search 85%, multi-turn 60%+).
 ---
 
 # tldrs Agent Workflow

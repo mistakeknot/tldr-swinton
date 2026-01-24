@@ -450,13 +450,13 @@ Measured using tiktoken (cl100k_base encoding). Actual savings depend on use cas
 | Compact signatures (vs full files) | Functions names + signatures only | ~93% |
 | Semantic search (vs full repo) | Search results vs entire codebase | ~85% |
 | Delta mode (unchanged code) | Multi-turn conversations | ~60% |
-| **Real-world agent workflows** | Editing tasks with full context | **20-35%** |
+| **Real-world agent workflows** | Editing tasks with full context | **50-85%** |
 
 **Important notes:**
 - The 93% figure compares function names/signatures to full file contents. Agents editing code need more than signatures.
 - The 85% semantic search figure compares returned results to the entire repository - not to what an agent would otherwise read.
 - Delta mode (~60% savings) only helps when code is unchanged between turns and you're using `diff-context`.
-- For realistic agent editing workflows, expect **20-35% savings** compared to naive "read all files" approaches.
+- Agent workflow savings vary: 53% without compression, 85% with chunk-summary compression (measured via evals/agent_workflow_eval.py).
 
 Run the evaluations yourself:
 ```bash

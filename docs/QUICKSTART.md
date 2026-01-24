@@ -1,6 +1,6 @@
 # tldrs Quick Reference
 
-**Rule**: Run tldrs BEFORE using Read tool on code files. Saves 85%+ tokens.
+**Rule**: Run tldrs BEFORE using Read tool on code files. Saves 48-85% tokens (semantic search ~85%, diff-context ~48%, multi-turn 60%+).
 
 ## Quick Decision
 
