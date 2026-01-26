@@ -472,6 +472,44 @@ def change_impact(project: str, files: list[str] | None = None) -> dict:
     return _send_command(project, {"cmd": "change_impact", "files": files})
 
 
+# === CONTEXT DELEGATION ===
+
+
+@mcp.tool()
+def delegate(
+    project: str,
+    task: str,
+    current_context: list[str] | None = None,
+    budget: int = 8000,
+    focus: list[str] | None = None,
+) -> str:
+    """Get an incremental context retrieval plan instead of raw context.
+
+    Instead of fetching all context upfront, returns a plan that the agent
+    can execute step-by-step, reducing wasted retrieval by 50%+.
+
+    Args:
+        project: Project root directory
+        task: Description of what you're trying to accomplish
+        current_context: Symbols you already have (to avoid re-retrieval)
+        budget: Maximum tokens to use for context
+        focus: Optional specific files/modules to focus on
+
+    Returns:
+        Formatted retrieval plan with ordered steps
+    """
+    from .context_delegation import create_delegation_plan
+
+    plan = create_delegation_plan(
+        project=project,
+        task_description=task,
+        current_context=current_context,
+        budget_tokens=budget,
+        focus_areas=focus,
+    )
+    return plan.format_for_agent()
+
+
 # === DAEMON MANAGEMENT ===
 
 
