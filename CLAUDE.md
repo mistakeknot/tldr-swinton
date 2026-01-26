@@ -15,7 +15,7 @@ This project is available as a Claude Code plugin from the [interagency-marketpl
 
 ```bash
 /plugin marketplace add mistakeknot/interagency-marketplace
-/plugin install tldrs
+/plugin install tldr-swinton
 ```
 
 **Available commands:**
@@ -26,7 +26,7 @@ This project is available as a Claude Code plugin from the [interagency-marketpl
 
 ## Plugin Publishing Runbook
 
-When releasing a new version of the tldrs plugin:
+When releasing a new version of the tldr-swinton plugin:
 
 ```bash
 # 1. Bump ALL version locations (must stay in sync!)
@@ -49,7 +49,7 @@ git push
 cd ../interagency-marketplace
 edit .claude-plugin/marketplace.json  # bump version to match
 git add .claude-plugin/marketplace.json
-git commit -m "chore: bump tldrs to vX.Y.Z"
+git commit -m "chore: bump tldr-swinton to vX.Y.Z"
 git push
 ```
 
