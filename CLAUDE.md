@@ -29,24 +29,36 @@ This project is available as a Claude Code plugin from the [interagency-marketpl
 When releasing a new version of the tldrs plugin:
 
 ```bash
-# 1. Update version in plugin.json
-edit .claude-plugin/plugin.json  # bump version
+# 1. Bump ALL version locations (must stay in sync!)
+edit pyproject.toml                   # version = "X.Y.Z"
+edit .claude-plugin/plugin.json       # "version": "X.Y.Z"
 
-# 2. Run tests
+# 2. Reinstall CLI to update global binary
+uv tool install --force .
+tldrs --version  # Verify shows new version
+
+# 3. Run tests
 uv run pytest tests/ -q --ignore=tests/test_agent_workflow_eval.py
 
-# 3. Commit and push tldr-swinton
-git add .claude-plugin/
-git commit -m "feat: <description>"
+# 4. Commit and push tldr-swinton
+git add pyproject.toml .claude-plugin/ uv.lock
+git commit -m "chore: bump version to X.Y.Z"
 git push
 
-# 4. Update interagency-marketplace
+# 5. Update interagency-marketplace
 cd ../interagency-marketplace
 edit .claude-plugin/marketplace.json  # bump version to match
 git add .claude-plugin/marketplace.json
 git commit -m "chore: bump tldrs to vX.Y.Z"
 git push
 ```
+
+**Version locations (all must match):**
+| File | Field |
+|------|-------|
+| `pyproject.toml` | `version = "X.Y.Z"` |
+| `.claude-plugin/plugin.json` | `"version": "X.Y.Z"` |
+| `interagency-marketplace/.claude-plugin/marketplace.json` | `"version": "X.Y.Z"` |
 
 **Plugin structure:**
 ```
@@ -65,7 +77,7 @@ git push
         └── SKILL.md     # Workflow skill
 ```
 
-**Version sync:** Keep `.claude-plugin/plugin.json` version in sync with `interagency-marketplace/.claude-plugin/marketplace.json`.
+**Version sync:** All three locations must match: `pyproject.toml`, `.claude-plugin/plugin.json`, and `interagency-marketplace/.claude-plugin/marketplace.json`. Always bump all three together.
 
 ## Claude Code-Specific Notes
 
