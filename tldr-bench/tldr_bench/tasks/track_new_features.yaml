@@ -1,19 +1,44 @@
-# Benchmark tasks for the 5 new efficiency features:
-# 1. Edit-Locality-Aware Context
-# 2. Attention-Weighted Context Pruning
-# 3. Context Delegation
-# 4. Multi-File Coherence Verification
-# 5. Success Correlation (tracking, not context)
+# Benchmark tasks for the new efficiency features
+#
+# FEATURE CATEGORIES (understand what each measures):
+#
+# COMPRESSION FEATURES (measure token savings vs baseline):
+#   - symbolkite: Signature-based context extraction
+#   - edit_locality: Edit-optimized context with boundaries & invariants
+#
+# LEARNING FEATURES (require historical data):
+#   - attention_pruning: Prunes context based on past usage patterns
+#     NOTE: With no history, returns symbolkite unchanged (no savings)
+#
+# WORKFLOW FEATURES (change retrieval pattern, not compression):
+#   - context_delegation: Returns retrieval PLAN, not context
+#     NOTE: Plan size is NOT comparable to context size
+#
+# QUALITY FEATURES (add tokens for error prevention):
+#   - coherence_verify: Adds cross-file consistency checks
+#     NOTE: INCREASES tokens vs symbolkite (by design)
+
+# =============================================================================
+# COMPRESSION BENCHMARKS - Measure actual token savings
+# =============================================================================
 
 # --- Edit-Locality Benchmarks ---
+# These compare edit_locality (function + boundaries + invariants) vs:
+# - baselines (full file)
+# - symbolkite (signatures only)
+
 - id: nf-edit-001
   title: "Edit-locality: Single function refactor"
   repo: "tldr-swinton"
   entry: "src/tldr_swinton/modules/core/daemon.py:TLDRDaemon._handle_notify"
   expected_files: ["src/tldr_swinton/modules/core/daemon.py"]
   expected_lines: [718]
-  type: "edit_locality"
-  notes: "Compare edit-locality context vs full context for function edit"
+  type: "compression"
+  category: "compression"
+  notes: |
+    Measures edit-locality context vs full file and symbolkite.
+    Edit-locality should be smaller than full file but larger than
+    pure symbolkite (it includes function body + boundaries).
   variants: ["baselines", "symbolkite", "edit_locality"]
 
 - id: nf-edit-002
@@ -22,8 +47,11 @@
   entry: "src/tldr_swinton/modules/semantic/index.py:SemanticIndex.search"
   expected_files: ["src/tldr_swinton/modules/semantic/index.py"]
   expected_lines: [150]
-  type: "edit_locality"
-  notes: "Function with type hints and assertions"
+  type: "compression"
+  category: "compression"
+  notes: |
+    Function with type hints and assertions - edit_locality
+    should extract these as invariants.
   variants: ["baselines", "symbolkite", "edit_locality"]
 
 - id: nf-edit-003
@@ -32,41 +60,69 @@
   entry: "src/tldr_swinton/modules/core/output_formats.py:format_context_pack"
   expected_files: ["src/tldr_swinton/modules/core/output_formats.py"]
   expected_lines: [50]
-  type: "edit_locality"
-  notes: "Small function with clear boundaries"
+  type: "compression"
+  category: "compression"
+  notes: |
+    Small function with clear boundaries - should show edit_locality
+    is close to symbolkite for simple functions.
   variants: ["baselines", "symbolkite", "edit_locality"]
 
+# =============================================================================
+# LEARNING BENCHMARKS - Require usage history to show savings
+# =============================================================================
+
 # --- Attention Pruning Benchmarks ---
+# NOTE: Without historical usage data, these will show ~0% savings
+# because attention_pruning returns symbolkite unchanged.
+
 - id: nf-attn-001
-  title: "Attention pruning: Deep call graph"
+  title: "Attention pruning: Deep call graph (COLD START)"
   repo: "tldr-swinton"
   entry: "src/tldr_swinton/cli.py:main"
   expected_files: ["src/tldr_swinton/cli.py"]
   depth: 3
-  type: "attention_pruning"
-  notes: "Deep call graph with many edges to prune"
-  variants: ["baselines", "symbolkite", "attention_pruning"]
+  type: "learning"
+  category: "learning"
+  notes: |
+    COLD START TEST - without usage history, attention_pruning
+    returns symbolkite unchanged. Run multiple sessions first,
+    then re-run to see actual pruning.
+  variants: ["symbolkite", "attention_pruning"]
 
 - id: nf-attn-002
-  title: "Attention pruning: Wide dependency set"
+  title: "Attention pruning: Wide dependency set (COLD START)"
   repo: "tldr-swinton"
   entry: "src/tldr_swinton/modules/core/mcp_server.py:context"
   expected_files: ["src/tldr_swinton/modules/core/mcp_server.py"]
   depth: 2
-  type: "attention_pruning"
-  notes: "Function with many imports and dependencies"
-  variants: ["baselines", "symbolkite", "attention_pruning"]
+  type: "learning"
+  category: "learning"
+  notes: |
+    COLD START TEST - no savings expected without usage data.
+    After sessions build history, re-run to measure actual pruning.
+  variants: ["symbolkite", "attention_pruning"]
+
+# =============================================================================
+# WORKFLOW BENCHMARKS - Measure plan efficiency, NOT token compression
+# =============================================================================
 
 # --- Context Delegation Benchmarks ---
-# Delegation tasks compare the plan size vs full symbolkite context
+# IMPORTANT: These compare PLAN SIZE to context size, which is NOT
+# a fair comparison. The plan tells the agent what to retrieve.
+# True comparison requires running an agent with/without delegation.
+
 - id: nf-deleg-001
   title: "Delegation: Understand parser module"
   repo: "tldr-swinton"
   entry: "src/tldr_swinton/modules/languages/python_lang.py:PythonParser"
   task_description: "Understand the parser module"
   expected_files: ["src/tldr_swinton/modules/languages/python_lang.py"]
-  type: "context_delegation"
-  notes: "Understanding task - compare upfront vs delegation plan"
+  type: "workflow"
+  category: "workflow"
+  notes: |
+    WORKFLOW TEST - context_delegation returns a retrieval PLAN,
+    not actual context. Token count measures plan overhead only.
+    To measure true savings, run agent with/without delegation.
   variants: ["symbolkite", "context_delegation"]
 
 - id: nf-deleg-002
@@ -75,8 +131,11 @@
   entry: "src/tldr_swinton/modules/core/daemon.py:TLDRDaemon._handle_notify"
   task_description: "Fix bug in daemon notification handler"
   expected_files: ["src/tldr_swinton/modules/core/daemon.py"]
-  type: "context_delegation"
-  notes: "Bug fix task - edit workflow"
+  type: "workflow"
+  category: "workflow"
+  notes: |
+    WORKFLOW TEST - measures plan size for bug fix workflow.
+    Actual savings require end-to-end agent execution.
   variants: ["symbolkite", "context_delegation"]
 
 - id: nf-deleg-003
@@ -85,11 +144,21 @@
   entry: "src/tldr_swinton/modules/semantic/index.py:SemanticIndex.search"
   task_description: "Add caching to semantic search results"
   expected_files: ["src/tldr_swinton/modules/semantic/index.py"]
-  type: "context_delegation"
-  notes: "Feature add task - needs similar patterns"
+  type: "workflow"
+  category: "workflow"
+  notes: |
+    WORKFLOW TEST - measures plan size for feature addition.
+    True comparison needs agent execution measurement.
   variants: ["symbolkite", "context_delegation"]
 
+# =============================================================================
+# QUALITY BENCHMARKS - Measure error detection, NOT token savings
+# =============================================================================
+
 # --- Coherence Verification Benchmarks ---
+# NOTE: coherence_verify ADDS tokens to symbolkite context.
+# Any "savings" vs baseline come from symbolkite, not coherence_verify.
+
 - id: nf-coh-001
   title: "Coherence: Multi-file refactor"
   repo: "tldr-swinton"
@@ -97,9 +166,13 @@
   expected_files:
     - "src/tldr_swinton/modules/core/daemon.py"
     - "src/tldr_swinton/modules/core/mcp_server.py"
-  type: "coherence_verify"
-  notes: "Class used across files - verify consistency"
-  variants: ["baselines", "symbolkite", "coherence_verify"]
+  type: "quality"
+  category: "quality"
+  notes: |
+    QUALITY TEST - coherence_verify adds cross-file verification
+    info ON TOP of symbolkite. Expect MORE tokens than symbolkite.
+    Value is in error prevention, not compression.
+  variants: ["symbolkite", "coherence_verify"]
 
 - id: nf-coh-002
   title: "Coherence: Interface change"
@@ -107,13 +180,19 @@
   entry: "src/tldr_swinton/modules/core/output_formats.py:format_context"
   expected_files:
     - "src/tldr_swinton/modules/core/output_formats.py"
-    - "src/tldr_swinton/modules/core/engines/symbolkite.py"
     - "src/tldr_swinton/cli.py"
-  type: "coherence_verify"
-  notes: "Function called from multiple files"
-  variants: ["baselines", "symbolkite", "coherence_verify"]
+  type: "quality"
+  category: "quality"
+  notes: |
+    QUALITY TEST - function called from multiple files.
+    coherence_verify identifies cross-file dependencies.
+    Token count will be HIGHER than symbolkite.
+  variants: ["symbolkite", "coherence_verify"]
 
-# --- Combined Efficiency Benchmarks ---
+# =============================================================================
+# COMBINED COMPARISON - See all variants on same task
+# =============================================================================
+
 - id: nf-combo-001
   title: "Combined: Full context pipeline comparison"
   repo: "tldr-swinton"
@@ -123,7 +202,12 @@
   expected_lines: [520]
   depth: 2
   type: "combined"
-  notes: "Compare all variants on the same task"
+  category: "all"
+  notes: |
+    COMBINED TEST - shows all variants on same task.
+    NOTE: context_delegation and coherence_verify are NOT
+    directly comparable to compression variants.
+    See individual category notes for proper interpretation.
   variants:
     - "baselines"
     - "symbolkite"
@@ -136,10 +220,14 @@
   title: "Combined: CLI entry point analysis"
   repo: "tldr-swinton"
   entry: "src/tldr_swinton/cli.py:main"
+  task_description: "Understand CLI entry point"
   expected_files: ["src/tldr_swinton/cli.py"]
   depth: 2
   type: "combined"
-  notes: "Full comparison on CLI module"
+  category: "all"
+  notes: |
+    COMBINED TEST - CLI module comparison.
+    See category-specific benchmarks for proper measurement.
   variants:
     - "baselines"
     - "symbolkite"

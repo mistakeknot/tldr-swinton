@@ -1,10 +1,25 @@
 """Coherence verification variant for benchmarking.
 
-This variant adds cross-file coherence checks to context,
+This variant ADDS cross-file coherence checks to context (on top of symbolkite),
 helping prevent multi-file edit failures.
+
+IMPORTANT: This is a QUALITY feature, not a compression feature.
+Token counts from this variant will be HIGHER than symbolkite because
+it adds verification information. The value is in ERROR PREVENTION.
+
+Proper benchmarking should measure:
+- % of cross-file type errors detected before commit
+- % of signature mismatches identified
+- False positive rate (warnings for correct code)
+- NOT token savings (this feature adds tokens, by design)
 """
 
 VARIANT_ID = "coherence_verify"
+
+# Marker to indicate this is a quality feature, not compression
+VARIANT_TYPE = "quality"
+COMPARABLE_TO = []  # Not meant for token savings comparison
+ADDS_OVERHEAD = True  # Explicitly adds tokens to base context
 
 
 def build_context(task: dict) -> str:
@@ -12,6 +27,9 @@ def build_context(task: dict) -> str:
 
     Adds cross-file dependency and type compatibility information
     to help prevent multi-file edit failures.
+
+    NOTE: This ADDS tokens to symbolkite context. Token "savings" vs baseline
+    come from symbolkite compression, not from coherence verification.
     """
     from tldr_swinton.engines.symbolkite import get_relevant_context
     from tldr_swinton.modules.core.coherence_verify import (

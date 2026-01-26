@@ -28,28 +28,34 @@ def build_context(task: dict) -> str:
     if not entry:
         raise ValueError("task.entry is required")
 
-    # Parse entry to get file and symbol
-    if ":" in entry:
-        file_path, symbol = entry.rsplit(":", 1)
-    else:
-        # Try to find file containing entry
-        file_path = ""
-        symbol = entry
+    # The entry format is "path/to/file.py:SymbolName" which is already
+    # the symbol_id format expected by get_edit_context
+    symbol_id = entry
 
-    file_path = file_path or task.get("expected_files", [""])[0]
-    if not file_path:
-        raise ValueError("Could not determine file path for edit-locality context")
+    # Validate we have the expected format
+    if ":" not in symbol_id:
+        raise ValueError(
+            f"task.entry must be in format 'path/to/file.py:SymbolName', got: {entry}"
+        )
 
-    language = task.get("language", "python")
+    # Optional: diff_lines from expected_lines if present
+    diff_lines = task.get("expected_lines")
+
+    # Optional: call_graph could be passed if available
+    call_graph = task.get("call_graph")
 
     try:
         ctx = get_edit_context(
-            project_root=project,
-            file_path=file_path,
-            target_symbol=symbol,
-            language=language,
+            project=project,
+            symbol_id=symbol_id,
+            diff_lines=diff_lines,
+            call_graph=call_graph,
         )
+        if ctx is None:
+            file_path, symbol = symbol_id.rsplit(":", 1)
+            return f"# Edit-locality: Symbol not found\n# Target: {symbol} in {file_path}"
         return format_edit_context_for_agent(ctx)
     except Exception as e:
+        file_path, symbol = symbol_id.rsplit(":", 1) if ":" in symbol_id else ("", symbol_id)
         # Fall back to basic context if edit-locality fails
         return f"# Edit-locality context failed: {e}\n# Target: {symbol} in {file_path}"
