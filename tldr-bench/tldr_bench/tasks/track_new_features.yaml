@@ -1,0 +1,149 @@
+# Benchmark tasks for the 5 new efficiency features:
+# 1. Edit-Locality-Aware Context
+# 2. Attention-Weighted Context Pruning
+# 3. Context Delegation
+# 4. Multi-File Coherence Verification
+# 5. Success Correlation (tracking, not context)
+
+# --- Edit-Locality Benchmarks ---
+- id: nf-edit-001
+  title: "Edit-locality: Single function refactor"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/modules/core/daemon.py:TLDRDaemon._handle_notify"
+  expected_files: ["src/tldr_swinton/modules/core/daemon.py"]
+  expected_lines: [718]
+  type: "edit_locality"
+  notes: "Compare edit-locality context vs full context for function edit"
+  variants: ["baselines", "symbolkite", "edit_locality"]
+
+- id: nf-edit-002
+  title: "Edit-locality: Class method with invariants"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/modules/semantic/index.py:SemanticIndex.search"
+  expected_files: ["src/tldr_swinton/modules/semantic/index.py"]
+  expected_lines: [150]
+  type: "edit_locality"
+  notes: "Function with type hints and assertions"
+  variants: ["baselines", "symbolkite", "edit_locality"]
+
+- id: nf-edit-003
+  title: "Edit-locality: Simple utility function"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/modules/core/output_formats.py:format_context_pack"
+  expected_files: ["src/tldr_swinton/modules/core/output_formats.py"]
+  expected_lines: [50]
+  type: "edit_locality"
+  notes: "Small function with clear boundaries"
+  variants: ["baselines", "symbolkite", "edit_locality"]
+
+# --- Attention Pruning Benchmarks ---
+- id: nf-attn-001
+  title: "Attention pruning: Deep call graph"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/cli.py:main"
+  expected_files: ["src/tldr_swinton/cli.py"]
+  depth: 3
+  type: "attention_pruning"
+  notes: "Deep call graph with many edges to prune"
+  variants: ["baselines", "symbolkite", "attention_pruning"]
+
+- id: nf-attn-002
+  title: "Attention pruning: Wide dependency set"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/modules/core/mcp_server.py:context"
+  expected_files: ["src/tldr_swinton/modules/core/mcp_server.py"]
+  depth: 2
+  type: "attention_pruning"
+  notes: "Function with many imports and dependencies"
+  variants: ["baselines", "symbolkite", "attention_pruning"]
+
+# --- Context Delegation Benchmarks ---
+# Delegation tasks compare the plan size vs full symbolkite context
+- id: nf-deleg-001
+  title: "Delegation: Understand parser module"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/modules/languages/python_lang.py:PythonParser"
+  task_description: "Understand the parser module"
+  expected_files: ["src/tldr_swinton/modules/languages/python_lang.py"]
+  type: "context_delegation"
+  notes: "Understanding task - compare upfront vs delegation plan"
+  variants: ["symbolkite", "context_delegation"]
+
+- id: nf-deleg-002
+  title: "Delegation: Fix bug in daemon"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/modules/core/daemon.py:TLDRDaemon._handle_notify"
+  task_description: "Fix bug in daemon notification handler"
+  expected_files: ["src/tldr_swinton/modules/core/daemon.py"]
+  type: "context_delegation"
+  notes: "Bug fix task - edit workflow"
+  variants: ["symbolkite", "context_delegation"]
+
+- id: nf-deleg-003
+  title: "Delegation: Add caching layer"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/modules/semantic/index.py:SemanticIndex.search"
+  task_description: "Add caching to semantic search results"
+  expected_files: ["src/tldr_swinton/modules/semantic/index.py"]
+  type: "context_delegation"
+  notes: "Feature add task - needs similar patterns"
+  variants: ["symbolkite", "context_delegation"]
+
+# --- Coherence Verification Benchmarks ---
+- id: nf-coh-001
+  title: "Coherence: Multi-file refactor"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/modules/core/daemon.py:TLDRDaemon"
+  expected_files:
+    - "src/tldr_swinton/modules/core/daemon.py"
+    - "src/tldr_swinton/modules/core/mcp_server.py"
+  type: "coherence_verify"
+  notes: "Class used across files - verify consistency"
+  variants: ["baselines", "symbolkite", "coherence_verify"]
+
+- id: nf-coh-002
+  title: "Coherence: Interface change"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/modules/core/output_formats.py:format_context"
+  expected_files:
+    - "src/tldr_swinton/modules/core/output_formats.py"
+    - "src/tldr_swinton/modules/core/engines/symbolkite.py"
+    - "src/tldr_swinton/cli.py"
+  type: "coherence_verify"
+  notes: "Function called from multiple files"
+  variants: ["baselines", "symbolkite", "coherence_verify"]
+
+# --- Combined Efficiency Benchmarks ---
+- id: nf-combo-001
+  title: "Combined: Full context pipeline comparison"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/modules/core/engines/symbolkite.py:get_relevant_context"
+  task_description: "Refactor the context retrieval pipeline"
+  expected_files: ["src/tldr_swinton/modules/core/engines/symbolkite.py"]
+  expected_lines: [520]
+  depth: 2
+  type: "combined"
+  notes: "Compare all variants on the same task"
+  variants:
+    - "baselines"
+    - "symbolkite"
+    - "edit_locality"
+    - "attention_pruning"
+    - "context_delegation"
+    - "coherence_verify"
+
+- id: nf-combo-002
+  title: "Combined: CLI entry point analysis"
+  repo: "tldr-swinton"
+  entry: "src/tldr_swinton/cli.py:main"
+  expected_files: ["src/tldr_swinton/cli.py"]
+  depth: 2
+  type: "combined"
+  notes: "Full comparison on CLI module"
+  variants:
+    - "baselines"
+    - "symbolkite"
+    - "edit_locality"
+    - "attention_pruning"
+    - "context_delegation"
+    - "coherence_verify"

@@ -26,6 +26,8 @@ def resolve_task_file(name_or_path: str) -> Path:
         return Path(__file__).with_name("official_datasets.yaml")
     if name_or_path == "official_datasets_context":
         return Path(__file__).with_name("official_datasets_context.yaml")
+    if name_or_path == "track_new_features":
+        return Path(__file__).with_name("track_new_features.yaml")
     raise FileNotFoundError(f"Unknown task file: {name_or_path}")
 
 

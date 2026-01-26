@@ -7,6 +7,7 @@ from typing import Any
 
 from . import baselines, cassette, coveragelens, symbolkite
 from . import cfg, dfg, difflens, pdg, slice
+from . import attention_pruning, coherence_verify, context_delegation, edit_locality
 
 VARIANTS = {
     "baselines": baselines,
@@ -18,6 +19,11 @@ VARIANTS = {
     "cfg": cfg,
     "pdg": pdg,
     "slice": slice,
+    # New efficiency features
+    "edit_locality": edit_locality,
+    "attention_pruning": attention_pruning,
+    "context_delegation": context_delegation,
+    "coherence_verify": coherence_verify,
 }
 
 
