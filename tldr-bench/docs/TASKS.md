@@ -77,22 +77,35 @@ Runs OpenHands benchmark harness.
 | `track_dataset_context.yaml` | 1 | Dataset + context tokens |
 | `official_datasets_context.yaml` | 14 | Official benchmark suite |
 | `track_executable.yaml` | 1 | OpenHands smoke test |
-| `track_new_features.yaml` | 12 | New efficiency features benchmark |
+| `track_new_features.yaml` | 5 | Token efficiency benchmarks (compression features) |
 
 ## New Features Track
 
-The `track_new_features` track benchmarks 4 new context efficiency features:
+The `track_new_features` track benchmarks compression features that can demonstrate
+actual token savings in static benchmarks:
 
 | Variant | Avg Savings | Description |
 |---------|-------------|-------------|
-| `edit_locality` | 99.5% | Edit-focused context with boundaries and invariants |
-| `context_delegation` | 96.4% | Returns retrieval plans instead of raw context |
-| `coherence_verify` | 70.0% | Adds cross-file coherence verification |
-| `attention_pruning` | 43.2% | Prunes based on historical usage patterns |
+| `symbolkite` | ~90% | Signature-based context extraction |
+| `edit_locality` | ~36% | Edit-focused context with boundaries and invariants |
 
-Run the new features benchmark:
+**Note:** Savings vary by task. edit_locality includes function bodies + boundaries,
+so it's larger than symbolkite (signatures only) but smaller than full files.
+
+### Disabled Variants
+
+The following variants were disabled because they cannot demonstrate value
+in static token-counting benchmarks. See `variants/disabled/README.md` for details:
+
+| Variant | Issue | Required Benchmark |
+|---------|-------|-------------------|
+| `attention_pruning` | Needs usage history | Multi-session learning |
+| `context_delegation` | Returns plan, not context | Agent execution |
+| `coherence_verify` | Adds tokens (quality feature) | Error detection rate |
+
+Run the compression benchmark:
 ```bash
-PYTHONPATH=tldr-bench:src uv run python tldr-bench/scripts/run_new_features_bench.py
+uv run python tldr-bench/scripts/run_new_features_bench.py
 ```
 
 ## Common Commands

@@ -50,6 +50,7 @@ Track task suites:
 - `track_executable` (OpenHands / executable harness)
 - `track_dataset` (dataset prompt stats only)
 - `track_dataset_context` (dataset prompt + context token stats)
+- `track_new_features` (compression feature benchmarks: symbolkite, edit_locality)
 
 Token savings snapshots are tool-specific. Use your variant outputs plus the
 baseline runners to compute savings for your own strategy.
