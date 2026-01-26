@@ -81,6 +81,8 @@ git push
 
 **Pre-commit hook:** The hook runs `scripts/check-versions.sh` to verify `pyproject.toml` and `plugin.json` match before allowing commits. To install the hook on a fresh clone, copy `.git/hooks/pre-commit` from an existing setup or run `scripts/check-versions.sh` manually.
 
+**IMPORTANT: Always update and push the marketplace.** Any change to `.claude-plugin/` (version bumps, renames, new commands, etc.) must be followed by updating `interagency-marketplace` and pushing both repos. The plugin is not published until the marketplace is updated.
+
 ## Claude Code-Specific Notes
 
 None currently - all instructions apply to all agents. See AGENTS.md for ContextPack JSON, ETag, and ambiguity notes.
