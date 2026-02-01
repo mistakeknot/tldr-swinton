@@ -16,10 +16,10 @@ tldr-swinton is a token-efficient code analysis tool for LLMs. It's a fork of ll
 
 ```bash
 # Install (development)
-pip install -e .
-pip install -e ".[semantic-ollama]"  # Ollama-only semantic search (FAISS + NumPy)
-pip install -e ".[semantic]"  # With sentence-transformers fallback (includes torch)
-pip install -e ".[full]"      # Full stack (includes Ollama + tiktoken)
+uv pip install -e .
+uv pip install -e ".[semantic-ollama]"  # Ollama-only semantic search (FAISS + NumPy)
+uv pip install -e ".[semantic]"  # With sentence-transformers fallback (includes torch)
+uv pip install -e ".[full]"      # Full stack (includes Ollama + tiktoken)
 
 # Test commands
 tldrs extract src/tldr_swinton/embeddings.py    # Extract file info
@@ -29,7 +29,7 @@ tldrs index .                                    # Build semantic index
 
 # After code changes
 find . -name "*.pyc" -delete && find . -name "__pycache__" -type d -exec rm -rf {} +
-pip install -e .
+uv pip install -e .
 ```
 
 Full workflow guide: see `docs/agent-workflow.md` or run `tldrs quickstart`.
@@ -38,7 +38,7 @@ Full workflow guide: see `docs/agent-workflow.md` or run `tldrs quickstart`.
 
 ```bash
 # From repo root
-pip install -e ".[full]"
+uv pip install -e ".[full]"
 tldrs --help
 
 # Smoke check
@@ -152,8 +152,33 @@ Session state is stored in `.tldrs/state.sqlite3` and tracks:
 
 ## MCP (Optional)
 
-- MCP server requires `pip install mcp`.
+- MCP server requires `uv pip install mcp`.
 - MCP context uses ContextPack for `json/json-pretty/ultracompact` formats.
+
+## Output Caps (`--max-lines` / `--max-bytes`)
+
+The `context`, `diff-context`, and `slice` commands support optional post-format
+output truncation. These are opt-in — no behavior change without them.
+
+```bash
+# Cap context output to 20 lines
+tldrs context main --project . --max-lines=20
+
+# Cap diff-context to 4KB
+tldrs diff-context --project . --max-bytes=4096
+
+# Both caps together
+tldrs context main --project . --max-lines=50 --max-bytes=2048
+
+# Slice with line cap
+tldrs slice src/app.py handle_request 42 --max-lines=10
+```
+
+When output is truncated, a marker is appended:
+`[TRUNCATED: output exceeded --max-lines=20]`
+
+For JSON output (`slice`), the `lines`/`slices` array is trimmed from the end
+and `"truncated": true` is added to the result dict. Output remains valid JSON.
 
 ## Module Selection (Agents)
 
@@ -416,7 +441,7 @@ tldrs structure path/to/file.ts | grep language
 
 2. Reinstall in development mode:
    ```bash
-   pip install -e .
+   uv pip install -e .
    ```
 
 3. Verify the correct module is loaded:

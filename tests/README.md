@@ -9,5 +9,5 @@ uv run --with pytest python -m pytest
 Install the optional test dependencies:
 
 ```bash
-pip install -e ".[test]"
+uv pip install -e ".[test]"
 ```

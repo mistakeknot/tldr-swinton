@@ -86,17 +86,17 @@ curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldr-swinton/main/scrip
 
 This removes the installation directory, shell alias, and pip packages. Project indexes (`.tldrs/` directories) are preserved by default.
 
-### Quick Install (pip)
+### Quick Install
 
 ```bash
-pip install tldr-swinton
+uv pip install tldr-swinton
 ```
 
 ### Optional: MCP Server
 
 The MCP server is optional. If you want MCP tools, install the MCP dependency:
 ```bash
-pip install mcp
+uv pip install mcp
 ```
 
 Then run:
@@ -137,12 +137,12 @@ cd tldr-swinton
 # Ollama-only (no torch):
 uv sync --extra semantic-ollama    # Fast, light-weight
 # OR
-pip install -e ".[semantic-ollama]"
+uv pip install -e ".[semantic-ollama]"
 #
 # If you need sentence-transformers fallback (no Ollama):
 uv sync --extra semantic
 # OR
-pip install -e ".[semantic]"
+uv pip install -e ".[semantic]"
 
 # Note: `tldrs index`/`tldrs find` require one of the semantic extras above.
 
@@ -273,7 +273,7 @@ git clone https://github.com/mistakeknot/tldr-swinton
 cd tldr-swinton
 uv sync --extra full    # Includes Ollama client + tiktoken
 # OR
-pip install -e ".[full]"
+uv pip install -e ".[full]"
 ```
 
 ## Quick Start
@@ -344,9 +344,9 @@ tldrs find "user authentication flow"
 
 **Installation for semantic search:**
 ```bash
-pip install tldr-swinton[semantic-ollama]  # FAISS + NumPy only (for Ollama)
+uv pip install tldr-swinton[semantic-ollama]  # FAISS + NumPy only (for Ollama)
 # OR, if you need sentence-transformers fallback:
-pip install tldr-swinton[semantic]  # Adds FAISS + sentence-transformers (+ torch)
+uv pip install tldr-swinton[semantic]  # Adds FAISS + sentence-transformers (+ torch)
 
 # (Recommended) Also install Ollama for faster embeddings:
 # See https://ollama.ai for installation, then:
@@ -378,7 +378,7 @@ Most commands output JSON by default. Use `--format compact` for token-efficient
 Languages marked "Optional" require installing additional tree-sitter grammars:
 
 ```bash
-pip install tldr-swinton[all]
+uv pip install tldr-swinton[all]
 ```
 
 ## Architecture
@@ -460,7 +460,7 @@ Measured using tiktoken (cl100k_base encoding). Actual savings depend on use cas
 
 Run the evaluations yourself:
 ```bash
-pip install tiktoken
+uv pip install tiktoken
 python evals/token_efficiency_eval.py
 python evals/agent_workflow_eval.py  # Most realistic measure
 ```

@@ -643,3 +643,54 @@ def _format_context_pack_ultracompact(pack: dict) -> list[str]:
         lines.append("")
 
     return lines
+
+
+def truncate_output(text: str, max_lines: int | None = None, max_bytes: int | None = None) -> str:
+    """Post-format text truncation. Returns text with TRUNCATED marker if capped."""
+    if max_lines is None and max_bytes is None:
+        return text
+    lines = text.split("\n")
+    truncated = False
+    if max_lines and len(lines) > max_lines:
+        lines = lines[:max_lines]
+        truncated = True
+    result = "\n".join(lines)
+    if max_bytes and len(result.encode("utf-8")) > max_bytes:
+        result = result.encode("utf-8")[:max_bytes].decode("utf-8", errors="ignore")
+        truncated = True
+    if truncated:
+        parts = []
+        if max_lines:
+            parts.append(f"--max-lines={max_lines}")
+        if max_bytes:
+            parts.append(f"--max-bytes={max_bytes}")
+        result += f"\n[TRUNCATED: output exceeded {', '.join(parts)}]"
+    return result
+
+
+def truncate_json_output(
+    data: dict,
+    max_lines: int | None = None,
+    max_bytes: int | None = None,
+    indent: int | None = None,
+) -> str:
+    """Truncate JSON output by dropping slices/lines from end until under caps."""
+    import copy
+
+    if max_lines is None and max_bytes is None:
+        return json.dumps(data, indent=indent, ensure_ascii=False)
+    d = copy.deepcopy(data)
+    trim_key = "slices" if "slices" in d else ("lines" if "lines" in d else None)
+    for _ in range(1000):
+        out = json.dumps(d, indent=indent, ensure_ascii=False)
+        over_lines = max_lines and out.count("\n") + 1 > max_lines
+        over_bytes = max_bytes and len(out.encode("utf-8")) > max_bytes
+        if not over_lines and not over_bytes:
+            return out
+        if trim_key and d.get(trim_key):
+            d[trim_key] = d[trim_key][:-1]
+            d["truncated"] = True
+        else:
+            break
+    d["truncated"] = True
+    return json.dumps(d, indent=indent, ensure_ascii=False)

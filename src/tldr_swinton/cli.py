@@ -734,6 +734,9 @@ Semantic Search:
         help="Disable delta mode even if session-id is provided",
     )
 
+    ctx_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
+    ctx_p.add_argument("--max-bytes", type=int, default=None, help="Cap output at N bytes")
+
     diff_p = subparsers.add_parser("diff-context", help="Diff-first context pack")
     diff_p.add_argument("--project", default=".", help="Project root directory")
     diff_p.add_argument("--base", default=None, help="Base ref (default: merge-base with main/master)")
@@ -774,6 +777,9 @@ Semantic Search:
         help="Disable delta mode even if session-id provided",
     )
 
+    diff_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
+    diff_p.add_argument("--max-bytes", type=int, default=None, help="Cap output at N bytes")
+
     # tldr cfg <file> <function>
     cfg_p = subparsers.add_parser("cfg", help="Control flow graph")
     cfg_p.add_argument("file", help="Source file")
@@ -799,6 +805,8 @@ Semantic Search:
     )
     slice_p.add_argument("--var", help="Variable to track (optional)")
     slice_p.add_argument("--lang", default=None, help="Language (auto-detected from extension if not specified)")
+    slice_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
+    slice_p.add_argument("--max-bytes", type=int, default=None, help="Cap output at N bytes")
 
     # tldr calls <path>
     calls_p = subparsers.add_parser("calls", help="Build cross-file call graph")
@@ -1259,6 +1267,9 @@ Semantic Search:
                         print(f"Error: {exc}", file=sys.stderr)
                         sys.exit(1)
                     output += f"\n\n# Included {ref}\n{included.rstrip()}\n"
+            if args.max_lines or args.max_bytes:
+                from .modules.core.output_formats import truncate_output
+                output = truncate_output(output, max_lines=args.max_lines, max_bytes=args.max_bytes)
             if args.output == "vhs":
                 try:
                     ref = _vhs_put(output, project_root)
@@ -1305,7 +1316,11 @@ Semantic Search:
                 )
             # Force JSON format when --machine flag is set
             fmt = "json" if getattr(args, "machine", False) else args.format
-            print(format_context_pack(pack, fmt=fmt))
+            diff_output = format_context_pack(pack, fmt=fmt)
+            if args.max_lines or args.max_bytes:
+                from .modules.core.output_formats import truncate_output
+                diff_output = truncate_output(diff_output, max_lines=args.max_lines, max_bytes=args.max_bytes)
+            print(diff_output)
 
         elif args.command == "cfg":
             lang = args.lang or detect_language_from_extension(args.file)
@@ -1328,7 +1343,12 @@ Semantic Search:
                 language=lang,
             )
             result = {"lines": sorted(lines), "count": len(lines)}
-            _machine_output(result, args)
+            if args.max_lines or args.max_bytes:
+                from .modules.core.output_formats import truncate_json_output
+                indent = None if getattr(args, "machine", False) else 2
+                print(truncate_json_output(result, max_lines=args.max_lines, max_bytes=args.max_bytes, indent=indent))
+            else:
+                _machine_output(result, args)
 
         elif args.command == "calls":
             # Check for cached graph and dirty files for incremental update
