@@ -10,7 +10,7 @@ if command -v tldrs &> /dev/null; then
     fi
     # Check ast-grep availability
     if ! python3 -c "import ast_grep_py" 2>/dev/null; then
-        echo "tldrs: Structural search unavailable. Install with: pip install 'tldr-swinton[structural]'"
+        echo "tldrs: Structural search unavailable. Reinstall with: uv tool install --force tldr-swinton"
     fi
 else
     echo "tldrs: NOT INSTALLED. Install with: pip install tldr-swinton"

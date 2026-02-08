@@ -88,7 +88,7 @@ Found 3 match(es):
 
 **Important:** Always single-quote patterns. `$VAR` and `$$$ARGS` are ast-grep meta-variables, not shell variables.
 
-Requires: `pip install 'tldr-swinton[structural]'`
+Included in base install (ast-grep-py).
 
 ## Workflow Examples
 

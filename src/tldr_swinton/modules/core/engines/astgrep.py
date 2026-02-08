@@ -8,7 +8,7 @@ Examples:
     "if $COND: $$$BODY"                         - all if statements
     "$OBJ.$METHOD($$$ARGS)"                     - all method calls
 
-Requires: pip install 'tldr-swinton[structural]'
+Included in base install (ast-grep-py).
 """
 from __future__ import annotations
 
@@ -100,7 +100,7 @@ def get_structural_search(
     except ImportError:
         raise ImportError(
             "ast-grep-py is required for structural search. "
-            "Install with: pip install 'tldr-swinton[structural]'"
+            "Reinstall with: uv tool install --force tldr-swinton"
         )
 
     root = Path(project_path).resolve()

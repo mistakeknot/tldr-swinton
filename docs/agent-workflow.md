@@ -77,7 +77,7 @@ tldrs context main --project . --depth 1 --budget 200 --format ultracompact
 
 ## Structural Search (ast-grep)
 
-Requires: `pip install 'tldr-swinton[structural]'`
+Included in base install (ast-grep-py).
 
 ```bash
 # Find all function definitions

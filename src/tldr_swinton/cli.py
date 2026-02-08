@@ -1183,7 +1183,7 @@ Semantic Search:
                 from .modules.core.engines.astgrep import get_structural_search
             except ImportError:
                 print("Error: ast-grep-py is required for structural search.")
-                print("Install with: pip install 'tldr-swinton[structural]'")
+                print("Reinstall with: uv tool install --force tldr-swinton")
                 return
 
             result = get_structural_search(

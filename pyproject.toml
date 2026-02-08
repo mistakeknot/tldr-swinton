@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tldr-swinton"
-version = "0.5.0"
+version = "0.5.1"
 description = "Centralized platform for improving coding agent performance - token-efficient code analysis, session artifacts, and benchmarking"
 readme = "README.md"
 license = "MIT"
@@ -38,6 +38,7 @@ dependencies = [
     "pygments>=2.0",
     "pygments-tldr>=2.19.3.0",
     "pathspec>=0.11.0",
+    "ast-grep-py>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -69,7 +70,6 @@ full = [
     "rich>=13.0",
     "ollama>=0.1",  # Local LLM client
     "tiktoken>=0.5",  # Token counting
-    "ast-grep-py>=0.30",  # Structural search
 ]
 # Additional language grammars
 all = [
@@ -80,10 +80,8 @@ all = [
     "tree-sitter-lua>=0.4.0",
     "tree-sitter-elixir>=0.3.0",
 ]
-# Structural code search (ast-grep)
-structural = [
-    "ast-grep-py>=0.30",
-]
+# Structural code search — kept as alias for backwards compatibility
+structural = []
 
 [project.scripts]
 tldr-swinton = "tldr_swinton.cli:main"

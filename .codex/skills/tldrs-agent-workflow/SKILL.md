@@ -77,7 +77,7 @@ tldrs structural 'if err != nil { $$$BODY }' --lang go
 
 Pattern syntax: `$VAR` matches single node, `$$$ARGS` matches varargs.
 
-Requires: `pip install 'tldr-swinton[structural]'`
+Included in base install (ast-grep-py).
 
 ### 4. Symbol Context
 
@@ -145,5 +145,5 @@ Supported: python, typescript, javascript, rust, go, java, c, cpp, ruby, php, ko
 - **"No git repository"**: diff-context requires a git repo. Use `tldrs structure` instead.
 - **"No semantic index found"**: Run `tldrs index .` first (takes 30-60s).
 - **"Ambiguous entry"**: Multiple symbols match. Use `file.py:symbol` format.
-- **"ast-grep-py is required"**: Install with `pip install 'tldr-swinton[structural]'`.
+- **"ast-grep-py is required"**: Reinstall with `uv tool install --force tldr-swinton`.
 - **Garbled structural pattern**: You likely double-quoted it. Always use single quotes.

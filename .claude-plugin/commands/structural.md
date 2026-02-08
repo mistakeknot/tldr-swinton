@@ -28,4 +28,4 @@ tldrs structural '$ARGUMENTS.pattern' ${ARGUMENTS.lang:+--lang $ARGUMENTS.lang}
 - All method calls: `'$OBJ.$METHOD($$$ARGS)'`
 - Go error handling: `'if err != nil { $$$BODY }'`
 
-Requires: `pip install 'tldr-swinton[structural]'`
+Included in base install (ast-grep-py).
