@@ -22,7 +22,14 @@ This project is available as a Claude Code plugin from the [interagency-marketpl
 - `/tldrs-find <query>` - Semantic code search
 - `/tldrs-diff` - Diff-focused context
 - `/tldrs-context <symbol>` - Symbol-level context
+- `/tldrs-structural <pattern>` - Structural code search (ast-grep)
 - `/tldrs-quickstart` - Quick reference guide
+
+**Autonomous skills** (Claude invokes these automatically):
+- `tldrs-session-start` - Runs diff-context before reading files
+- `tldrs-find-code` - Semantic/structural search instead of grep
+- `tldrs-understand-symbol` - Symbol context before reading files
+- `tldrs-compress-context` - Compression and caching for large outputs
 
 ## Plugin Publishing Runbook
 
@@ -68,13 +75,16 @@ git push
 │   ├── find.md
 │   ├── diff-context.md
 │   ├── context.md
+│   ├── structural.md
 │   └── quickstart.md
 ├── hooks/
-│   └── hooks.json       # Hook definitions
+│   ├── hooks.json       # Hook definitions
 │   └── setup.sh         # Setup hook script
-└── skills/
-    └── tldrs-agent-workflow/
-        └── SKILL.md     # Workflow skill
+└── skills/              # 4 focused skills (Claude-invoked)
+    ├── tldrs-session-start/
+    ├── tldrs-find-code/
+    ├── tldrs-understand-symbol/
+    └── tldrs-compress-context/
 ```
 
 **Version sync:** All three locations must match: `pyproject.toml`, `.claude-plugin/plugin.json`, and `interagency-marketplace/.claude-plugin/marketplace.json`. Always bump all three together.
