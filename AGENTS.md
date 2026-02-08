@@ -371,7 +371,7 @@ elif self.language == "rust":
 python -c "from tldr_swinton.embeddings import check_backends; print(check_backends())"
 
 # Ollama (preferred - fast, local)
-ollama pull nomic-embed-text
+ollama pull nomic-embed-text-v2-moe
 tldrs index . --backend ollama
 
 # sentence-transformers (fallback - 1.3GB download)

@@ -27,6 +27,7 @@ from .embeddings import (
 from .vector_store import (
     VectorStore,
     CodeUnit,
+    SearchResult,
     make_unit_id,
     get_file_hash,
 )
@@ -527,6 +528,25 @@ def build_index(
         embed_model=stats.embed_model,
         embed_backend=stats.embed_backend
     )
+
+    # Build BM25 index for hybrid search
+    try:
+        from .bm25_store import BM25Store
+
+        bm25 = BM25Store(store.index_dir)
+        # Use the same texts that were used for embeddings
+        all_texts = [_build_embed_text(u) for u in all_units]
+        all_ids = [u.id for u in all_units]
+        bm25.build(all_ids, all_texts)
+        bm25.save()
+        if show_progress:
+            print("  BM25 lexical index: built")
+    except ImportError:
+        if show_progress:
+            print("  BM25 lexical index: skipped (rank-bm25 not installed)")
+    except Exception as e:
+        logger.debug("Failed to build BM25 index: %s", e)
+
     store.save()
 
     if show_progress:
@@ -539,6 +559,48 @@ def build_index(
 
 # Pattern for identifier-like queries (function/method names)
 _IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_\.]*$")
+
+
+def _rrf_fuse(
+    semantic_results: list[SearchResult],
+    bm25_results: list[tuple[str, float]],
+    exclude_ids: set[str],
+    store: VectorStore,
+    k_param: int = 60,
+) -> list[tuple[CodeUnit, float]]:
+    """Reciprocal Rank Fusion of semantic and BM25 results.
+
+    RRF score = sum(1 / (k + rank)) across result lists.
+    k_param=60 is the standard default from the original RRF paper.
+
+    Returns:
+        List of (CodeUnit, fused_score) tuples, sorted by fused score descending.
+    """
+    scores: dict[str, float] = {}  # unit_id -> fused score
+    units: dict[str, CodeUnit] = {}  # unit_id -> CodeUnit
+
+    # Score semantic results
+    for rank, result in enumerate(semantic_results):
+        uid = result.unit.id
+        if uid in exclude_ids:
+            continue
+        scores[uid] = scores.get(uid, 0.0) + 1.0 / (k_param + rank + 1)
+        units[uid] = result.unit
+
+    # Score BM25 results
+    for rank, (uid, _bm25_score) in enumerate(bm25_results):
+        if uid in exclude_ids:
+            continue
+        scores[uid] = scores.get(uid, 0.0) + 1.0 / (k_param + rank + 1)
+        if uid not in units:
+            unit = store.get_unit(uid)
+            if unit:
+                units[uid] = unit
+
+    # Sort by fused score
+    ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+    return [(units[uid], score) for uid, score in ranked if uid in units]
 
 
 def search_index(
@@ -620,27 +682,57 @@ def search_index(
     # Embed query for semantic search
     result = embed_text(query, backend=backend, model=model)
 
-    # Search
+    # Semantic search
     semantic_results = store.search(result.vector, k=remaining_k + len(exact_matches))
 
-    # Filter out any semantic results that are already in exact matches
-    exact_ids = {u.id for u in exact_matches}
-    semantic_results = [r for r in semantic_results if r.unit.id not in exact_ids]
+    # Try BM25 for hybrid search
+    bm25_results: list[tuple[str, float]] = []
+    try:
+        from .bm25_store import BM25Store
 
-    # Format semantic results
-    semantic_formatted = [
-        {
-            "name": r.unit.name,
-            "file": r.unit.file,
-            "line": r.unit.line,
-            "type": r.unit.unit_type,
-            "signature": r.unit.signature,
-            "summary": r.unit.summary,
-            "score": round(r.score, 4),
-            "rank": len(exact_results) + i + 1,
-        }
-        for i, r in enumerate(semantic_results[:remaining_k])
-    ]
+        bm25 = BM25Store(store.index_dir)
+        if bm25.load():
+            bm25_results = bm25.search(query, k=remaining_k + len(exact_matches))
+    except (ImportError, Exception) as e:
+        logger.debug("BM25 search unavailable: %s", e)
+
+    # Filter out exact matches from both result sets
+    exact_ids = {u.id for u in exact_matches}
+
+    if bm25_results:
+        # RRF fusion of semantic + BM25 results
+        fused = _rrf_fuse(semantic_results, bm25_results, exact_ids, store)
+
+        # Format fused results
+        semantic_formatted = [
+            {
+                "name": unit.name,
+                "file": unit.file,
+                "line": unit.line,
+                "type": unit.unit_type,
+                "signature": unit.signature,
+                "summary": unit.summary,
+                "score": round(score, 4),
+                "rank": len(exact_results) + i + 1,
+            }
+            for i, (unit, score) in enumerate(fused[:remaining_k])
+        ]
+    else:
+        # Fallback to pure semantic search
+        semantic_results = [r for r in semantic_results if r.unit.id not in exact_ids]
+        semantic_formatted = [
+            {
+                "name": r.unit.name,
+                "file": r.unit.file,
+                "line": r.unit.line,
+                "type": r.unit.unit_type,
+                "signature": r.unit.signature,
+                "summary": r.unit.summary,
+                "score": round(r.score, 4),
+                "rank": len(exact_results) + i + 1,
+            }
+            for i, r in enumerate(semantic_results[:remaining_k])
+        ]
 
     return exact_results + semantic_formatted
 

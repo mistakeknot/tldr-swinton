@@ -46,6 +46,7 @@ TEST_QUERIES = [
 ]
 
 OLLAMA_MODELS = [
+    "nomic-embed-text-v2-moe",
     "nomic-embed-text",
     "mxbai-embed-large",
     "all-minilm",
@@ -162,7 +163,7 @@ def test_search_quality(
 ) -> dict:
     """Test actual search quality against an existing index.
 
-    This uses the existing index (built with nomic-embed-text) to
+    This uses the existing index (built with nomic-embed-text-v2-moe) to
     compare how well different query embeddings work.
 
     NOTE: For a true comparison, we'd need to rebuild the index
@@ -312,7 +313,7 @@ def main():
 
         # Only test the model that matches the index
         # Testing other models against a differently-embedded index is unfair
-        result = test_search_quality(args.index, "nomic-embed-text", backend="ollama")
+        result = test_search_quality(args.index, "nomic-embed-text-v2-moe", backend="ollama")
         all_results["search_quality"].append(result)
 
     # Summary

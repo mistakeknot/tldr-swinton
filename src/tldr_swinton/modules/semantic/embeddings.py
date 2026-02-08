@@ -2,7 +2,7 @@
 Embedding backends for tldr-swinton semantic search.
 
 Supports multiple embedding backends:
-- Ollama (nomic-embed-text) - Local, fast, no download needed if Ollama running
+- Ollama (nomic-embed-text-v2-moe) - Local, fast, no download needed if Ollama running
 - sentence-transformers - HuggingFace models (BGE, MiniLM, etc.)
 
 Use Ollama for local development, sentence-transformers for production quality.
@@ -41,12 +41,13 @@ BackendType = Literal["ollama", "sentence-transformers", "auto"]
 
 # Configuration
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_EMBED_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+OLLAMA_EMBED_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text-v2-moe")
 DEFAULT_BACKEND = os.environ.get("TLDR_EMBED_BACKEND", "auto")
 
 # Embedding dimensions by model
 MODEL_DIMENSIONS = {
     # Ollama models
+    "nomic-embed-text-v2-moe": 768,
     "nomic-embed-text": 768,
     "mxbai-embed-large": 1024,
     "all-minilm": 384,
@@ -131,9 +132,26 @@ class OllamaEmbedder:
             embedding = data["embedding"]
             return np_local.array(embedding, dtype=np_local.float32)
 
-    def embed_batch(self, texts: list[str]) -> list[np.ndarray]:
-        """Embed multiple texts (Ollama doesn't batch, so sequential)."""
-        return [self.embed(text) for text in texts]
+    def embed_batch(self, texts: list[str], max_workers: int = 8) -> list[np.ndarray]:
+        """Embed multiple texts in parallel using ThreadPoolExecutor."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        if len(texts) <= 1:
+            return [self.embed(text) for text in texts]
+
+        workers = min(max_workers, len(texts))
+        results = [None] * len(texts)
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            future_to_idx = {
+                executor.submit(self.embed, text): i
+                for i, text in enumerate(texts)
+            }
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                results[idx] = future.result()
+
+        return results
 
 
 class SentenceTransformerEmbedder:
@@ -311,15 +329,15 @@ def embed_batch(
             ) as progress:
                 task = progress.add_task(f"Embedding ({actual_backend})...", total=len(texts))
 
-                # Batch for sentence-transformers, sequential for Ollama
+                # Batch for sentence-transformers, parallelized batch for Ollama
                 if isinstance(embedder, SentenceTransformerEmbedder):
                     vectors = embedder.embed_batch(texts)
                     for vector in vectors:
                         results.append(make_result(vector))
                         progress.update(task, advance=1)
                 else:
-                    for text in texts:
-                        vector = embedder.embed(text)
+                    vectors = embedder.embed_batch(texts)
+                    for vector in vectors:
                         results.append(make_result(vector))
                         progress.update(task, advance=1)
 

@@ -26,6 +26,7 @@ from .embeddings import (
     BackendType,
 )
 from .vector_store import VectorStore, CodeUnit, make_unit_id, get_file_hash
+from .bm25_store import BM25Store
 
 __all__ = [
     # Index operations
@@ -43,4 +44,6 @@ __all__ = [
     "CodeUnit",
     "make_unit_id",
     "get_file_hash",
+    # BM25 store
+    "BM25Store",
 ]

@@ -6,7 +6,7 @@
 # Options:
 #   --yes           Skip confirmation prompts
 #   --no-ollama     Skip Ollama model setup
-#   --model NAME    Ollama embedding model (default: nomic-embed-text)
+#   --model NAME    Ollama embedding model (default: nomic-embed-text-v2-moe)
 #   --dir PATH      Installation directory (default: ~/tldr-swinton)
 #
 
@@ -23,7 +23,7 @@ NC='\033[0m' # No Color
 INSTALL_DIR="${HOME}/tldr-swinton"
 SKIP_CONFIRM=false
 SKIP_OLLAMA=false
-OLLAMA_MODEL="nomic-embed-text"
+OLLAMA_MODEL="nomic-embed-text-v2-moe"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -52,7 +52,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --yes, -y       Skip confirmation prompts"
             echo "  --no-ollama     Skip Ollama model setup"
-            echo "  --model NAME    Ollama embedding model (default: nomic-embed-text)"
+            echo "  --model NAME    Ollama embedding model (default: nomic-embed-text-v2-moe)"
             echo "  --dir PATH      Installation directory (default: ~/tldr-swinton)"
             echo "  --help, -h      Show this help message"
             exit 0

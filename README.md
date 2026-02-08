@@ -148,7 +148,7 @@ uv pip install -e ".[semantic]"
 
 # 3. (Recommended) Set up Ollama for fast local embeddings
 #    Install from https://ollama.ai, then:
-ollama pull nomic-embed-text
+ollama pull nomic-embed-text-v2-moe
 
 # 4. Verify installation
 tldrs --help
@@ -263,7 +263,7 @@ tldrs diff-context --project . --compress chunk-summary
 **Requirements:**
 - Python 3.10+
 - For semantic search embeddings, one of:
-  - **Ollama** (recommended): Install from https://ollama.ai, then `ollama pull nomic-embed-text` (274MB)
+  - **Ollama** (recommended): Install from https://ollama.ai, then `ollama pull nomic-embed-text-v2-moe` (274MB)
   - **sentence-transformers** (fallback): Automatically downloads BGE model on first use (1.3GB)
 
 ### For Development
@@ -338,7 +338,7 @@ tldrs find "user authentication flow"
 ```
 
 **Backend Options:**
-- `--backend ollama` - Use Ollama (fast, local, requires [Ollama](https://ollama.ai) + `ollama pull nomic-embed-text`)
+- `--backend ollama` - Use Ollama (fast, local, requires [Ollama](https://ollama.ai) + `ollama pull nomic-embed-text-v2-moe`)
 - `--backend sentence-transformers` - Use HuggingFace BGE model (1.3GB download on first use)
 - `--backend auto` (default) - Try Ollama first, fall back to sentence-transformers
 
@@ -350,7 +350,7 @@ uv pip install tldr-swinton[semantic]  # Adds FAISS + sentence-transformers (+ t
 
 # (Recommended) Also install Ollama for faster embeddings:
 # See https://ollama.ai for installation, then:
-ollama pull nomic-embed-text
+ollama pull nomic-embed-text-v2-moe
 ```
 
 ### Output Formats

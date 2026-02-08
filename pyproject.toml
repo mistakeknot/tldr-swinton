@@ -47,6 +47,7 @@ test = ["pytest>=8.0"]
 semantic-ollama = [
     "numpy>=1.26",
     "faiss-cpu>=1.7",
+    "rank-bm25>=0.2.2",
     "rich>=13.0",  # Progress bars
 ]
 # Semantic search with embeddings
@@ -55,6 +56,7 @@ semantic = [
     "sentence-transformers>=2.0",
     "torch>=2.0",
     "faiss-cpu>=1.7",
+    "rank-bm25>=0.2.2",
     "rich>=13.0",  # Progress bars
 ]
 # Full stack with Ollama integration
@@ -63,6 +65,7 @@ full = [
     "sentence-transformers>=2.0",
     "torch>=2.0",
     "faiss-cpu>=1.7",
+    "rank-bm25>=0.2.2",
     "rich>=13.0",
     "ollama>=0.1",  # Local LLM client
     "tiktoken>=0.5",  # Token counting
