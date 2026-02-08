@@ -1,13 +1,15 @@
 #!/bin/bash
 # tldrs Setup Hook
 # Runs on: claude --init, claude --init-only, claude --maintenance
-# Purpose: Check if semantic index exists and suggest building it
+# Purpose: Check tldrs install, semantic index, and optional features
 
-# Only show message if tldrs is installed but no index exists
 if command -v tldrs &> /dev/null; then
+    # Check semantic index
     if [ ! -d ".tldrs" ]; then
-        echo "tldrs: No semantic index found in this project."
-        echo "  Run: tldrs index ."
-        echo "  This enables semantic search with: tldrs find \"your query\""
+        echo "tldrs: No semantic index. Run 'tldrs index .' to enable semantic search."
+    fi
+    # Check ast-grep availability
+    if ! python3 -c "import ast_grep_py" 2>/dev/null; then
+        echo "tldrs: Structural search unavailable. Install with: pip install 'tldr-swinton[structural]'"
     fi
 fi

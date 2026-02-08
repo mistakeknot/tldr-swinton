@@ -40,7 +40,11 @@ tldrs context main --project . --depth 1 --budget 200 --format ultracompact
    - `tldrs index .`
    - `tldrs find "authentication logic"`
 
-5) Need deep analysis?
+5) Need to find code by structural pattern?
+   - `tldrs structural 'if $COND: $$$BODY' --lang python`
+   - Single-quote patterns to prevent shell expansion of `$`
+
+6) Need deep analysis?
    - `tldrs slice <file> <func> <line>`
    - `tldrs cfg <file> <function>`
    - `tldrs dfg <file> <function>`
@@ -70,6 +74,20 @@ tldrs context main --project . --depth 1 --budget 200 --format ultracompact
   - `tldrs diff-context --project . --budget 1500 --compress two-stage`
 - Chunk-summary compression:
   - `tldrs diff-context --project . --budget 1500 --compress chunk-summary`
+
+## Structural Search (ast-grep)
+
+Requires: `pip install 'tldr-swinton[structural]'`
+
+```bash
+# Find all function definitions
+tldrs structural 'def $FUNC($$$ARGS): $$$BODY' --lang python
+
+# Find all method calls
+tldrs structural '$OBJ.$METHOD($$$ARGS)' --lang python
+```
+
+**Shell escaping**: Always single-quote patterns. `$VAR` and `$$$ARGS` are ast-grep meta-variables that the shell would otherwise expand.
 
 ## Impact / Test Selection
 

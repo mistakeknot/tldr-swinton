@@ -8,6 +8,7 @@
 |------|---------|------|
 | Start any coding task | `tldrs diff-context --project . --budget 2000` | Review changed symbols |
 | Find code by concept | `tldrs find "auth logic"` | Read top results |
+| Find code by structure | `tldrs structural 'pattern' --lang python` | Read matches |
 | Understand a function | `tldrs context func --project . --depth 2` | Read if editing |
 | Explore structure | `tldrs structure src/` | Navigate to relevant files |
 
@@ -63,6 +64,31 @@ handle_request(request) -> Response
   calls: validate_input, process_data, format_response
   called_by: main, api_handler
 ```
+
+### 4. Structural Search
+
+```bash
+tldrs structural 'def $FUNC($$$ARGS): return None' --lang python
+```
+
+**Output:**
+```
+Found 3 match(es):
+
+  src/api.py:42
+    def get_user(id): return None
+    $FUNC = get_user
+
+  src/utils.py:15
+    def noop(): return None
+    $FUNC = noop
+```
+
+**What it tells you:** Code matches by AST structure, with meta-variable bindings.
+
+**Important:** Always single-quote patterns. `$VAR` and `$$$ARGS` are ast-grep meta-variables, not shell variables.
+
+Requires: `pip install 'tldr-swinton[structural]'`
 
 ## Workflow Examples
 

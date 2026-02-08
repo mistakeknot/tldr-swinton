@@ -20,6 +20,7 @@ uv pip install -e .
 uv pip install -e ".[semantic-ollama]"  # Ollama-only semantic search (FAISS + NumPy)
 uv pip install -e ".[semantic]"  # With sentence-transformers fallback (includes torch)
 uv pip install -e ".[full]"      # Full stack (includes Ollama + tiktoken)
+uv pip install -e ".[structural]"  # Structural code search (ast-grep)
 
 # Test commands
 tldrs extract src/tldr_swinton/embeddings.py    # Extract file info
@@ -54,6 +55,7 @@ The repo includes a Claude Code plugin at `.claude-plugin/`. Available commands:
 | `/tldrs-find <query>` | Semantic code search |
 | `/tldrs-diff` | Diff-focused context for recent changes |
 | `/tldrs-context <symbol>` | Symbol-level context |
+| `/tldrs-structural <pattern>` | Structural code search (ast-grep patterns) |
 | `/tldrs-quickstart` | Show quick reference guide |
 
 To use as a plugin:
@@ -199,7 +201,10 @@ tldrs extract path/to/file.py
 tldrs index .
 tldrs find "authentication logic"
 
-# 5) Deep analysis helpers (optional)
+# 5) Structural code search (requires ast-grep-py)
+tldrs structural 'def $FUNC($$$ARGS): return None' --lang python
+
+# 6) Deep analysis helpers (optional)
 tldrs slice <file> <func> <line>
 tldrs cfg <file> <function>
 tldrs dfg <file> <function>
@@ -218,10 +223,20 @@ If `tldrs-vhs` isn't on PATH (non-interactive shells), set:
 export TLDRS_VHS_CMD="$HOME/tldrs-vhs/.venv/bin/tldrs-vhs"
 ```
 
-## Compression Prototype Promotion Gate
+## Compression Modes
 
-Experimental compression modes (e.g., `--compress two-stage` or `--compress chunk-summary`) **must not be promoted** until they pass all of:
-- **≥10% additional savings** vs the current diff+deps baseline on `evals/difflens_eval.py`
+The `--compress` flag on `diff-context` supports two experimental modes:
+
+- **`two-stage`**: Indent-aware block detection + 0/1 knapsack DP for block selection.
+  Scores blocks by diff overlap (10x), adjacency (3x), and control-flow keywords (0.5x).
+  Saves 35-73% tokens with `--budget` constraint.
+- **`chunk-summary`**: Replaces code with LLM-ready summaries (signature + key lines).
+  Saves 85-95% but loses implementation detail.
+
+### Promotion Gate
+
+Experimental compression modes **must not be promoted to default** until they pass:
+- **>=10% additional savings** vs the current diff+deps baseline on `evals/difflens_eval.py`
 - **No regressions** on `evals/agent_workflow_eval.py`
 - **At least one manual spot check** on a real repo (correctness/readability)
 
@@ -479,9 +494,31 @@ The agent workflow eval tests real token savings for code modification tasks (no
 | `embeddings.py` | Ollama/sentence-transformers embedding backend |
 | `vector_store.py` | FAISS vector storage wrapper |
 | `index.py` | Semantic index management |
+| `engines/astgrep.py` | Structural code search via ast-grep |
+| `bm25_store.py` | BM25 keyword index for hybrid search |
 | `semantic.py` | Original semantic search (5-layer embeddings) |
 
 ## Version History
+
+- **0.5.0** - Skill-first plugin, structural search, compression upgrades
+  - Plugin restructured: 4 focused skills replace 1 broad skill
+  - Added `tldrs structural` - ast-grep tree-sitter pattern matching
+  - Added `@lru_cache` to 14 tree-sitter parser factory functions
+  - Upgraded `_two_stage_prune` with indent-based blocks + knapsack DP
+  - Added BM25 hybrid search (RRF fusion with semantic search)
+  - Upgraded embedding model to `nomic-embed-text-v2-moe` (475M MoE)
+  - Added `--max-lines` / `--max-bytes` output caps
+  - New optional dep group: `[structural]` for ast-grep-py
+
+- **0.4.0** - Output caps, benchmark infrastructure
+  - Added `--max-lines` / `--max-bytes` to context, diff-context, slice
+  - Added benchmark harness (`tldrs bench`)
+  - Disabled non-demonstrable benchmark variants
+
+- **0.3.0** - Embedding and search upgrades
+  - Switched Ollama model to `nomic-embed-text-v2-moe`
+  - Added BM25 hybrid search with RRF fusion
+  - Parallelized Ollama embedding calls
 
 - **0.2.0** - Semantic search with Ollama support
   - Added `tldrs index` - Build semantic index with Ollama or sentence-transformers

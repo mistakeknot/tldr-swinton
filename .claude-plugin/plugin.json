@@ -1,7 +1,7 @@
 {
   "name": "tldr-swinton",
-  "version": "0.4.0",
-  "description": "Token-efficient code reconnaissance for LLMs. Up to 84% token savings with semantic search, diff-context, symbol analysis, and delta-first extraction.",
+  "version": "0.5.0",
+  "description": "Token-efficient code reconnaissance for LLMs. Autonomous skills save 48-85% tokens via diff-context, semantic search, structural patterns, symbol analysis, and delta caching.",
   "author": {
     "name": "MK",
     "email": "mistakeknot@vibeguider.org"
@@ -9,14 +9,18 @@
   "repository": "https://github.com/mistakeknot/tldr-swinton",
   "homepage": "https://github.com/mistakeknot/tldr-swinton#readme",
   "license": "MIT",
-  "keywords": ["code-analysis", "token-efficiency", "semantic-search", "diff-context", "llm-tools"],
+  "keywords": ["code-analysis", "token-efficiency", "semantic-search", "structural-search", "diff-context", "llm-tools"],
   "skills": [
-    "./skills/tldrs-agent-workflow"
+    "./skills/tldrs-session-start",
+    "./skills/tldrs-find-code",
+    "./skills/tldrs-understand-symbol",
+    "./skills/tldrs-compress-context"
   ],
   "commands": [
     "./commands/find.md",
     "./commands/diff-context.md",
     "./commands/context.md",
+    "./commands/structural.md",
     "./commands/quickstart.md"
   ],
   "hooks": "./hooks/hooks.json"
