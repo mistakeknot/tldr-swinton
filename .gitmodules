@@ -4,3 +4,5 @@
 [submodule "tldr-bench/data"]
 	path = tldr-bench/data
 	url = https://github.com/mistakeknot/tldr-bench-datasets.git
+	update = none
+	fetchRecurseSubmodules = false
