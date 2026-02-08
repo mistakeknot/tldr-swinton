@@ -1,7 +1,7 @@
 {
   "name": "tldr-swinton",
   "version": "0.5.0",
-  "description": "Token-efficient code reconnaissance for LLMs. Autonomous skills save 48-85% tokens via diff-context, semantic search, structural patterns, symbol analysis, and delta caching.",
+  "description": "Token-efficient code reconnaissance for LLMs. Autonomous skills save 48-85% tokens via diff-context, semantic search, structural patterns, and symbol analysis.",
   "author": {
     "name": "MK",
     "email": "mistakeknot@vibeguider.org"
@@ -13,8 +13,7 @@
   "skills": [
     "./skills/tldrs-session-start",
     "./skills/tldrs-find-code",
-    "./skills/tldrs-understand-symbol",
-    "./skills/tldrs-compress-context"
+    "./skills/tldrs-understand-symbol"
   ],
   "commands": [
     "./commands/find.md",

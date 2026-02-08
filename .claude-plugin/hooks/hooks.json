@@ -1,5 +1,5 @@
 {
-  "description": "tldrs plugin hooks - semantic index setup check",
+  "description": "tldrs plugin hooks — token-efficient reconnaissance nudging",
   "hooks": {
     "Setup": [
       {
@@ -8,6 +8,18 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/setup.sh",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/suggest-recon.sh\"",
+            "timeout": 3
           }
         ]
       }

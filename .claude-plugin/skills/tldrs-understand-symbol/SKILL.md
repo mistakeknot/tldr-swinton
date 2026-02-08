@@ -1,6 +1,8 @@
 ---
 name: tldrs-understand-symbol
-description: "Use BEFORE reading a file to understand a function or class. Gets call graph, signatures, and callers in ~85% fewer tokens than reading the full file."
+description: "Use when asked about how a function works, what calls it, or what it depends on. Gets call graph, signatures, and callers in ~85% fewer tokens than reading the full file."
+allowed-tools:
+  - Bash
 ---
 
 # Understand a Symbol
@@ -23,6 +25,13 @@ handle_request(request) -> Response
   called_by: main, api_handler
   types: Request, Response
 ```
+
+## Next Step
+
+After reading the output:
+1. If you need to edit the symbol, now Read the file (you know exactly where to look)
+2. If you need broader context, increase `--depth 3`
+3. For reverse impact analysis: `tldrs impact <symbol> --depth 3`
 
 ## Disambiguation
 
@@ -51,14 +60,26 @@ tldrs structure src/path/to/dir/
 tldrs impact authenticate --depth 3
 ```
 
+## Output Caps
+
+If output is too large:
+```bash
+tldrs context <symbol> --project . --depth 2 --max-lines 50
+```
+
 ## Depth Tuning
 
 - `--depth 1`: direct calls only (minimal tokens)
 - `--depth 2`: calls + their calls (default, usually sufficient)
 - `--depth 3`: broad context (use for unfamiliar code)
 
+## Common Errors
+
+- **"Ambiguous entry"**: Multiple symbols match. Use `file.py:symbol` format.
+- **"No symbols found"**: Symbol name doesn't match. Try `tldrs structure` to discover names.
+- **Very large output**: Add `--max-lines 50` or reduce `--depth`.
+
 ## When to Skip
 
-- You need the full code body to make an edit: just Read the file
-- The file is < 200 lines: just Read it
-- You need implementation details, not architecture
+- You are editing a single file under 200 lines AND you already know which file it is
+- You need the full implementation body, not architecture

@@ -12,4 +12,7 @@ if command -v tldrs &> /dev/null; then
     if ! python3 -c "import ast_grep_py" 2>/dev/null; then
         echo "tldrs: Structural search unavailable. Install with: pip install 'tldr-swinton[structural]'"
     fi
+else
+    echo "tldrs: NOT INSTALLED. Install with: pip install tldr-swinton"
+    echo "tldrs: Plugin skills will not function until tldrs is installed."
 fi
