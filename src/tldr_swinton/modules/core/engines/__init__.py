@@ -15,3 +15,11 @@ __all__ = [
     "get_pdg_context",
     "get_slice",
 ]
+
+# Optional: structural search (requires ast-grep-py at runtime)
+try:
+    from .astgrep import get_structural_search
+
+    __all__.append("get_structural_search")
+except ImportError:
+    pass

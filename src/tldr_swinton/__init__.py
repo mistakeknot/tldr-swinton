@@ -59,6 +59,12 @@ from .modules.core import (
     extract_pdg,
 )
 
+# Optional: structural search
+try:
+    from .modules.core.engines.astgrep import get_structural_search as engine_get_structural_search
+except ImportError:
+    pass
+
 # Module access
 from . import modules
 
@@ -148,3 +154,6 @@ __all__ = [
     "extract_python_pdg",
     "extract_pdg",
 ]
+
+if "engine_get_structural_search" in globals():
+    __all__.append("engine_get_structural_search")

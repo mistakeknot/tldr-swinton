@@ -332,6 +332,59 @@ def _split_blocks_by_blank(lines: list[str]) -> list[tuple[int, int]]:
     return blocks or [(0, len(lines) - 1)]
 
 
+def _split_blocks_by_indent(lines: list[str]) -> list[tuple[int, int]]:
+    """Split code into blocks at indentation-level transitions.
+
+    Detects block boundaries where indentation level changes, which captures
+    structural boundaries (function bodies, if/else branches, loops) better
+    than blank-line splitting. Inspired by LongCodeZip (ASE 2025).
+    """
+    if not lines:
+        return [(0, 0)]
+
+    blocks: list[tuple[int, int]] = []
+    start = 0
+
+    def _indent_level(line: str) -> int | None:
+        stripped = line.lstrip()
+        if not stripped:
+            return None  # blank line - no indent signal
+        return len(line) - len(stripped)
+
+    prev_indent = _indent_level(lines[0])
+
+    for idx in range(len(lines)):
+        stripped = lines[idx].strip()
+        if stripped == "" or stripped == "...":
+            if start < idx:
+                blocks.append((start, idx - 1))
+            start = idx + 1
+            prev_indent = None
+            continue
+
+        cur_indent = _indent_level(lines[idx])
+        if cur_indent is None:
+            continue
+
+        # Block boundary: indent level changed AND we're at a "top" boundary
+        # (dedent back to a lower level, or indent into a new scope)
+        if prev_indent is not None and cur_indent != prev_indent:
+            # Only split at dedents (end of a block) to avoid splitting
+            # every indented line. Also split at significant indents (>=4 change)
+            if cur_indent < prev_indent or abs(cur_indent - prev_indent) >= 4:
+                if start < idx:
+                    blocks.append((start, idx - 1))
+                start = idx
+
+        prev_indent = cur_indent
+
+    # Final block
+    if start < len(lines):
+        blocks.append((start, len(lines) - 1))
+
+    return blocks or [(0, len(lines) - 1)]
+
+
 def _two_stage_prune(
     code: str,
     code_start: int,
@@ -339,7 +392,7 @@ def _two_stage_prune(
     budget_tokens: int | None,
 ) -> tuple[str, int, int]:
     lines = code.splitlines()
-    blocks = _split_blocks_by_blank(lines)
+    blocks = _split_blocks_by_indent(lines)
     block_count = len(blocks)
     if block_count == 0:
         return code, 0, 0
@@ -348,47 +401,131 @@ def _two_stage_prune(
         idx = line_no - code_start
         return block[0] <= idx <= block[1]
 
-    keep_indexes: list[int] = []
+    # Score each block
+    scores: list[float] = []
+    sizes: list[int] = []  # token estimate per block (chars / 4)
+    diff_block_indices: set[int] = set()
+
     for b_idx, block in enumerate(blocks):
-        if any(_line_in_block(block, line_no) for line_no in diff_lines):
-            keep_indexes.append(b_idx)
+        start, end = block
+        block_lines = lines[start:end + 1]
+        block_text = "\n".join(block_lines)
+        size = max(1, len(block_text) // 4)  # rough token estimate
+        sizes.append(size)
 
-    if not keep_indexes:
-        keep_indexes = [0]
+        score = 0.0
+        # Primary: diff overlap - blocks containing diff lines get high score
+        overlap = sum(1 for ln in diff_lines if _line_in_block(block, ln))
+        if overlap > 0:
+            score += 10.0 * overlap
+            diff_block_indices.add(b_idx)
 
-    allow_neighbors = budget_tokens is None or budget_tokens >= 2500
+        # Secondary: adjacency to diff blocks (will be recalculated after first pass)
+        # Tertiary: control-flow keywords
+        cf_keywords = (
+            "if ",
+            "else",
+            "elif ",
+            "for ",
+            "while ",
+            "return ",
+            "raise ",
+            "try:",
+            "except ",
+            "finally:",
+            "with ",
+            "yield ",
+            "async ",
+        )
+        cf_count = sum(
+            1
+            for line in block_lines
+            if any(line.strip().startswith(kw) for kw in cf_keywords)
+        )
+        score += 0.5 * cf_count
 
-    if allow_neighbors:
-        expanded: set[int] = set()
-        for idx in keep_indexes:
-            expanded.add(idx)
-            if idx - 1 >= 0:
-                expanded.add(idx - 1)
-            if idx + 1 < block_count:
-                expanded.add(idx + 1)
-        keep = sorted(expanded)
-    else:
-        keep = sorted(set(keep_indexes))
+        scores.append(score)
 
-    max_blocks = None
+    # Second pass: adjacency bonus for blocks next to diff blocks
+    for b_idx in list(diff_block_indices):
+        if b_idx - 1 >= 0 and b_idx - 1 not in diff_block_indices:
+            scores[b_idx - 1] += 3.0
+        if b_idx + 1 < block_count and b_idx + 1 not in diff_block_indices:
+            scores[b_idx + 1] += 3.0
+
+    # Always keep diff blocks
+    must_keep = diff_block_indices or {0}
+
+    # Budget: estimate max tokens for block selection
     if budget_tokens is not None:
+        max_tokens = budget_tokens
+    else:
+        max_tokens = sum(sizes)  # no budget = keep everything eligible
+
+    # 0/1 Knapsack DP for optional blocks (not must-keep)
+    optional = [
+        (i, scores[i], sizes[i])
+        for i in range(block_count)
+        if i not in must_keep and scores[i] > 0
+    ]
+
+    # Reserve budget for must-keep blocks
+    must_keep_cost = sum(sizes[i] for i in must_keep)
+    remaining_budget = max(0, max_tokens - must_keep_cost)
+
+    # Simple knapsack - small enough for DP (typically <50 blocks)
+    keep = set(must_keep)
+    if optional and remaining_budget > 0:
+        n = len(optional)
+        W = min(remaining_budget, 10000)  # cap to prevent huge DP tables
+        # Scale sizes down if needed
+        scale = 1
+        if W > 5000:
+            scale = max(1, W // 5000)
+            W = W // scale
+
+        dp = [0] * (W + 1)
+        choice = [[False] * (W + 1) for _ in range(n)]
+
+        for i in range(n):
+            _, val, raw_sz = optional[i]
+            sz = max(1, raw_sz // scale)
+            for w in range(W, sz - 1, -1):
+                if dp[w - sz] + val > dp[w]:
+                    dp[w] = dp[w - sz] + val
+                    choice[i][w] = True
+
+        # Traceback
+        w = W
+        for i in range(n - 1, -1, -1):
+            if choice[i][w]:
+                keep.add(optional[i][0])
+                w -= max(1, optional[i][2] // scale)
+
+    # Apply max_blocks cap (same logic as before)
+    if budget_tokens is not None:
+        allow_neighbors = budget_tokens >= 2500
         if not allow_neighbors:
             max_blocks = 1
         elif budget_tokens <= 1600:
             max_blocks = 2
         else:
             max_blocks = 3
-    if max_blocks is not None and len(keep) > max_blocks:
-        keep = keep[:max_blocks]
+        # If knapsack selected too many, trim by score (keep must_keep first)
+        if len(keep) > max_blocks:
+            ranked = sorted(keep, key=lambda i: (i in must_keep, scores[i]), reverse=True)
+            keep = set(ranked[:max_blocks])
+
+    keep_sorted = sorted(keep)
 
     kept_lines: list[str] = []
-    for idx, block_idx in enumerate(keep):
+    for idx, block_idx in enumerate(keep_sorted):
         if idx > 0:
             kept_lines.append("...")
         start, end = blocks[block_idx]
         kept_lines.extend(lines[start:end + 1])
 
-    dropped_blocks = max(0, block_count - len(keep))
+    dropped_blocks = max(0, block_count - len(keep_sorted))
     return "\n".join(kept_lines), block_count, dropped_blocks
 
 

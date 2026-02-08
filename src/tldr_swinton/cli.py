@@ -670,6 +670,25 @@ Semantic Search:
         "--max-files", type=int, default=10000, help="Max files to scan (default: 10000)"
     )
 
+    # tldrs structural <pattern> [path] [--lang LANG]
+    structural_p = subparsers.add_parser(
+        "structural", help="Structural code search using ast-grep patterns"
+    )
+    structural_p.add_argument(
+        "pattern",
+        help="ast-grep pattern (use $VAR for wildcards, $$$ARGS for varargs)",
+    )
+    structural_p.add_argument("path", nargs="?", default=".", help="Project root")
+    structural_p.add_argument(
+        "--lang", help="Language to search (auto-detected if omitted)"
+    )
+    structural_p.add_argument(
+        "--max-results", type=int, default=50, help="Maximum matches"
+    )
+    structural_p.add_argument(
+        "--budget-tokens", type=int, help="Token budget for results"
+    )
+
     # tldr extract <file> [--class X] [--function Y] [--method Class.method]
     extract_p = subparsers.add_parser("extract", help="Extract full file info")
     extract_p.add_argument("file", help="File to analyze")
@@ -1158,6 +1177,52 @@ Semantic Search:
                 respect_gitignore=getattr(args, "respect_gitignore", False),
             )
             _machine_output(result, args)
+
+        elif args.command == "structural":
+            try:
+                from .modules.core.engines.astgrep import get_structural_search
+            except ImportError:
+                print("Error: ast-grep-py is required for structural search.")
+                print("Install with: pip install 'tldr-swinton[structural]'")
+                return
+
+            result = get_structural_search(
+                args.path,
+                args.pattern,
+                language=args.lang,
+                budget_tokens=args.budget_tokens,
+                max_results=args.max_results,
+            )
+
+            if hasattr(args, "machine") and args.machine:
+                _machine_output(
+                    [
+                        {
+                            "file": m.file,
+                            "line": m.line,
+                            "end_line": m.end_line,
+                            "text": m.text,
+                            "meta_vars": m.meta_vars,
+                        }
+                        for m in result.matches
+                    ],
+                    args,
+                )
+            else:
+                if not result.matches:
+                    print(f"No matches for pattern: {args.pattern}")
+                else:
+                    print(f"Found {len(result.matches)} match(es):\n")
+                    for m in result.matches:
+                        print(f"  {m.file}:{m.line}")
+                        for line in m.text.splitlines()[:5]:
+                            print(f"    {line}")
+                        if len(m.text.splitlines()) > 5:
+                            print(f"    ... ({len(m.text.splitlines())} lines total)")
+                        if m.meta_vars:
+                            for key, value in m.meta_vars.items():
+                                print(f"    ${key} = {value}")
+                        print()
 
         elif args.command == "extract":
             result = extract_file(args.file)

@@ -69,6 +69,7 @@ full = [
     "rich>=13.0",
     "ollama>=0.1",  # Local LLM client
     "tiktoken>=0.5",  # Token counting
+    "ast-grep-py>=0.30",  # Structural search
 ]
 # Additional language grammars
 all = [
@@ -78,6 +79,10 @@ all = [
     "tree-sitter-scala>=0.24.0",
     "tree-sitter-lua>=0.4.0",
     "tree-sitter-elixir>=0.3.0",
+]
+# Structural code search (ast-grep)
+structural = [
+    "ast-grep-py>=0.30",
 ]
 
 [project.scripts]

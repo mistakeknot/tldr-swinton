@@ -16,6 +16,7 @@ Key functions:
 
 import ast
 import os
+from functools import lru_cache
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -155,6 +156,7 @@ class ProjectCallGraph:
         return edge in self._edges
 
 
+@lru_cache(maxsize=1)
 def _get_ts_parser():
     """Get or create a tree-sitter TypeScript parser."""
     if not TREE_SITTER_AVAILABLE:
@@ -165,6 +167,7 @@ def _get_ts_parser():
     return parser
 
 
+@lru_cache(maxsize=1)
 def _get_rust_parser():
     """Get or create a tree-sitter Rust parser."""
     if not TREE_SITTER_RUST_AVAILABLE:
@@ -175,6 +178,7 @@ def _get_rust_parser():
     return parser
 
 
+@lru_cache(maxsize=1)
 def _get_go_parser():
     """Get or create a tree-sitter Go parser."""
     if not TREE_SITTER_GO_AVAILABLE:
@@ -185,6 +189,7 @@ def _get_go_parser():
     return parser
 
 
+@lru_cache(maxsize=1)
 def _get_java_parser():
     """Get or create a tree-sitter Java parser."""
     if not TREE_SITTER_JAVA_AVAILABLE:
@@ -195,6 +200,7 @@ def _get_java_parser():
     return parser
 
 
+@lru_cache(maxsize=1)
 def _get_c_parser():
     """Get or create a tree-sitter C parser."""
     if not TREE_SITTER_C_AVAILABLE:
@@ -205,6 +211,7 @@ def _get_c_parser():
     return parser
 
 
+@lru_cache(maxsize=1)
 def _get_ruby_parser():
     """Get or create a tree-sitter Ruby parser."""
     if not TREE_SITTER_RUBY_AVAILABLE:
@@ -215,6 +222,7 @@ def _get_ruby_parser():
     return parser
 
 
+@lru_cache(maxsize=1)
 def _get_php_parser():
     """Get or create a tree-sitter PHP parser."""
     if not TREE_SITTER_PHP_AVAILABLE:
@@ -225,6 +233,7 @@ def _get_php_parser():
     return parser
 
 
+@lru_cache(maxsize=1)
 def _get_cpp_parser():
     """Get or create a tree-sitter C++ parser."""
     if not TREE_SITTER_CPP_AVAILABLE:
@@ -235,6 +244,7 @@ def _get_cpp_parser():
     return parser
 
 
+@lru_cache(maxsize=1)
 def _get_kotlin_parser():
     """Get or create a tree-sitter Kotlin parser."""
     if not TREE_SITTER_KOTLIN_AVAILABLE:
@@ -245,6 +255,7 @@ def _get_kotlin_parser():
     return parser
 
 
+@lru_cache(maxsize=1)
 def _get_swift_parser():
     """Get or create a tree-sitter Swift parser."""
     if not TREE_SITTER_SWIFT_AVAILABLE:
@@ -255,6 +266,7 @@ def _get_swift_parser():
     return parser
 
 
+@lru_cache(maxsize=1)
 def _get_csharp_parser():
     """Get or create a tree-sitter C# parser."""
     if not TREE_SITTER_CSHARP_AVAILABLE:
@@ -265,6 +277,7 @@ def _get_csharp_parser():
     return parser
 
 
+@lru_cache(maxsize=1)
 def _get_scala_parser():
     """Get or create a tree-sitter Scala parser."""
     if not TREE_SITTER_SCALA_AVAILABLE:
@@ -1147,6 +1160,7 @@ def _parse_ruby_require_node(node, source: bytes) -> dict | None:
     }
 
 
+@lru_cache(maxsize=1)
 def _get_lua_parser():
     """Get or create a tree-sitter Lua parser."""
     if not TREE_SITTER_LUA_AVAILABLE:
@@ -1300,6 +1314,7 @@ def parse_elixir_imports(file_path: str | Path) -> list[dict]:
     return imports
 
 
+@lru_cache(maxsize=1)
 def _get_elixir_parser():
     """Get or create an Elixir tree-sitter parser."""
     from tree_sitter import Language, Parser
