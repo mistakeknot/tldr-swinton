@@ -31,6 +31,7 @@ When a plugin is renamed (e.g., `tldrs` → `tldr-swinton`):
 - The old cache directory remains at `~/.claude/plugins/cache/interagency-marketplace/tldrs/`
 - `claude plugin uninstall tldrs` fails because the name doesn't match any entry in `installed_plugins.json`
 - The cache directory persists indefinitely
+- **Worst case:** The old name persists in `~/.claude/settings.json` under `enabledPlugins` as `"tldrs@interagency-marketplace": true`. This causes a "failed to load" error on every session start, even after the cache directory is deleted. `claude plugin uninstall` does NOT clean `enabledPlugins` — you must manually edit `settings.json` to remove the stale key.
 
 ### temp_git Accumulation
 
@@ -50,10 +51,14 @@ The plugin installer clones the entire repository into the cache. The `.claude-p
 ### Manual Cleanup
 
 ```bash
-# 1. Remove ghost entries (old plugin names)
+# 1. Remove ghost from enabledPlugins in settings.json
+# Edit ~/.claude/settings.json, delete the line: "tldrs@interagency-marketplace": true
+# This is the MOST IMPORTANT step — the "failed to load" error comes from here
+
+# 2. Remove ghost cache directories (old plugin names)
 rm -rf ~/.claude/plugins/cache/interagency-marketplace/tldrs
 
-# 2. Remove stale temp directories
+# 3. Remove stale temp directories
 rm -rf ~/.claude/plugins/cache/temp_git_*
 
 # 3. Remove broken version directories
