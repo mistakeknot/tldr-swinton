@@ -33,6 +33,10 @@ This project is available as a Claude Code plugin from the [interagency-marketpl
 
 ## Plugin Publishing Runbook
 
+**Interactive (preferred):** Use `/interpub:release <version>` for a guided 4-phase workflow with validation and push confirmation.
+
+**Scripted:** Use the local bump script:
+
 ```bash
 # One command — updates all 3 version locations, commits, pushes, reinstalls CLI
 scripts/bump-version.sh 0.7.0
@@ -41,7 +45,7 @@ scripts/bump-version.sh 0.7.0
 scripts/bump-version.sh 0.7.0 --dry-run
 ```
 
-The script updates `pyproject.toml`, `.claude-plugin/plugin.json`, and `../interagency-marketplace/.claude-plugin/marketplace.json` atomically. The pre-commit hook (`scripts/check-versions.sh`) validates all three are in sync.
+Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../interagency-marketplace/.claude-plugin/marketplace.json` atomically. The pre-commit hook (`scripts/check-versions.sh`) validates all three are in sync.
 
 **Plugin structure:**
 ```
