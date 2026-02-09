@@ -7,8 +7,8 @@ import re
 import subprocess
 
 from ..ast_extractor import FunctionInfo
-from ..cross_file_calls import build_project_call_graph
 from ..hybrid_extractor import HybridExtractor
+from ..project_index import ProjectIndex
 from ..workspace import iter_workspace_files
 from ..contextpack_engine import Candidate, ContextPackEngine
 
@@ -572,133 +572,12 @@ def build_diff_context_from_hunks(
     project = Path(project).resolve()
     symbol_diff_lines = map_hunks_to_symbols(project, hunks, language=language)
 
-    extractor = HybridExtractor()
-    symbol_index: dict[str, FunctionInfo] = {}
-    symbol_files: dict[str, str] = {}
-    symbol_raw_names: dict[str, str] = {}
-    signature_overrides: dict[str, str] = {}
-    name_index: dict[str, list[str]] = defaultdict(list)
-    qualified_index: dict[str, list[str]] = defaultdict(list)
-    file_name_index: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
-    symbol_ranges: dict[str, tuple[int, int]] = {}
-    file_sources: dict[str, str] = {}
-
-    ext_map = {
-        "python": {".py"},
-        "typescript": {".ts", ".tsx"},
-        "go": {".go"},
-        "rust": {".rs"},
-    }
-    extensions = ext_map.get(language, {".py"})
-
-    for file_path in iter_workspace_files(project, extensions=extensions):
-        try:
-            source = file_path.read_text()
-            file_sources[str(file_path)] = source
-            total_lines = max(1, len(source.splitlines()))
-            info = extractor.extract(str(file_path))
-            rel_path = str(file_path.relative_to(project))
-
-            def register_symbol(
-                qualified_name: str,
-                func_info: FunctionInfo,
-                raw_name: str | None = None,
-                signature_override: str | None = None,
-                include_module_alias: bool = False,
-            ) -> str:
-                symbol_id = f"{rel_path}:{qualified_name}"
-                symbol_index[symbol_id] = func_info
-                symbol_files[symbol_id] = str(file_path)
-
-                raw = raw_name or func_info.name
-                symbol_raw_names[symbol_id] = raw
-                name_index[raw].append(symbol_id)
-                file_name_index[rel_path][raw].append(symbol_id)
-                if qualified_name != raw:
-                    file_name_index[rel_path][qualified_name].append(symbol_id)
-
-                qualified_index[qualified_name].append(symbol_id)
-                if include_module_alias:
-                    module_name = file_path.stem
-                    qualified_index[f"{module_name}.{raw}"].append(symbol_id)
-
-                if signature_override:
-                    signature_overrides[symbol_id] = signature_override
-
-                return symbol_id
-
-            for func in info.functions:
-                register_symbol(
-                    qualified_name=func.name,
-                    func_info=func,
-                    include_module_alias=True,
-                )
-
-            for cls in info.classes:
-                class_as_func = FunctionInfo(
-                    name=cls.name,
-                    params=[],
-                    return_type=cls.name,
-                    docstring=cls.docstring,
-                    line_number=cls.line_number,
-                    language=info.language,
-                )
-                register_symbol(
-                    qualified_name=cls.name,
-                    func_info=class_as_func,
-                    raw_name=cls.name,
-                    signature_override=f"class {cls.name}",
-                )
-
-                for method in cls.methods:
-                    register_symbol(
-                        qualified_name=f"{cls.name}.{method.name}",
-                        func_info=method,
-                        raw_name=method.name,
-                    )
-
-            symbol_ranges.update(_compute_symbol_ranges(info, rel_path, total_lines))
-        except Exception:
-            continue
-
-    call_graph = build_project_call_graph(str(project), language=language)
-    adjacency: dict[str, list[str]] = defaultdict(list)
-    reverse_adjacency: dict[str, list[str]] = defaultdict(list)
-
-    def _to_rel_path(path_str: str) -> str:
-        path_obj = Path(path_str)
-        if path_obj.is_absolute():
-            try:
-                return str(path_obj.relative_to(project))
-            except ValueError:
-                return str(path_obj)
-        return str(path_obj)
-
-    for edge in call_graph.edges:
-        caller_file, caller_func, callee_file, callee_func = edge
-        caller_rel = _to_rel_path(caller_file)
-        callee_rel = _to_rel_path(callee_file)
-
-        caller_symbols = file_name_index.get(caller_rel, {}).get(caller_func, [])
-        if not caller_symbols:
-            caller_symbols = [f"{caller_rel}:{caller_func}"]
-
-        callee_symbols = file_name_index.get(callee_rel, {}).get(callee_func, [])
-        if not callee_symbols:
-            callee_symbols = [f"{callee_rel}:{callee_func}"]
-
-        for caller_symbol in caller_symbols:
-            adjacency[caller_symbol].extend(callee_symbols)
-        for callee_symbol in callee_symbols:
-            reverse_adjacency[callee_symbol].extend(caller_symbols)
-
-    def _dedupe_sorted(values: list[str]) -> list[str]:
-        return sorted(set(values))
-
-    for key, values in list(adjacency.items()):
-        adjacency[key] = _dedupe_sorted(values)
-    for key, values in list(reverse_adjacency.items()):
-        reverse_adjacency[key] = _dedupe_sorted(values)
+    idx = ProjectIndex.build(
+        project, language,
+        include_sources=True,
+        include_ranges=True,
+        include_reverse_adjacency=True,
+    )
 
     ordered: list[str] = []
     relevance: dict[str, str] = {}
@@ -718,11 +597,11 @@ def build_diff_context_from_hunks(
     }
 
     for symbol_id in list(ordered):
-        for callee in adjacency.get(symbol_id, []):
+        for callee in idx.adjacency.get(symbol_id, []):
             if callee not in relevance:
                 relevance[callee] = "callee"
                 ordered.append(callee)
-        for caller in reverse_adjacency.get(symbol_id, []):
+        for caller in idx.reverse_adjacency.get(symbol_id, []):
             if caller not in relevance:
                 relevance[caller] = "caller"
                 ordered.append(caller)
@@ -747,15 +626,15 @@ def build_diff_context_from_hunks(
     relevance_score = {"contains_diff": 3, "caller": 2, "callee": 2, "adjacent": 1}
 
     for order_idx, symbol_id in enumerate(ordered):
-        func_info = symbol_index.get(symbol_id)
-        signature = signature_overrides.get(symbol_id)
+        func_info = idx.symbol_index.get(symbol_id)
+        signature = idx.signature_overrides.get(symbol_id)
         if not signature:
             if func_info:
                 signature = func_info.signature()
             else:
                 signature = f"def {symbol_id.split(':')[-1]}(...)"
 
-        lines_range = symbol_ranges.get(symbol_id)
+        lines_range = idx.symbol_ranges.get(symbol_id)
         if not lines_range and func_info:
             lines_range = (func_info.line_number, func_info.line_number)
 
@@ -768,13 +647,13 @@ def build_diff_context_from_hunks(
                 class_name = qual_part.split(".", 1)[0]
                 class_symbol = f"{rel_part}:{class_name}"
                 if class_symbol in class_multi_diff and (budget_tokens is None or budget_tokens >= 4000):
-                    class_range = symbol_ranges.get(class_symbol)
+                    class_range = idx.symbol_ranges.get(class_symbol)
                     if class_range:
                         code_scope_range = class_range
         if symbol_id in symbol_diff_lines and lines_range:
-            file_path = symbol_files.get(symbol_id)
-            if file_path and file_path in file_sources:
-                src_lines = file_sources[file_path].splitlines()
+            file_path = idx.symbol_files.get(symbol_id)
+            if file_path and file_path in idx.file_sources:
+                src_lines = idx.file_sources[file_path].splitlines()
                 start, end = code_scope_range or lines_range
                 start = max(1, start)
                 end = min(len(src_lines), end)
@@ -827,10 +706,17 @@ def build_diff_context_from_hunks(
             )
         )
 
+    # Build post-processors (attention reranking + edit locality)
+    processors = _get_diff_processors(project, idx.file_sources)
+
     pack = ContextPackEngine(registry=None).build_context_pack(
         candidates,
         budget_tokens=budget_tokens,
+        post_processors=processors or None,
     )
+
+    # Record delivery for attention tracking
+    _record_attention_delivery(project, pack)
 
     slices: list[dict] = []
     for item in pack.slices:
@@ -851,6 +737,45 @@ def build_diff_context_from_hunks(
         "budget_used": pack.budget_used,
         "slices": slices,
     }
+
+
+def _get_diff_processors(project: Path, file_sources: dict[str, str]) -> list:
+    """Build post-processors for diff context (attention + edit locality)."""
+    processors = []
+
+    # Attention reranking
+    db_path = project / ".tldrs" / "attention.db"
+    if db_path.exists():
+        try:
+            from ..attention_pruning import AttentionTracker, create_candidate_reranker
+            tracker = AttentionTracker(project)
+            processors.append(create_candidate_reranker(tracker))
+        except Exception:
+            pass
+
+    # Edit locality enrichment
+    try:
+        from ..edit_locality import create_edit_locality_enricher
+        processors.append(create_edit_locality_enricher(project, file_sources))
+    except Exception:
+        pass
+
+    return processors
+
+
+def _record_attention_delivery(project: Path, pack) -> None:
+    """Record delivered symbol IDs for attention tracking."""
+    db_path = project / ".tldrs" / "attention.db"
+    if not db_path.exists():
+        return
+    try:
+        import os
+        from ..attention_pruning import AttentionTracker
+        tracker = AttentionTracker(project)
+        session_id = os.environ.get("TLDRS_SESSION_ID", "default")
+        tracker.record_delivery(session_id, [s.id for s in pack.slices])
+    except Exception:
+        pass
 
 
 def get_diff_signatures(
@@ -875,111 +800,12 @@ def get_diff_signatures(
     project = Path(project).resolve()
     symbol_diff_lines = map_hunks_to_symbols(project, hunks, language=language)
 
-    extractor = HybridExtractor()
-    symbol_index: dict[str, FunctionInfo] = {}
-    symbol_files: dict[str, str] = {}
-    signature_overrides: dict[str, str] = {}
-    symbol_ranges: dict[str, tuple[int, int]] = {}
-    name_index: dict[str, list[str]] = defaultdict(list)
-    file_name_index: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
-
-    ext_map = {
-        "python": {".py"},
-        "typescript": {".ts", ".tsx"},
-        "go": {".go"},
-        "rust": {".rs"},
-    }
-    extensions = ext_map.get(language, {".py"})
-
-    for file_path in iter_workspace_files(project, extensions=extensions):
-        try:
-            source = file_path.read_text()
-            total_lines = max(1, len(source.splitlines()))
-            info = extractor.extract(str(file_path))
-            rel_path = str(file_path.relative_to(project))
-
-            def register_symbol(
-                qualified_name: str,
-                func_info: FunctionInfo,
-                raw_name: str | None = None,
-                signature_override: str | None = None,
-            ) -> str:
-                symbol_id = f"{rel_path}:{qualified_name}"
-                symbol_index[symbol_id] = func_info
-                symbol_files[symbol_id] = str(file_path)
-
-                raw = raw_name or func_info.name
-                name_index[raw].append(symbol_id)
-                file_name_index[rel_path][raw].append(symbol_id)
-                if qualified_name != raw:
-                    file_name_index[rel_path][qualified_name].append(symbol_id)
-
-                if signature_override:
-                    signature_overrides[symbol_id] = signature_override
-
-                return symbol_id
-
-            for func in info.functions:
-                register_symbol(qualified_name=func.name, func_info=func)
-
-            for cls in info.classes:
-                class_as_func = FunctionInfo(
-                    name=cls.name,
-                    params=[],
-                    return_type=cls.name,
-                    docstring=cls.docstring,
-                    line_number=cls.line_number,
-                    language=info.language,
-                )
-                register_symbol(
-                    qualified_name=cls.name,
-                    func_info=class_as_func,
-                    raw_name=cls.name,
-                    signature_override=f"class {cls.name}",
-                )
-
-                for method in cls.methods:
-                    register_symbol(
-                        qualified_name=f"{cls.name}.{method.name}",
-                        func_info=method,
-                        raw_name=method.name,
-                    )
-
-            symbol_ranges.update(_compute_symbol_ranges(info, rel_path, total_lines))
-        except Exception:
-            continue
-
-    # Build call graph for caller/callee expansion
-    call_graph = build_project_call_graph(str(project), language=language)
-    adjacency: dict[str, list[str]] = defaultdict(list)
-    reverse_adjacency: dict[str, list[str]] = defaultdict(list)
-
-    def _to_rel_path(path_str: str) -> str:
-        path_obj = Path(path_str)
-        if path_obj.is_absolute():
-            try:
-                return str(path_obj.relative_to(project))
-            except ValueError:
-                return str(path_obj)
-        return str(path_obj)
-
-    for edge in call_graph.edges:
-        caller_file, caller_func, callee_file, callee_func = edge
-        caller_rel = _to_rel_path(caller_file)
-        callee_rel = _to_rel_path(callee_file)
-
-        caller_symbols = file_name_index.get(caller_rel, {}).get(caller_func, [])
-        if not caller_symbols:
-            caller_symbols = [f"{caller_rel}:{caller_func}"]
-
-        callee_symbols = file_name_index.get(callee_rel, {}).get(callee_func, [])
-        if not callee_symbols:
-            callee_symbols = [f"{callee_rel}:{callee_func}"]
-
-        for caller_symbol in caller_symbols:
-            adjacency[caller_symbol].extend(callee_symbols)
-        for callee_symbol in callee_symbols:
-            reverse_adjacency[callee_symbol].extend(caller_symbols)
+    idx = ProjectIndex.build(
+        project, language,
+        include_sources=False,
+        include_ranges=True,
+        include_reverse_adjacency=True,
+    )
 
     # Collect ordered symbols with relevance
     ordered: list[str] = []
@@ -991,11 +817,11 @@ def get_diff_signatures(
 
     # Expand to callers/callees
     for symbol_id in list(ordered):
-        for callee in adjacency.get(symbol_id, []):
+        for callee in idx.adjacency.get(symbol_id, []):
             if callee not in relevance:
                 relevance[callee] = "callee"
                 ordered.append(callee)
-        for caller in reverse_adjacency.get(symbol_id, []):
+        for caller in idx.reverse_adjacency.get(symbol_id, []):
             if caller not in relevance:
                 relevance[caller] = "caller"
                 ordered.append(caller)
@@ -1004,8 +830,8 @@ def get_diff_signatures(
     signatures: list[DiffSymbolSignature] = []
 
     for symbol_id in ordered:
-        func_info = symbol_index.get(symbol_id)
-        signature = signature_overrides.get(symbol_id)
+        func_info = idx.symbol_index.get(symbol_id)
+        signature = idx.signature_overrides.get(symbol_id)
         if not signature:
             if func_info:
                 signature = func_info.signature()
@@ -1013,7 +839,7 @@ def get_diff_signatures(
                 signature = f"def {symbol_id.split(':')[-1]}(...)"
 
         line = func_info.line_number if func_info else 0
-        file_path_str = symbol_files.get(symbol_id, "?")
+        file_path_str = idx.symbol_files.get(symbol_id, "?")
 
         signatures.append(
             DiffSymbolSignature(

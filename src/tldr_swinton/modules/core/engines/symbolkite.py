@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass, field
-import sys
-import os
 from pathlib import Path
-import warnings
 
 from ..ast_extractor import FunctionInfo
 from ..cfg_extractor import (
@@ -23,9 +19,9 @@ from ..cfg_extractor import (
     extract_swift_cfg,
     extract_typescript_cfg,
 )
-from ..cross_file_calls import build_project_call_graph
 from ..contextpack_engine import Candidate, ContextPackEngine
 from ..hybrid_extractor import HybridExtractor
+from ..project_index import ProjectIndex
 from ..workspace import iter_workspace_files
 
 
@@ -205,97 +201,7 @@ def get_relevant_context(
             module_path = str(rel_path.with_suffix(""))
             return _get_module_exports(project, module_path, language, include_docstrings)
 
-    api_module = sys.modules.get("tldr_swinton.api")
-    call_graph_builder = getattr(api_module, "build_project_call_graph", None)
-    if callable(call_graph_builder):
-        call_graph = call_graph_builder(str(project), language=language)
-    else:
-        call_graph = build_project_call_graph(str(project), language=language)
-
-    extractor = HybridExtractor()
-    symbol_index: dict[str, FunctionInfo] = {}
-    symbol_files: dict[str, str] = {}
-    symbol_raw_names: dict[str, str] = {}
-    signature_overrides: dict[str, str] = {}
-    name_index: dict[str, list[str]] = defaultdict(list)
-    qualified_index: dict[str, list[str]] = defaultdict(list)
-    file_name_index: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
-
-    ext_map = {
-        "python": {".py"},
-        "typescript": {".ts", ".tsx"},
-        "go": {".go"},
-        "rust": {".rs"},
-    }
-    extensions = ext_map.get(language, {".py"})
-
-    file_sources: dict[str, str] = {}
-
-    for file_path in iter_workspace_files(project, extensions=extensions):
-        try:
-            source = file_path.read_text()
-            file_sources[str(file_path)] = source
-
-            info = extractor.extract(str(file_path))
-            rel_path = str(file_path.relative_to(project))
-
-            def register_symbol(
-                qualified_name: str,
-                func_info: FunctionInfo,
-                raw_name: str | None = None,
-                signature_override: str | None = None,
-                include_module_alias: bool = False,
-            ) -> str:
-                symbol_id = f"{rel_path}:{qualified_name}"
-                symbol_index[symbol_id] = func_info
-                symbol_files[symbol_id] = str(file_path)
-
-                raw = raw_name or func_info.name
-                symbol_raw_names[symbol_id] = raw
-                name_index[raw].append(symbol_id)
-                file_name_index[rel_path][raw].append(symbol_id)
-
-                qualified_index[qualified_name].append(symbol_id)
-                if include_module_alias:
-                    module_name = file_path.stem
-                    qualified_index[f"{module_name}.{raw}"].append(symbol_id)
-
-                if signature_override:
-                    signature_overrides[symbol_id] = signature_override
-
-                return symbol_id
-
-            for func in info.functions:
-                register_symbol(
-                    qualified_name=func.name,
-                    func_info=func,
-                    include_module_alias=True,
-                )
-
-            for cls in info.classes:
-                class_as_func = FunctionInfo(
-                    name=cls.name,
-                    params=[],
-                    return_type=cls.name,
-                    docstring=cls.docstring,
-                    line_number=cls.line_number,
-                    language=info.language,
-                )
-                register_symbol(
-                    qualified_name=cls.name,
-                    func_info=class_as_func,
-                    raw_name=cls.name,
-                    signature_override=f"class {cls.name}",
-                )
-
-                for method in cls.methods:
-                    register_symbol(
-                        qualified_name=f"{cls.name}.{method.name}",
-                        func_info=method,
-                        raw_name=method.name,
-                    )
-        except Exception:
-            pass
+    idx = ProjectIndex.build(project, language, include_sources=True)
 
     cfg_extractors = {
         "python": extract_python_cfg,
@@ -314,90 +220,8 @@ def get_relevant_context(
     }
     cfg_extractor_fn = cfg_extractors.get(language, extract_python_cfg)
 
-    adjacency: dict[str, list[str]] = defaultdict(list)
-
-    def _to_rel_path(path_str: str) -> str:
-        path_obj = Path(path_str)
-        if path_obj.is_absolute():
-            try:
-                return str(path_obj.relative_to(project))
-            except ValueError:
-                return str(path_obj)
-        return str(path_obj)
-
-    for edge in call_graph.edges:
-        caller_file, caller_func, callee_file, callee_func = edge
-        caller_rel = _to_rel_path(caller_file)
-        callee_rel = _to_rel_path(callee_file)
-
-        caller_symbols = file_name_index.get(caller_rel, {}).get(caller_func, [])
-        if not caller_symbols:
-            caller_symbols = [f"{caller_rel}:{caller_func}"]
-
-        callee_symbols = file_name_index.get(callee_rel, {}).get(callee_func, [])
-        if not callee_symbols:
-            callee_symbols = [f"{callee_rel}:{callee_func}"]
-
-        for caller_symbol in caller_symbols:
-            adjacency[caller_symbol].extend(callee_symbols)
-
-    def resolve_entry_symbols(name: str, allow_ambiguous: bool) -> tuple[list[str], list[str]]:
-        if ":" in name:
-            file_part, sym_part = name.split(":", 1)
-            symbol_id = f"{file_part}:{sym_part}"
-            if symbol_id in symbol_index:
-                return [symbol_id], []
-            symbol_id = f"{_to_rel_path(file_part)}:{sym_part}"
-            if symbol_id in symbol_index:
-                return [symbol_id], []
-            matches = []
-            for rel_path, names in file_name_index.items():
-                if rel_path == file_part or rel_path.endswith(file_part):
-                    matches.extend(names.get(sym_part, []))
-            if matches:
-                return matches, []
-
-        if "." in name:
-            matches = qualified_index.get(name, [])
-            if matches:
-                return matches, []
-
-        matches = name_index.get(name, [])
-        if matches:
-            if len(matches) == 1:
-                return matches, []
-
-            def score_match(symbol_id: str) -> tuple[int, int, int, str]:
-                rel_path, sym = (
-                    symbol_id.rsplit(":", 1) if ":" in symbol_id else ("", symbol_id)
-                )
-                basename = Path(rel_path).stem if rel_path else ""
-                sym_tail = sym.split(".")[-1]
-                basename_match = 1 if basename.lower() == sym_tail.lower() else 0
-                exact_match = 1 if sym == name else 0
-                path_depth = rel_path.count("/") if rel_path else 0
-                return (-basename_match, -exact_match, path_depth, rel_path)
-
-            if not allow_ambiguous:
-                return [], matches
-            chosen = sorted(matches, key=score_match)[0]
-            if not os.environ.get("TLDRS_NO_WARNINGS"):
-                warnings.warn(
-                    f"Ambiguous entry point '{name}' matched {len(matches)} symbols; using {chosen}",
-                    stacklevel=2,
-                )
-            return [chosen], matches
-
-        return [name], []
-
-    def _dedupe_sorted(values: list[str]) -> list[str]:
-        return sorted(set(values))
-
-    for key, values in list(adjacency.items()):
-        adjacency[key] = _dedupe_sorted(values)
-
     visited: set[str] = set()
-    resolved, candidates = resolve_entry_symbols(entry_point, disambiguate)
+    resolved, candidates = idx.resolve_entry_symbols(entry_point, disambiguate)
     if candidates and not resolved:
         return RelevantContext(
             entry_point=entry_point,
@@ -416,23 +240,23 @@ def get_relevant_context(
             continue
         visited.add(symbol_id)
 
-        func_info = symbol_index.get(symbol_id)
+        func_info = idx.symbol_index.get(symbol_id)
         if func_info:
-            file_path = symbol_files[symbol_id]
-            raw_name = symbol_raw_names.get(symbol_id, func_info.name)
+            file_path = idx.symbol_files[symbol_id]
+            raw_name = idx.symbol_raw_names.get(symbol_id, func_info.name)
 
             blocks = None
             cyclomatic = None
-            if file_path in file_sources:
+            if file_path in idx.file_sources:
                 try:
-                    cfg = cfg_extractor_fn(file_sources[file_path], raw_name)
+                    cfg = cfg_extractor_fn(idx.file_sources[file_path], raw_name)
                     if cfg and cfg.blocks:
                         blocks = len(cfg.blocks)
                         cyclomatic = cfg.cyclomatic_complexity
                 except Exception:
                     pass
 
-            signature = signature_overrides.get(symbol_id, func_info.signature())
+            signature = idx.signature_overrides.get(symbol_id, func_info.signature())
 
             ctx = FunctionContext(
                 name=symbol_id,
@@ -440,14 +264,14 @@ def get_relevant_context(
                 line=func_info.line_number,
                 signature=signature,
                 docstring=func_info.docstring if include_docstrings else None,
-                calls=adjacency.get(symbol_id, []),
+                calls=idx.adjacency.get(symbol_id, []),
                 depth=current_depth,
                 blocks=blocks,
                 cyclomatic=cyclomatic,
             )
             result_functions.append(ctx)
 
-            for callee in adjacency.get(symbol_id, []):
+            for callee in idx.adjacency.get(symbol_id, []):
                 if callee not in visited and current_depth < depth:
                     queue.append((callee, current_depth + 1))
         else:
@@ -456,13 +280,13 @@ def get_relevant_context(
                 name=symbol_id,
                 file="?",
                 line=0,
-                signature=f"def {fallback_name}(...)" ,
-                calls=adjacency.get(symbol_id, []),
+                signature=f"def {fallback_name}(...)",
+                calls=idx.adjacency.get(symbol_id, []),
                 depth=current_depth,
             )
             result_functions.append(ctx)
 
-            for callee in adjacency.get(symbol_id, []):
+            for callee in idx.adjacency.get(symbol_id, []):
                 if callee not in visited and current_depth < depth:
                     queue.append((callee, current_depth + 1))
 
@@ -515,10 +339,17 @@ def get_context_pack(
             )
         )
 
+    # Build post-processors (attention reranking when available)
+    processors = _get_attention_processors(Path(project).resolve())
+
     pack = ContextPackEngine(registry=None).build_context_pack(
         candidates,
         budget_tokens=budget_tokens,
+        post_processors=processors or None,
     )
+
+    # Record delivery for attention tracking
+    _record_attention_delivery(Path(project).resolve(), pack)
 
     slices: list[dict] = []
     for item in pack.slices:
@@ -649,179 +480,9 @@ def get_signatures_for_entry(
                 for func in ctx.functions
             ]
 
-    # Build call graph and symbol index (same as get_relevant_context but lighter)
-    api_module = sys.modules.get("tldr_swinton.api")
-    call_graph_builder = getattr(api_module, "build_project_call_graph", None)
-    if callable(call_graph_builder):
-        call_graph = call_graph_builder(str(project), language=language)
-    else:
-        call_graph = build_project_call_graph(str(project), language=language)
+    idx = ProjectIndex.build(project, language, include_sources=False)
 
-    extractor = HybridExtractor()
-    symbol_index: dict[str, FunctionInfo] = {}
-    symbol_files: dict[str, str] = {}
-    symbol_raw_names: dict[str, str] = {}
-    signature_overrides: dict[str, str] = {}
-    name_index: dict[str, list[str]] = defaultdict(list)
-    qualified_index: dict[str, list[str]] = defaultdict(list)
-    file_name_index: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
-
-    ext_map = {
-        "python": {".py"},
-        "typescript": {".ts", ".tsx"},
-        "go": {".go"},
-        "rust": {".rs"},
-    }
-    extensions = ext_map.get(language, {".py"})
-
-    for file_path in iter_workspace_files(project, extensions=extensions):
-        try:
-            info = extractor.extract(str(file_path))
-            rel_path = str(file_path.relative_to(project))
-
-            def register_symbol(
-                qualified_name: str,
-                func_info: FunctionInfo,
-                raw_name: str | None = None,
-                signature_override: str | None = None,
-                include_module_alias: bool = False,
-            ) -> str:
-                symbol_id = f"{rel_path}:{qualified_name}"
-                symbol_index[symbol_id] = func_info
-                symbol_files[symbol_id] = str(file_path)
-
-                raw = raw_name or func_info.name
-                symbol_raw_names[symbol_id] = raw
-                name_index[raw].append(symbol_id)
-                file_name_index[rel_path][raw].append(symbol_id)
-
-                qualified_index[qualified_name].append(symbol_id)
-                if include_module_alias:
-                    module_name = file_path.stem
-                    qualified_index[f"{module_name}.{raw}"].append(symbol_id)
-
-                if signature_override:
-                    signature_overrides[symbol_id] = signature_override
-
-                return symbol_id
-
-            for func in info.functions:
-                register_symbol(
-                    qualified_name=func.name,
-                    func_info=func,
-                    include_module_alias=True,
-                )
-
-            for cls in info.classes:
-                class_as_func = FunctionInfo(
-                    name=cls.name,
-                    params=[],
-                    return_type=cls.name,
-                    docstring=cls.docstring,
-                    line_number=cls.line_number,
-                    language=info.language,
-                )
-                register_symbol(
-                    qualified_name=cls.name,
-                    func_info=class_as_func,
-                    raw_name=cls.name,
-                    signature_override=f"class {cls.name}",
-                )
-
-                for method in cls.methods:
-                    register_symbol(
-                        qualified_name=f"{cls.name}.{method.name}",
-                        func_info=method,
-                        raw_name=method.name,
-                    )
-        except Exception:
-            pass
-
-    # Build adjacency from call graph
-    adjacency: dict[str, list[str]] = defaultdict(list)
-
-    def _to_rel_path(path_str: str) -> str:
-        path_obj = Path(path_str)
-        if path_obj.is_absolute():
-            try:
-                return str(path_obj.relative_to(project))
-            except ValueError:
-                return str(path_obj)
-        return str(path_obj)
-
-    for edge in call_graph.edges:
-        caller_file, caller_func, callee_file, callee_func = edge
-        caller_rel = _to_rel_path(caller_file)
-        callee_rel = _to_rel_path(callee_file)
-
-        caller_symbols = file_name_index.get(caller_rel, {}).get(caller_func, [])
-        if not caller_symbols:
-            caller_symbols = [f"{caller_rel}:{caller_func}"]
-
-        callee_symbols = file_name_index.get(callee_rel, {}).get(callee_func, [])
-        if not callee_symbols:
-            callee_symbols = [f"{callee_rel}:{callee_func}"]
-
-        for caller_symbol in caller_symbols:
-            adjacency[caller_symbol].extend(callee_symbols)
-
-    def _dedupe_sorted(values: list[str]) -> list[str]:
-        return sorted(set(values))
-
-    for key, values in list(adjacency.items()):
-        adjacency[key] = _dedupe_sorted(values)
-
-    # Resolve entry point
-    def resolve_entry_symbols(name: str, allow_ambiguous: bool) -> tuple[list[str], list[str]]:
-        if ":" in name:
-            file_part, sym_part = name.split(":", 1)
-            symbol_id = f"{file_part}:{sym_part}"
-            if symbol_id in symbol_index:
-                return [symbol_id], []
-            symbol_id = f"{_to_rel_path(file_part)}:{sym_part}"
-            if symbol_id in symbol_index:
-                return [symbol_id], []
-            matches = []
-            for rel_path, names in file_name_index.items():
-                if rel_path == file_part or rel_path.endswith(file_part):
-                    matches.extend(names.get(sym_part, []))
-            if matches:
-                return matches, []
-
-        if "." in name:
-            matches = qualified_index.get(name, [])
-            if matches:
-                return matches, []
-
-        matches = name_index.get(name, [])
-        if matches:
-            if len(matches) == 1:
-                return matches, []
-
-            def score_match(symbol_id: str) -> tuple[int, int, int, str]:
-                rel_path, sym = (
-                    symbol_id.rsplit(":", 1) if ":" in symbol_id else ("", symbol_id)
-                )
-                basename = Path(rel_path).stem if rel_path else ""
-                sym_tail = sym.split(".")[-1]
-                basename_match = 1 if basename.lower() == sym_tail.lower() else 0
-                exact_match = 1 if sym == name else 0
-                path_depth = rel_path.count("/") if rel_path else 0
-                return (-basename_match, -exact_match, path_depth, rel_path)
-
-            if not allow_ambiguous:
-                return [], matches
-            chosen = sorted(matches, key=score_match)[0]
-            if not os.environ.get("TLDRS_NO_WARNINGS"):
-                warnings.warn(
-                    f"Ambiguous entry point '{name}' matched {len(matches)} symbols; using {chosen}",
-                    stacklevel=2,
-                )
-            return [chosen], matches
-
-        return [name], []
-
-    resolved, candidates = resolve_entry_symbols(entry_point, disambiguate)
+    resolved, candidates = idx.resolve_entry_symbols(entry_point, disambiguate)
     if candidates and not resolved:
         from ..errors import ERR_AMBIGUOUS
         return {
@@ -843,10 +504,10 @@ def get_signatures_for_entry(
             continue
         visited.add(symbol_id)
 
-        func_info = symbol_index.get(symbol_id)
+        func_info = idx.symbol_index.get(symbol_id)
         if func_info:
-            file_path = symbol_files[symbol_id]
-            signature = signature_overrides.get(symbol_id, func_info.signature())
+            file_path = idx.symbol_files[symbol_id]
+            signature = idx.signature_overrides.get(symbol_id, func_info.signature())
 
             result_signatures.append(
                 SymbolSignature(
@@ -855,11 +516,11 @@ def get_signatures_for_entry(
                     line=func_info.line_number,
                     depth=current_depth,
                     file_path=file_path,
-                    calls=adjacency.get(symbol_id, []),
+                    calls=idx.adjacency.get(symbol_id, []),
                 )
             )
 
-            for callee in adjacency.get(symbol_id, []):
+            for callee in idx.adjacency.get(symbol_id, []):
                 if callee not in visited and current_depth < depth:
                     queue.append((callee, current_depth + 1))
         else:
@@ -872,15 +533,43 @@ def get_signatures_for_entry(
                     line=0,
                     depth=current_depth,
                     file_path="?",
-                    calls=adjacency.get(symbol_id, []),
+                    calls=idx.adjacency.get(symbol_id, []),
                 )
             )
 
-            for callee in adjacency.get(symbol_id, []):
+            for callee in idx.adjacency.get(symbol_id, []):
                 if callee not in visited and current_depth < depth:
                     queue.append((callee, current_depth + 1))
 
     return result_signatures
+
+
+def _get_attention_processors(project: Path) -> list:
+    """Build attention-based post-processors if attention DB exists."""
+    db_path = project / ".tldrs" / "attention.db"
+    if not db_path.exists():
+        return []
+    try:
+        from ..attention_pruning import AttentionTracker, create_candidate_reranker
+        tracker = AttentionTracker(project)
+        return [create_candidate_reranker(tracker)]
+    except Exception:
+        return []
+
+
+def _record_attention_delivery(project: Path, pack) -> None:
+    """Record delivered symbol IDs for attention tracking."""
+    db_path = project / ".tldrs" / "attention.db"
+    if not db_path.exists():
+        return
+    try:
+        import os
+        from ..attention_pruning import AttentionTracker
+        tracker = AttentionTracker(project)
+        session_id = os.environ.get("TLDRS_SESSION_ID", "default")
+        tracker.record_delivery(session_id, [s.id for s in pack.slices])
+    except Exception:
+        pass
 
 
 __all__ = [
