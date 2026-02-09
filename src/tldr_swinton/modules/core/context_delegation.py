@@ -427,6 +427,61 @@ class ContextDelegator:
         return suggestions
 
 
+    def plan_to_candidates(
+        self,
+        plan: RetrievalPlan,
+        index: "ProjectIndex | None" = None,
+    ) -> "list[Candidate]":
+        """Convert a retrieval plan's entry points into resolved Candidates.
+
+        Uses the shared ProjectIndex to resolve entry point names to
+        actual symbol IDs, then builds Candidate objects suitable for
+        ContextPackEngine.
+
+        Args:
+            plan: A RetrievalPlan with entry_points
+            index: Optional ProjectIndex for symbol resolution
+
+        Returns:
+            List of Candidate objects for the entry points
+        """
+        from .contextpack_engine import Candidate
+
+        candidates: list[Candidate] = []
+
+        for priority, entry in enumerate(plan.entry_points):
+            resolved_ids = [entry]  # Default: use as-is
+
+            if index is not None:
+                resolved, _ = index.resolve_entry_symbols(entry, allow_ambiguous=True)
+                if resolved:
+                    resolved_ids = resolved
+
+            for symbol_id in resolved_ids:
+                signature = None
+                lines = None
+                if index is not None:
+                    func_info = index.symbol_index.get(symbol_id)
+                    if func_info:
+                        signature = index.signature_overrides.get(
+                            symbol_id, func_info.signature()
+                        )
+                        lines = (func_info.line_number, func_info.line_number)
+
+                candidates.append(
+                    Candidate(
+                        symbol_id=symbol_id,
+                        relevance=max(1, len(plan.entry_points) - priority),
+                        relevance_label="entry_point",
+                        order=priority,
+                        signature=signature,
+                        lines=lines,
+                    )
+                )
+
+        return candidates
+
+
 def create_delegation_plan(
     project: str | Path,
     task_description: str,

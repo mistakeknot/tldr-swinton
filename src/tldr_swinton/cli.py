@@ -464,6 +464,12 @@ Semantic Search:
         help="Disable delta mode even if session-id provided",
     )
 
+    diff_p.add_argument(
+        "--verify",
+        action="store_true",
+        help="Run coherence verification on diff context (checks cross-file compatibility)",
+    )
+
     diff_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
     diff_p.add_argument("--max-bytes", type=int, default=None, help="Cap output at N bytes")
 
@@ -1075,6 +1081,13 @@ Semantic Search:
                     language=args.lang,
                     compress=None if args.compress == "none" else args.compress,
                 )
+            # Opt-in coherence verification
+            if getattr(args, "verify", False) or os.environ.get("TLDRS_COHERENCE_VERIFY"):
+                from .modules.core.coherence_verify import verify_from_context_pack, format_coherence_report_for_agent
+                report = verify_from_context_pack(project, pack)
+                if not report.is_coherent:
+                    print(format_coherence_report_for_agent(report), file=sys.stderr)
+
             # Force JSON format when --machine flag is set
             fmt = "json" if getattr(args, "machine", False) else args.format
             diff_output = format_context_pack(pack, fmt=fmt)
@@ -1261,7 +1274,6 @@ Semantic Search:
                 _machine_output(result, args)
 
         elif args.command == "warm":
-            import os
             import subprocess
             import time
 

@@ -434,6 +434,79 @@ def get_edit_context(
     )
 
 
+def create_edit_locality_enricher(
+    project: str | Path,
+    file_sources: dict[str, str],
+) -> "Callable[[list], list]":
+    """Create a post-processor that adds edit boundary and invariant metadata.
+
+    Only enriches candidates that have diff_lines in their meta.
+    Compatible with ContextPackEngine's post_processors parameter.
+    """
+    from .contextpack_engine import Candidate
+
+    project = Path(project).resolve()
+    analyzer = EditLocalityAnalyzer()
+
+    def enrich(candidates: list[Candidate]) -> list[Candidate]:
+        enriched = []
+        for candidate in candidates:
+            meta = dict(candidate.meta) if candidate.meta else {}
+            diff_lines = meta.get("diff_lines")
+
+            # Only enrich candidates with diff info and line ranges
+            if diff_lines and candidate.lines:
+                symbol_id = candidate.symbol_id
+                if ":" in symbol_id:
+                    rel_path = symbol_id.split(":", 1)[0]
+                    file_path = project / rel_path
+                    abs_path = str(file_path)
+
+                    source = file_sources.get(abs_path)
+                    if source:
+                        source_lines = source.splitlines()
+                        start, end = candidate.lines
+
+                        # Flatten diff_lines ranges to individual lines
+                        flat_diff = []
+                        for item in diff_lines:
+                            if isinstance(item, list) and len(item) == 2:
+                                flat_diff.extend(range(item[0], item[1] + 1))
+                            elif isinstance(item, int):
+                                flat_diff.append(item)
+
+                        boundary = analyzer.compute_edit_boundary(
+                            source_lines, start, end, flat_diff or None
+                        )
+                        invariants = analyzer.extract_invariants(
+                            source_lines, start, end
+                        )
+
+                        meta["edit_boundary"] = {
+                            "start": boundary.start_line,
+                            "end": boundary.end_line,
+                            "type": boundary.boundary_type,
+                        }
+                        meta["invariants"] = [
+                            {"kind": inv.kind, "line": inv.line, "content": inv.content}
+                            for inv in invariants[:5]  # Cap to avoid bloat
+                        ]
+
+            enriched.append(Candidate(
+                symbol_id=candidate.symbol_id,
+                relevance=candidate.relevance,
+                relevance_label=candidate.relevance_label,
+                order=candidate.order,
+                signature=candidate.signature,
+                code=candidate.code,
+                lines=candidate.lines,
+                meta=meta if meta else candidate.meta,
+            ))
+        return enriched
+
+    return enrich
+
+
 def format_edit_context_for_agent(context: EditContext) -> str:
     """Format EditContext as agent-friendly text."""
     lines = [

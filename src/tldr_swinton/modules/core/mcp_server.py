@@ -498,16 +498,60 @@ def delegate(
     Returns:
         Formatted retrieval plan with ordered steps
     """
-    from .context_delegation import create_delegation_plan
+    from .context_delegation import ContextDelegator, create_delegation_plan
 
-    plan = create_delegation_plan(
-        project=project,
+    delegator = ContextDelegator(Path(project))
+    plan = delegator.create_plan(
         task_description=task,
         current_context=current_context,
         budget_tokens=budget,
         focus_areas=focus,
     )
+
+    # If entry points were found, resolve them via ProjectIndex
+    if plan.entry_points:
+        try:
+            from .project_index import ProjectIndex
+            idx = ProjectIndex.build(project, include_sources=False)
+            candidates = delegator.plan_to_candidates(plan, idx)
+            if candidates:
+                plan_dict = plan.to_dict()
+                plan_dict["resolved_candidates"] = [
+                    {"symbol_id": c.symbol_id, "signature": c.signature}
+                    for c in candidates
+                ]
+        except Exception:
+            pass
+
     return plan.format_for_agent()
+
+
+# === COHERENCE VERIFICATION ===
+
+
+@mcp.tool()
+def verify_coherence(
+    project: str,
+    files: list[str] | None = None,
+) -> str:
+    """Verify cross-file coherence of recent edits.
+
+    Checks for signature mismatches, removed parameters, and import
+    inconsistencies across edited files. Run before committing multi-file edits.
+
+    Args:
+        project: Project root directory
+        files: Optional list of files to check (auto-detects from git if None)
+
+    Returns:
+        Formatted coherence report
+    """
+    from .coherence_verify import verify_from_context_pack, format_coherence_report_for_agent
+
+    # Build a minimal pack from the files list
+    pack = {"slices": [{"id": f"{f}:_"} for f in (files or [])]}
+    report = verify_from_context_pack(project, pack)
+    return format_coherence_report_for_agent(report)
 
 
 # === DAEMON MANAGEMENT ===

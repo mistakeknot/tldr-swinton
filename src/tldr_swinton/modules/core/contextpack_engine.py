@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 import hashlib
 from pathlib import Path
@@ -47,10 +48,14 @@ class ContextPackEngine:
         self,
         candidates: list[Candidate],
         budget_tokens: int | None = None,
+        post_processors: list[Callable[[list[Candidate]], list[Candidate]]] | None = None,
     ) -> ContextPack:
         if not candidates:
             return ContextPack(slices=[])
         ordered = sorted(candidates, key=lambda c: (-c.relevance, c.order, c.symbol_id))
+        if post_processors:
+            for processor in post_processors:
+                ordered = processor(ordered)
         slices: list[ContextSlice] = []
         used = 0
 
@@ -114,6 +119,7 @@ class ContextPackEngine:
         candidates: list[Candidate],
         delta_result: "DeltaResult",
         budget_tokens: int | None = None,
+        post_processors: list[Callable[[list[Candidate]], list[Candidate]]] | None = None,
     ) -> ContextPack:
         """Build context pack with delta detection.
 
@@ -134,6 +140,9 @@ class ContextPackEngine:
             return ContextPack(slices=[], unchanged=[], rehydrate={})
 
         ordered = sorted(candidates, key=lambda c: (-c.relevance, c.order, c.symbol_id))
+        if post_processors:
+            for processor in post_processors:
+                ordered = processor(ordered)
         slices: list[ContextSlice] = []
         used = 0
         unchanged_ids: list[str] = []

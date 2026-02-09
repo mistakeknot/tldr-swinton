@@ -456,3 +456,26 @@ def create_attention_reranker(
         return sorted(candidates, key=lambda x: x.get("combined_score", 0), reverse=True)
 
     return rerank
+
+
+def create_candidate_reranker(
+    tracker: AttentionTracker,
+) -> "Callable[[list[Candidate]], list[Candidate]]":
+    """Create a post-processor that reranks Candidates using attention scores.
+
+    Combines 70% original relevance + 30% attention score into a new
+    relevance value, then re-sorts. Compatible with ContextPackEngine's
+    post_processors parameter.
+    """
+    from .contextpack_engine import Candidate
+
+    def rerank(candidates: list[Candidate]) -> list[Candidate]:
+        scored: list[tuple[float, Candidate]] = []
+        for candidate in candidates:
+            attention = tracker.compute_attention_score(candidate.symbol_id)
+            combined = 0.7 * candidate.relevance + 0.3 * attention
+            scored.append((combined, candidate))
+        scored.sort(key=lambda pair: pair[0], reverse=True)
+        return [c for _, c in scored]
+
+    return rerank

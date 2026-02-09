@@ -461,6 +461,82 @@ def verify_edit_coherence(
     return verifier.verify_coherence(edits)
 
 
+def verify_from_context_pack(
+    project_root: str | Path,
+    pack: dict,
+    file_changes: dict[str, tuple[str, str]] | None = None,
+) -> CoherenceReport:
+    """Verify coherence from a context pack's slice list.
+
+    Convenience function that extracts edited files from a context pack
+    and verifies cross-file coherence. If file_changes aren't provided,
+    reads current file contents and compares against git HEAD.
+
+    Args:
+        project_root: Path to project root
+        pack: Context pack dict with 'slices' list
+        file_changes: Optional {file_path: (old_content, new_content)} overrides
+
+    Returns:
+        CoherenceReport with verification results
+    """
+    root = Path(project_root).resolve()
+
+    if file_changes:
+        return verify_edit_coherence(root, file_changes)
+
+    # Extract unique files from slices
+    edited_files: set[str] = set()
+    for s in pack.get("slices", []):
+        symbol_id = s.get("id", "")
+        if ":" in symbol_id:
+            rel_path = symbol_id.split(":", 1)[0]
+            edited_files.add(rel_path)
+
+    if not edited_files:
+        return CoherenceReport(
+            is_coherent=True,
+            issues=[],
+            edited_files=[],
+            dependencies_checked=0,
+            cross_file_refs_found=0,
+        )
+
+    # Build edits from git diff (current vs HEAD)
+    import subprocess
+    edits: dict[str, tuple[str, str]] = {}
+    for rel_path in edited_files:
+        file_path = root / rel_path
+        if not file_path.exists():
+            continue
+        try:
+            new_content = file_path.read_text()
+        except OSError:
+            continue
+        # Get old content from git HEAD
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(root), "show", f"HEAD:{rel_path}"],
+                capture_output=True, text=True,
+            )
+            old_content = result.stdout if result.returncode == 0 else ""
+        except Exception:
+            old_content = ""
+        if old_content != new_content:
+            edits[rel_path] = (old_content, new_content)
+
+    if not edits:
+        return CoherenceReport(
+            is_coherent=True,
+            issues=[],
+            edited_files=list(edited_files),
+            dependencies_checked=0,
+            cross_file_refs_found=0,
+        )
+
+    return verify_edit_coherence(root, edits)
+
+
 def format_coherence_report_for_agent(report: CoherenceReport) -> str:
     """Format CoherenceReport as agent-friendly text."""
     lines = [
