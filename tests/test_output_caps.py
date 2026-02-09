@@ -9,6 +9,10 @@ import pytest
 from tldr_swinton.modules.core.output_formats import truncate_output, truncate_json_output
 
 
+def _content_before_marker(text: str) -> str:
+    return text.split("[TRUNCATED:")[0].rstrip("\n")
+
+
 # --- Unit tests for truncate_output ---
 
 def test_truncate_output_no_caps():
@@ -19,11 +23,10 @@ def test_truncate_output_no_caps():
 def test_truncate_output_max_lines():
     text = "\n".join(f"line{i}" for i in range(20))
     result = truncate_output(text, max_lines=5)
-    lines = result.split("\n")
-    # 5 content lines + 1 truncation marker
-    assert len(lines) == 6
-    assert "[TRUNCATED:" in lines[-1]
-    assert "--max-lines=5" in lines[-1]
+    assert "[TRUNCATED:" in result
+    assert "--max-lines=5" in result
+    content_lines = _content_before_marker(result).splitlines()
+    assert len(content_lines) <= 5
 
 
 def test_truncate_output_max_bytes():
@@ -32,7 +35,7 @@ def test_truncate_output_max_bytes():
     assert "[TRUNCATED:" in result
     assert "--max-bytes=100" in result
     # The content before marker should be <= 100 bytes
-    content_before_marker = result.split("\n[TRUNCATED:")[0]
+    content_before_marker = _content_before_marker(result)
     assert len(content_before_marker.encode("utf-8")) <= 100
 
 
@@ -42,6 +45,42 @@ def test_truncate_output_both_caps():
     assert "[TRUNCATED:" in result
     assert "--max-lines=5" in result
     assert "--max-bytes=100" in result
+
+
+def test_truncate_output_max_bytes_symbol_boundary():
+    """max-bytes should truncate at a symbol boundary, not mid-symbol block."""
+    blocks = []
+    for i in range(10):
+        blocks.append(f"P0:func_{i} def func_{i}(x: int) -> int @{i * 10}")
+        blocks.append(f"  calls: P0:helper_{i}")
+        blocks.append("")
+    text = "\n".join(blocks)
+
+    result = truncate_output(text, max_bytes=220)
+    assert "[TRUNCATED:" in result
+    content = _content_before_marker(result)
+    non_empty = [line for line in content.split("\n") if line.strip()]
+    assert non_empty
+    assert non_empty[-1].startswith("  calls:")
+
+
+def test_truncate_output_max_lines_symbol_boundary():
+    """max-lines should truncate at a symbol boundary."""
+    blocks = []
+    for i in range(10):
+        blocks.append(f"P0:func_{i} def func_{i}() @{i * 10}")
+        blocks.append(f"  calls: P0:helper_{i}")
+        blocks.append("")
+    text = "\n".join(blocks)
+
+    # 7 lines cuts in the middle of the 3rd block without boundary rewind.
+    result = truncate_output(text, max_lines=7)
+    assert "[TRUNCATED:" in result
+    content = _content_before_marker(result)
+    assert "func_2" not in content
+    non_empty = [line for line in content.split("\n") if line.strip()]
+    assert non_empty
+    assert non_empty[-1].startswith("  calls:")
 
 
 def test_truncate_output_under_caps():

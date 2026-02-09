@@ -719,6 +719,12 @@ Semantic Search:
         help="Include docstrings in output",
     )
     ctx_p.add_argument(
+        "--include-body",
+        action="store_true",
+        default=False,
+        help="Include function bodies in ultracompact format",
+    )
+    ctx_p.add_argument(
         "--output",
         choices=["stdout", "vhs"],
         default="stdout",
@@ -824,6 +830,12 @@ Semantic Search:
     )
     slice_p.add_argument("--var", help="Variable to track (optional)")
     slice_p.add_argument("--lang", default=None, help="Language (auto-detected from extension if not specified)")
+    slice_p.add_argument(
+        "--include-code",
+        action="store_true",
+        default=False,
+        help="Include source code at sliced lines in output",
+    )
     slice_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
     slice_p.add_argument("--max-bytes", type=int, default=None, help="Cap output at N bytes")
 
@@ -1288,9 +1300,13 @@ Semantic Search:
             fmt = args.format
             if getattr(args, "machine", False):
                 fmt = "ultracompact"  # Use ultracompact format, will convert to JSON
+            elif getattr(args, "include_body", False) and fmt == "text":
+                # include-body is implemented for ultracompact/context-pack output.
+                fmt = "ultracompact"
 
             if fmt == "ultracompact":
                 from .modules.core.output_formats import format_context_pack
+                from .modules.core.contextpack_engine import include_symbol_bodies
 
                 if use_delta and session_id:
                     pack = _get_context_pack_with_delta(
@@ -1303,13 +1319,29 @@ Semantic Search:
                         include_docstrings=args.with_docs,
                     )
                 else:
-                    pack = get_symbol_context_pack(
-                        args.project,
-                        args.entry,
-                        depth=args.depth,
+                    pack_kwargs = {
+                        "project": args.project,
+                        "entry_point": args.entry,
+                        "depth": args.depth,
+                        "language": args.lang,
+                        "budget_tokens": args.budget,
+                        "include_docstrings": args.with_docs,
+                    }
+                    if getattr(args, "include_body", False):
+                        pack_kwargs["include_body"] = True
+                    try:
+                        pack = get_symbol_context_pack(**pack_kwargs)
+                    except TypeError:
+                        # Backward compatibility: older API without include_body.
+                        pack_kwargs.pop("include_body", None)
+                        pack = get_symbol_context_pack(**pack_kwargs)
+
+                if getattr(args, "include_body", False):
+                    pack = include_symbol_bodies(
+                        pack,
+                        project_root,
                         language=args.lang,
                         budget_tokens=args.budget,
-                        include_docstrings=args.with_docs,
                     )
                 # Use json format for --machine flag
                 out_fmt = "json" if getattr(args, "machine", False) else "ultracompact"
@@ -1407,7 +1439,20 @@ Semantic Search:
                 variable=args.var,
                 language=lang,
             )
-            result = {"lines": sorted(lines), "count": len(lines)}
+            sorted_lines = sorted(lines)
+            result = {"lines": sorted_lines, "count": len(lines)}
+
+            if getattr(args, "include_code", False) and sorted_lines:
+                file_path = Path(args.file).resolve()
+                if file_path.exists():
+                    source_lines = file_path.read_text().splitlines()
+                    code_lines: list[str] = []
+                    for line_no in sorted_lines:
+                        if 1 <= line_no <= len(source_lines):
+                            code_lines.append(source_lines[line_no - 1])
+                    result["code"] = "\n".join(code_lines)
+                    result["file"] = str(file_path)
+
             if args.max_lines or args.max_bytes:
                 from .modules.core.output_formats import truncate_json_output
                 indent = None if getattr(args, "machine", False) else 2

@@ -645,26 +645,79 @@ def _format_context_pack_ultracompact(pack: dict) -> list[str]:
     return lines
 
 
+def _take_prefix_by_bytes(lines: list[str], max_bytes: int) -> list[str]:
+    kept: list[str] = []
+    size = 0
+    for line in lines:
+        line_bytes = len((line + "\n").encode("utf-8"))
+        if size + line_bytes > max_bytes:
+            break
+        kept.append(line)
+        size += line_bytes
+    return kept
+
+
+def _trim_to_symbol_boundary(lines: list[str]) -> list[str]:
+    """Rewind to the last complete symbol boundary.
+
+    Primary boundary is a blank line (ultracompact and most text formats).
+    Fallback boundary for text format is the start of the last `📍` block.
+    """
+    if not lines:
+        return []
+    if lines[-1].strip() == "":
+        return lines
+
+    trimmed = list(lines)
+    while trimmed and trimmed[-1].strip():
+        trimmed.pop()
+    if trimmed:
+        return trimmed
+
+    symbol_starts = [idx for idx, line in enumerate(lines) if line.lstrip().startswith("📍")]
+    if len(symbol_starts) >= 2:
+        return lines[:symbol_starts[-1]]
+    if len(symbol_starts) == 1 and symbol_starts[0] > 0:
+        return lines[:symbol_starts[0]]
+    return []
+
+
 def truncate_output(text: str, max_lines: int | None = None, max_bytes: int | None = None) -> str:
     """Post-format text truncation. Returns text with TRUNCATED marker if capped."""
     if max_lines is None and max_bytes is None:
         return text
-    lines = text.split("\n")
+
+    original_lines = text.split("\n")
+    lines = list(original_lines)
     truncated = False
+
     if max_lines and len(lines) > max_lines:
-        lines = lines[:max_lines]
+        lines = _trim_to_symbol_boundary(lines[:max_lines])
         truncated = True
+
     result = "\n".join(lines)
     if max_bytes and len(result.encode("utf-8")) > max_bytes:
-        result = result.encode("utf-8")[:max_bytes].decode("utf-8", errors="ignore")
+        lines = _trim_to_symbol_boundary(_take_prefix_by_bytes(lines, max_bytes))
+        result = "\n".join(lines)
         truncated = True
+
+    result = result.rstrip("\n")
+    omitted = max(0, len(original_lines) - len(lines))
+
     if truncated:
         parts = []
         if max_lines:
             parts.append(f"--max-lines={max_lines}")
         if max_bytes:
             parts.append(f"--max-bytes={max_bytes}")
-        result += f"\n[TRUNCATED: output exceeded {', '.join(parts)}]"
+        marker = f"[TRUNCATED: output exceeded {', '.join(parts)}"
+        if omitted:
+            marker += f"; omitted {omitted} lines"
+        marker += "]"
+        if result:
+            result += f"\n\n{marker}"
+        else:
+            result = marker
     return result
 
 
