@@ -39,16 +39,30 @@ if [ -z "$PLUGIN_VERSION" ]; then
     exit 1
 fi
 
-# Compare
+# Compare pyproject.toml vs plugin.json
 if [ "$PYPROJECT_VERSION" != "$PLUGIN_VERSION" ]; then
     echo -e "${RED}Version mismatch detected!${NC}" >&2
     echo "" >&2
     echo "  pyproject.toml:              $PYPROJECT_VERSION" >&2
     echo "  .claude-plugin/plugin.json:  $PLUGIN_VERSION" >&2
     echo "" >&2
-    echo "All versions must match. Update both files before committing." >&2
-    echo "See CLAUDE.md 'Plugin Publishing Runbook' for the full process." >&2
+    echo "Run: scripts/bump-version.sh $PYPROJECT_VERSION" >&2
     exit 1
+fi
+
+# Also check marketplace if the sibling repo exists
+MARKETPLACE="$REPO_ROOT/../interagency-marketplace/.claude-plugin/marketplace.json"
+if [ -f "$MARKETPLACE" ]; then
+    MARKETPLACE_VERSION=$(grep -A5 '"tldr-swinton"' "$MARKETPLACE" | grep '"version"' | sed 's/.*"\([0-9][^"]*\)".*/\1/')
+    if [ -n "$MARKETPLACE_VERSION" ] && [ "$MARKETPLACE_VERSION" != "$PYPROJECT_VERSION" ]; then
+        echo -e "${RED}Marketplace version drift!${NC}" >&2
+        echo "" >&2
+        echo "  pyproject.toml + plugin.json:  $PYPROJECT_VERSION" >&2
+        echo "  interagency-marketplace:       $MARKETPLACE_VERSION" >&2
+        echo "" >&2
+        echo "Run: scripts/bump-version.sh $PYPROJECT_VERSION" >&2
+        exit 1
+    fi
 fi
 
 # Success

@@ -33,39 +33,15 @@ This project is available as a Claude Code plugin from the [interagency-marketpl
 
 ## Plugin Publishing Runbook
 
-When releasing a new version of the tldr-swinton plugin:
-
 ```bash
-# 1. Bump ALL version locations (must stay in sync!)
-edit pyproject.toml                   # version = "X.Y.Z"
-edit .claude-plugin/plugin.json       # "version": "X.Y.Z"
+# One command — updates all 3 version locations, commits, pushes, reinstalls CLI
+scripts/bump-version.sh 0.7.0
 
-# 2. Reinstall CLI to update global binary
-uv tool install --force .
-tldrs --version  # Verify shows new version
-
-# 3. Run tests
-uv run pytest tests/ -q --ignore=tests/test_agent_workflow_eval.py
-
-# 4. Commit and push tldr-swinton
-git add pyproject.toml .claude-plugin/ uv.lock
-git commit -m "chore: bump version to X.Y.Z"
-git push
-
-# 5. Update interagency-marketplace
-cd ../interagency-marketplace
-edit .claude-plugin/marketplace.json  # bump version to match
-git add .claude-plugin/marketplace.json
-git commit -m "chore: bump tldr-swinton to vX.Y.Z"
-git push
+# Dry-run to preview changes
+scripts/bump-version.sh 0.7.0 --dry-run
 ```
 
-**Version locations (all must match):**
-| File | Field |
-|------|-------|
-| `pyproject.toml` | `version = "X.Y.Z"` |
-| `.claude-plugin/plugin.json` | `"version": "X.Y.Z"` |
-| `interagency-marketplace/.claude-plugin/marketplace.json` | `"version": "X.Y.Z"` |
+The script updates `pyproject.toml`, `.claude-plugin/plugin.json`, and `../interagency-marketplace/.claude-plugin/marketplace.json` atomically. The pre-commit hook (`scripts/check-versions.sh`) validates all three are in sync.
 
 **Plugin structure:**
 ```
