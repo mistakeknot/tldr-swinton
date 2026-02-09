@@ -1,6 +1,6 @@
 {
   "name": "tldr-swinton",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Token-efficient code reconnaissance for LLMs. Autonomous skills save 48-85% tokens via diff-context, semantic search, structural patterns, and symbol analysis.",
   "author": {
     "name": "MK",
@@ -11,16 +11,16 @@
   "license": "MIT",
   "keywords": ["code-analysis", "token-efficiency", "semantic-search", "structural-search", "diff-context", "llm-tools"],
   "skills": [
-    "./skills/tldrs-session-start",
-    "./skills/tldrs-find-code",
-    "./skills/tldrs-understand-symbol"
+    "./.claude-plugin/skills/tldrs-session-start",
+    "./.claude-plugin/skills/tldrs-find-code",
+    "./.claude-plugin/skills/tldrs-understand-symbol"
   ],
   "commands": [
-    "./commands/find.md",
-    "./commands/diff-context.md",
-    "./commands/context.md",
-    "./commands/structural.md",
-    "./commands/quickstart.md"
+    "./.claude-plugin/commands/find.md",
+    "./.claude-plugin/commands/diff-context.md",
+    "./.claude-plugin/commands/context.md",
+    "./.claude-plugin/commands/structural.md",
+    "./.claude-plugin/commands/quickstart.md"
   ],
-  "hooks": "./hooks/hooks.json"
+  "hooks": "./.claude-plugin/hooks/hooks.json"
 }
