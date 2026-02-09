@@ -188,6 +188,9 @@ __all__ = [
     "DiffSymbolSignature",
     "get_signatures_for_entry",
     "get_diff_signatures",
+    # Delta-first orchestration
+    "get_context_pack_with_delta",
+    "get_diff_context_with_delta",
     # Cross-file functions
     "build_project_call_graph",
     "scan_project_files",
@@ -212,6 +215,10 @@ from .engines.symbolkite import (
 from .engines.difflens import (
     DiffSymbolSignature,
     get_diff_signatures as _get_diff_signatures,
+)
+from .engines.delta import (
+    get_context_pack_with_delta,
+    get_diff_context_with_delta,
 )
 from .path_utils import PathTraversalError, _resolve_source, _validate_path_containment
 

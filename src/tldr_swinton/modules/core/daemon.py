@@ -729,15 +729,12 @@ class TLDRDaemon:
         delta_result = store.check_delta(session_id, symbol_etags)
 
         # Build delta-aware pack
-        def _relevance_to_int(label):
-            if not label:
-                return 0
-            return {"contains_diff": 100, "caller": 80, "callee": 80, "test": 60, "signature_only": 20}.get(label, 50)
+        from .engines.delta import relevance_to_int
 
         candidates = [
             Candidate(
                 symbol_id=s["id"],
-                relevance=_relevance_to_int(s.get("relevance")),
+                relevance=relevance_to_int(s.get("relevance")),
                 relevance_label=s.get("relevance"),
                 order=i,
                 signature=s.get("signature", ""),

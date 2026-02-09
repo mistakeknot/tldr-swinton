@@ -259,14 +259,14 @@ class TestDeltaContextPacks:
 
     def test_context_pack_delta_mode(self, sample_project: Path):
         """Context pack should work in delta mode."""
-        from tldr_swinton.cli import _get_context_pack_with_delta
+        from tldr_swinton.modules.core.engines.delta import get_context_pack_with_delta
         from tldr_swinton.modules.core.state_store import StateStore
 
         store = StateStore(sample_project)
         session_id = store.get_or_create_default_session("python")
 
         # First call - no cache
-        pack1 = _get_context_pack_with_delta(
+        pack1 = get_context_pack_with_delta(
             str(sample_project),
             "main",
             session_id,
@@ -281,7 +281,7 @@ class TestDeltaContextPacks:
             assert pack1.cache_stats.get("misses", 0) > 0
 
         # Second call - should have hits
-        pack2 = _get_context_pack_with_delta(
+        pack2 = get_context_pack_with_delta(
             str(sample_project),
             "main",
             session_id,
@@ -315,13 +315,13 @@ class TestDeltaContextPacks:
         content = main_py.read_text()
         main_py.write_text(content.replace("return result", "return result + 1"))
 
-        from tldr_swinton.cli import _get_diff_context_with_delta
+        from tldr_swinton.modules.core.engines.delta import get_diff_context_with_delta
         from tldr_swinton.modules.core.state_store import StateStore
 
         store = StateStore(sample_project)
         session_id = store.get_or_create_default_session("python")
 
-        pack = _get_diff_context_with_delta(
+        pack = get_diff_context_with_delta(
             sample_project,
             session_id,
             language="python",

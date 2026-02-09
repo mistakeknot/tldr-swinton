@@ -6,6 +6,7 @@ from .cfg import get_cfg_context
 from .dfg import get_dfg_context
 from .pdg import get_pdg_context
 from .slice import get_slice
+from .delta import get_context_pack_with_delta, get_diff_context_with_delta, relevance_to_int
 
 __all__ = [
     "get_relevant_context",
@@ -14,6 +15,9 @@ __all__ = [
     "get_dfg_context",
     "get_pdg_context",
     "get_slice",
+    "get_context_pack_with_delta",
+    "get_diff_context_with_delta",
+    "relevance_to_int",
 ]
 
 # Optional: structural search (requires ast-grep-py at runtime)
