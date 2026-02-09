@@ -4,11 +4,14 @@
 #
 # Input: JSON on stdin with { session_id, tool_name, tool_input: { file_path } }
 
+# Fail-safe: any error → exit silently (never block reads)
+set +e
+
 # Read stdin once (hook input is JSON)
-INPUT=$(cat)
+INPUT=$(cat 2>/dev/null) || exit 0
 
 # Extract session_id for stable flag file (persists across hook calls in one conversation)
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // ""')
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null) || exit 0
 if [ -z "$SESSION_ID" ]; then
     exit 0
 fi
@@ -21,7 +24,10 @@ FLAG="/tmp/tldrs-session-${SESSION_ID}"
 command -v tldrs &> /dev/null || exit 0
 
 # Extract the file path from tool_input
-FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // ""')
+FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // ""' 2>/dev/null) || exit 0
+
+# Skip if file path is empty
+[ -z "$FILE" ] && exit 0
 
 # Skip non-code files — no need to nudge for docs, configs, etc.
 case "$FILE" in
