@@ -158,16 +158,6 @@ class TestCacheFriendlyPrefixMaximization:
         assert "body_code_here" not in prefix, "Code body leaked into prefix"
         assert "body_code_here" in dynamic, "Code body missing from dynamic"
 
-    def test_cache_hints_present(self):
-        """Cache hints JSON block appears in output."""
-        pack = _make_pack(
-            slices=[_make_slice("a.py:f", "def f():", "code", (1, 5))],
-            unchanged=[],
-            cache_stats={"hit_rate": 0.0, "hits": 0, "misses": 1},
-        )
-        out = format_context_pack(pack, fmt="cache-friendly")
-        assert "cache_hints" in out, "No cache_hints block in output"
-
     def test_cache_hints_parseable(self):
         """Cache hints block is valid JSON with required fields."""
         pack = _make_pack(

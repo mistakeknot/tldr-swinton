@@ -558,6 +558,8 @@ def _format_cache_friendly(pack: dict) -> str:
 
     # Compute breakpoint offset from assembled output, then replace placeholder
     breakpoint_offset = output.find("<!-- CACHE_BREAKPOINT")
+    if breakpoint_offset < 0:
+        breakpoint_offset = 0  # Defensive: degrade to 0 if marker missing
     hints_data = {
         "cache_hints": {
             "prefix_tokens": prefix_token_est,

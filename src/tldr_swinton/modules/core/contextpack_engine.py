@@ -472,14 +472,26 @@ def include_symbol_bodies(
     return out_pack
 
 
-def _estimate_tokens(text: str) -> int:
-    try:
-        import tiktoken
+_TIKTOKEN_ENCODER = None
 
-        encoding = tiktoken.get_encoding("cl100k_base")
-        return len(encoding.encode(text))
-    except Exception:
-        return max(1, len(text) // 4)
+
+def _get_tiktoken_encoder():
+    """Get cached tiktoken encoder to avoid repeated initialization."""
+    global _TIKTOKEN_ENCODER
+    if _TIKTOKEN_ENCODER is None:
+        try:
+            import tiktoken
+            _TIKTOKEN_ENCODER = tiktoken.get_encoding("cl100k_base")
+        except Exception:
+            pass
+    return _TIKTOKEN_ENCODER
+
+
+def _estimate_tokens(text: str) -> int:
+    encoder = _get_tiktoken_encoder()
+    if encoder is not None:
+        return len(encoder.encode(text))
+    return max(1, len(text) // 4)
 
 
 def _compute_etag(signature: str, code: str | None) -> str:
