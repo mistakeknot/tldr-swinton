@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 
 from .symbol_registry import SymbolRegistry
+from .token_utils import estimate_tokens as _estimate_tokens
 
 
 @dataclass(frozen=True)
@@ -470,28 +471,6 @@ def include_symbol_bodies(
     out_pack["slices"] = budgeted
     out_pack["budget_used"] = used
     return out_pack
-
-
-_TIKTOKEN_ENCODER = None
-
-
-def _get_tiktoken_encoder():
-    """Get cached tiktoken encoder to avoid repeated initialization."""
-    global _TIKTOKEN_ENCODER
-    if _TIKTOKEN_ENCODER is None:
-        try:
-            import tiktoken
-            _TIKTOKEN_ENCODER = tiktoken.get_encoding("cl100k_base")
-        except Exception:
-            pass
-    return _TIKTOKEN_ENCODER
-
-
-def _estimate_tokens(text: str) -> int:
-    encoder = _get_tiktoken_encoder()
-    if encoder is not None:
-        return len(encoder.encode(text))
-    return max(1, len(text) // 4)
 
 
 def _compute_etag(signature: str, code: str | None) -> str:

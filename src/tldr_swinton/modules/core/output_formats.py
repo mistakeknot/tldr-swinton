@@ -6,9 +6,6 @@ import hashlib
 import json
 from typing import Iterable
 
-# Cached tiktoken encoder to avoid repeated initialization
-_TIKTOKEN_ENCODER = None
-
 # Default max calls shown (for ultracompact format)
 MAX_CALLS_DEFAULT = 12
 # Minimum calls to always show
@@ -60,6 +57,7 @@ def _dedupe_preserve(items: list[str]) -> list[str]:
 
 from .api import RelevantContext
 from .contextpack_engine import ContextPack, ContextSlice
+from .token_utils import estimate_tokens as _estimate_tokens
 
 
 def format_context(
@@ -205,30 +203,6 @@ def _apply_budget(lines: Iterable[str], budget_tokens: int) -> list[str]:
         output.append(line)
         used += est
     return output
-
-
-def _get_tiktoken_encoder():
-    """Get cached tiktoken encoder to avoid repeated initialization."""
-    global _TIKTOKEN_ENCODER
-    if _TIKTOKEN_ENCODER is None:
-        try:
-            import tiktoken
-            _TIKTOKEN_ENCODER = tiktoken.get_encoding("cl100k_base")
-        except Exception:
-            pass
-    return _TIKTOKEN_ENCODER
-
-
-def _estimate_tokens(text_or_lines: str | Iterable[str]) -> int:
-    if isinstance(text_or_lines, str):
-        text = text_or_lines
-    else:
-        text = "\n".join(text_or_lines)
-
-    encoder = _get_tiktoken_encoder()
-    if encoder is not None:
-        return len(encoder.encode(text))
-    return max(1, len(text) // 4)
 
 
 def _render_text_function(ctx: RelevantContext, func, include_details: bool) -> list[str]:
