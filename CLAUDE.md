@@ -75,4 +75,4 @@ Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../inte
 
 ## Claude Code-Specific Notes
 
-None currently - all instructions apply to all agents. See AGENTS.md for ContextPack JSON, ETag, and ambiguity notes.
+**After adding formats/flags:** Also update `../Ashpool` (regression suite, A/B scripts, demo). See AGENTS.md "Related Projects".

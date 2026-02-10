@@ -12,6 +12,19 @@ tldr-swinton is a token-efficient code analysis tool for LLMs. It's a fork of ll
 - `src/tldr_swinton/` - Main Python package
 - `evals/` - Evaluation scripts for token efficiency
 
+## Related Projects
+
+| Project | What | Path |
+|---------|------|------|
+| **Ashpool** | Agent workbench: run capture + artifact store + eval/regression for tldrs outputs | `../Ashpool` |
+
+**Ashpool integration**: Ashpool captures tldrs runs as artifacts with metadata tagging, scores token efficiency, and A/B tests output formats. When adding new tldrs formats or flags, also update:
+- `../Ashpool/scripts/regression_suite.json` — add regression queries for new formats/flags
+- `../Ashpool/scripts/ab_formats.py` — add new formats to `DEFAULT_FORMATS`
+- `../Ashpool/demo-tldrs.sh` — add demo runs showcasing new features
+
+See `../Ashpool/demo-tldrs.sh` for a working integration demo.
+
 ## Quick Reference
 
 ```bash
