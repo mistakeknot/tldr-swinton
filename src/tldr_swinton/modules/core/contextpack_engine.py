@@ -112,6 +112,7 @@ class ContextPackEngine:
         return ContextPack(
             slices=slices,
             budget_used=used,
+            cache_stats={"hit_rate": 0.0, "hits": 0, "misses": len(slices)},
         )
 
     def build_context_pack_delta(
