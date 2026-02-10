@@ -367,7 +367,7 @@ Semantic Search:
         "--format",
         choices=["text", "ultracompact", "cache-friendly"],
         default="text",
-        help="Output format",
+        help="Output format (cache-friendly: optimized for LLM provider prompt caching)",
     )
     ctx_p.add_argument(
         "--budget",
@@ -439,7 +439,7 @@ Semantic Search:
         "--format",
         choices=["ultracompact", "json", "json-pretty", "cache-friendly"],
         default="ultracompact",
-        help="Output format (default: ultracompact)",
+        help="Output format (default: ultracompact; cache-friendly: optimized for LLM prompt caching)",
     )
     diff_p.add_argument(
         "--lang",
