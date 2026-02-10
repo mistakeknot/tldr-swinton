@@ -15,6 +15,7 @@ Usage:
     tldrs slice <file> <func> <line>     Program slice
 """
 import argparse
+from dataclasses import asdict
 import io
 import json
 import os
@@ -439,6 +440,12 @@ Semantic Search:
         default=False,
         help="Deduplicate common imports across files (10-20%% savings)",
     )
+    ctx_p.add_argument(
+        "--type-prune",
+        action="store_true",
+        default=False,
+        help="Prune self-documenting and stdlib symbols from caller/callee expansion",
+    )
 
     ctx_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
     ctx_p.add_argument("--max-bytes", type=int, default=None, help="Cap output at N bytes")
@@ -507,6 +514,12 @@ Semantic Search:
         default=False,
         help="Deduplicate common imports across files (10-20%% savings)",
     )
+    diff_p.add_argument(
+        "--type-prune",
+        action="store_true",
+        default=False,
+        help="Prune self-documenting and stdlib symbols from caller/callee expansion",
+    )
 
     diff_p.add_argument(
         "--verify",
@@ -516,6 +529,17 @@ Semantic Search:
 
     diff_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
     diff_p.add_argument("--max-bytes", type=int, default=None, help="Cap output at N bytes")
+
+    distill_p = subparsers.add_parser(
+        "distill",
+        help="Distill context for sub-agent consumption (compressed summary)",
+    )
+    distill_p.add_argument("--task", required=True, help="Task description")
+    distill_p.add_argument("--budget", type=int, default=1500, help="Token budget for output")
+    distill_p.add_argument("--project", default=".", help="Project root")
+    distill_p.add_argument("--session-id", default=None, help="Session ID for delta")
+    distill_p.add_argument("--format", choices=["text", "json"], default="text")
+    distill_p.add_argument("--language", default=None, help="Primary language")
 
     hotspots_p = subparsers.add_parser(
         "hotspots",
@@ -654,6 +678,18 @@ Semantic Search:
         "--background", action="store_true", help="Build in background process"
     )
     warm_p.add_argument("--lang", default="python", help="Language")
+
+    prebuild_parser = subparsers.add_parser(
+        "prebuild",
+        help="Precompute context bundle for current HEAD",
+    )
+    prebuild_parser.add_argument("--project", default=".", help="Project root")
+    prebuild_parser.add_argument("--base", default="main", help="Base ref for diff context")
+    prebuild_parser.add_argument(
+        "--install-hook",
+        action="store_true",
+        help="Install git post-commit hook for automatic prebuilding",
+    )
 
     # tldr semantic index <path> / tldr semantic search <query>
     semantic_p = subparsers.add_parser(
@@ -1044,6 +1080,7 @@ Semantic Search:
                         zoom_level=zoom_level,
                         strip_comments=args.strip_comments,
                         compress_imports=args.compress_imports,
+                        type_prune=args.type_prune,
                     )
                 else:
                     pack_kwargs = {
@@ -1056,6 +1093,7 @@ Semantic Search:
                         "zoom_level": zoom_level,
                         "strip_comments": args.strip_comments,
                         "compress_imports": args.compress_imports,
+                        "type_prune": args.type_prune,
                     }
                     if getattr(args, "include_body", False):
                         pack_kwargs["include_body"] = True
@@ -1085,6 +1123,7 @@ Semantic Search:
                     depth=args.depth,
                     language=args.lang,
                     include_docstrings=args.with_docs,
+                    type_prune=args.type_prune,
                 )
                 output = format_context(ctx, fmt=args.format, budget_tokens=args.budget)
             if args.include:
@@ -1139,6 +1178,7 @@ Semantic Search:
                     zoom_level=zoom_level,
                     strip_comments=args.strip_comments,
                     compress_imports=args.compress_imports,
+                    type_prune=args.type_prune,
                 )
             else:
                 pack = get_diff_context(
@@ -1151,6 +1191,7 @@ Semantic Search:
                     zoom_level=zoom_level,
                     strip_comments=args.strip_comments,
                     compress_imports=args.compress_imports,
+                    type_prune=args.type_prune,
                 )
             # Opt-in coherence verification
             if getattr(args, "verify", False) or os.environ.get("TLDRS_COHERENCE_VERIFY"):
@@ -1166,6 +1207,23 @@ Semantic Search:
                 from .modules.core.output_formats import truncate_output
                 diff_output = truncate_output(diff_output, max_lines=args.max_lines, max_bytes=args.max_bytes)
             print(diff_output)
+
+        elif args.command == "distill":
+            from .modules.core.context_delegation import ContextDelegator
+            from .modules.core.distill_formatter import format_distilled
+
+            delegator = ContextDelegator(Path(args.project))
+            distilled = delegator.distill(
+                args.project,
+                args.task,
+                budget=args.budget,
+                session_id=args.session_id,
+                language=args.language,
+            )
+            if args.format == "json":
+                print(json.dumps(asdict(distilled), indent=2))
+            else:
+                print(format_distilled(distilled, budget=args.budget))
 
         elif args.command == "hotspots":
             from .modules.core.attention_pruning import AttentionTracker
@@ -1426,6 +1484,30 @@ Semantic Search:
 
                 # Print stats
                 print(f"Indexed {len(files)} files, found {len(graph.edges)} edges")
+
+        elif args.command == "prebuild":
+            from .modules.core.bundle import build_bundle, save_bundle
+
+            project_path = Path(args.project).resolve()
+            if not project_path.exists():
+                print(f"Error: Path not found: {args.project}", file=sys.stderr)
+                sys.exit(1)
+
+            bundle = build_bundle(project_path, base_ref=args.base)
+            save_bundle(bundle, project_path)
+            print(f"Bundle saved: {bundle.commit_sha} ({len(bundle.structure)} symbols)")
+
+            if args.install_hook:
+                git_dir = project_path / ".git"
+                if not git_dir.exists():
+                    print(f"Error: Not a git repository: {project_path}", file=sys.stderr)
+                    sys.exit(1)
+                hooks_dir = git_dir / "hooks"
+                hooks_dir.mkdir(parents=True, exist_ok=True)
+                hook_path = hooks_dir / "post-commit"
+                hook_path.write_text("#!/usr/bin/env bash\n\ntldrs prebuild --project . &\n")
+                hook_path.chmod(0o755)
+                print(f"Installed post-commit hook: {hook_path}")
 
         elif args.command == "semantic":
             from .modules.semantic.index import build_index, search_index

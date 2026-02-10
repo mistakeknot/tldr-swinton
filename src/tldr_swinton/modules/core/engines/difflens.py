@@ -5,12 +5,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import re
 import subprocess
+import sys
 
 from ..ast_extractor import FunctionInfo
 from ..hybrid_extractor import HybridExtractor
 from ..project_index import ProjectIndex
 from ..workspace import iter_workspace_files
 from ..contextpack_engine import Candidate, ContextPackEngine
+from ..type_pruner import prune_expansion
 from ..zoom import ZoomLevel
 
 
@@ -572,6 +574,7 @@ def build_diff_context_from_hunks(
     zoom_level: ZoomLevel = ZoomLevel.L4,
     strip_comments: bool = False,
     compress_imports: bool = False,
+    type_prune: bool = False,
 ) -> dict:
     project = Path(project).resolve()
     symbol_diff_lines = map_hunks_to_symbols(project, hunks, language=language)
@@ -733,6 +736,27 @@ def build_diff_context_from_hunks(
             )
         )
 
+    if type_prune and candidates:
+        callee_signature = ""
+        callee_code = None
+        for candidate in candidates:
+            if candidate.relevance_label == "contains_diff":
+                callee_signature = candidate.signature or ""
+                callee_code = candidate.code
+                break
+        if not callee_signature:
+            callee_signature = candidates[0].signature or ""
+            callee_code = candidates[0].code
+
+        before_count = len(candidates)
+        candidates = prune_expansion(
+            candidates,
+            callee_signature=callee_signature,
+            callee_code=callee_code,
+        )
+        after_count = len(candidates)
+        print(f"Type pruning: {before_count} → {after_count} candidates", file=sys.stderr)
+
     # Build post-processors (attention reranking + edit locality)
     processors = _get_diff_processors(project, idx.file_sources)
 
@@ -815,6 +839,7 @@ def get_diff_signatures(
     project: str | Path,
     hunks: list[tuple[str, int, int]],
     language: str = "python",
+    type_prune: bool = False,
 ) -> list[DiffSymbolSignature]:
     """Get signatures for symbols affected by diff hunks without extracting code.
 
@@ -885,6 +910,41 @@ def get_diff_signatures(
             )
         )
 
+    if type_prune and signatures:
+        expanded_candidates = [
+            Candidate(
+                symbol_id=sig.symbol_id,
+                relevance={"contains_diff": 3, "caller": 2, "callee": 2, "adjacent": 1}.get(
+                    sig.relevance_label, 1
+                ),
+                relevance_label=sig.relevance_label,
+                order=i,
+                signature=sig.signature,
+                code=None,
+                lines=(sig.line, sig.line) if sig.line else None,
+                meta={"diff_lines": sig.diff_lines},
+            )
+            for i, sig in enumerate(signatures)
+        ]
+        callee_signature = next(
+            (sig.signature for sig in signatures if sig.relevance_label == "contains_diff"),
+            signatures[0].signature,
+        )
+        before_count = len(expanded_candidates)
+        pruned_candidates = prune_expansion(
+            expanded_candidates,
+            callee_signature=callee_signature,
+            callee_code=None,
+        )
+        after_count = len(pruned_candidates)
+        print(f"Type pruning: {before_count} → {after_count} candidates", file=sys.stderr)
+        by_symbol = {sig.symbol_id: sig for sig in signatures}
+        signatures = [
+            by_symbol[candidate.symbol_id]
+            for candidate in pruned_candidates
+            if candidate.symbol_id in by_symbol
+        ]
+
     return signatures
 
 
@@ -921,6 +981,7 @@ def get_diff_context(
     zoom_level: ZoomLevel = ZoomLevel.L4,
     strip_comments: bool = False,
     compress_imports: bool = False,
+    type_prune: bool = False,
 ) -> dict:
     project = Path(project).resolve()
     base_ref = base or "HEAD~1"
@@ -952,6 +1013,7 @@ def get_diff_context(
         zoom_level=zoom_level,
         strip_comments=strip_comments,
         compress_imports=compress_imports,
+        type_prune=type_prune,
     )
     pack["base"] = base_ref
     pack["head"] = head_ref

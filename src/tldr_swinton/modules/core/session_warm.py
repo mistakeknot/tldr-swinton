@@ -251,4 +251,11 @@ def maybe_warm_background(
         **_get_subprocess_detach_kwargs(),
     )
 
+    try:
+        from .bundle import build_bundle, save_bundle
+        bundle = build_bundle(project_path)
+        save_bundle(bundle, project_path)
+    except Exception:
+        pass
+
     return True

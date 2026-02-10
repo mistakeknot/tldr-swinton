@@ -311,6 +311,7 @@ def build_diff_context_from_hunks(
     zoom_level: ZoomLevel = ZoomLevel.L4,
     strip_comments: bool = False,
     compress_imports: bool = False,
+    type_prune: bool = False,
 ) -> dict:
     from .engines.difflens import (
         build_diff_context_from_hunks as _build_diff_context_from_hunks,
@@ -325,6 +326,7 @@ def build_diff_context_from_hunks(
         zoom_level=zoom_level,
         strip_comments=strip_comments,
         compress_imports=compress_imports,
+        type_prune=type_prune,
     )
 
 
@@ -338,6 +340,7 @@ def get_diff_context(
     zoom_level: ZoomLevel = ZoomLevel.L4,
     strip_comments: bool = False,
     compress_imports: bool = False,
+    type_prune: bool = False,
 ) -> dict:
     from .engines.difflens import get_diff_context as _get_diff_context
 
@@ -351,6 +354,7 @@ def get_diff_context(
         zoom_level=zoom_level,
         strip_comments=strip_comments,
         compress_imports=compress_imports,
+        type_prune=type_prune,
     )
 
 
@@ -1047,6 +1051,7 @@ def get_symbol_context_pack(
     zoom_level: ZoomLevel = ZoomLevel.L4,
     strip_comments: bool = False,
     compress_imports: bool = False,
+    type_prune: bool = False,
 ) -> dict:
     return _get_symbol_context_pack(
         project,
@@ -1059,6 +1064,7 @@ def get_symbol_context_pack(
         zoom_level=zoom_level,
         strip_comments=strip_comments,
         compress_imports=compress_imports,
+        type_prune=type_prune,
     )
 
 
@@ -1068,6 +1074,7 @@ def get_signatures_for_entry(
     depth: int = 2,
     language: str = "python",
     disambiguate: bool = True,
+    type_prune: bool = False,
 ) -> list[SymbolSignature] | dict:
     """Get symbol signatures without extracting code bodies.
 
@@ -1096,6 +1103,7 @@ def get_signatures_for_entry(
         depth=depth,
         language=language,
         disambiguate=disambiguate,
+        type_prune=type_prune,
     )
 
 
@@ -1103,6 +1111,7 @@ def get_diff_signatures(
     project: str | Path,
     hunks: list[tuple[str, int, int]],
     language: str = "python",
+    type_prune: bool = False,
 ) -> list[DiffSymbolSignature]:
     """Get signatures for symbols affected by diff hunks without extracting code.
 
@@ -1125,7 +1134,7 @@ def get_diff_signatures(
         >>> for sig in sigs:
         ...     print(f"{sig.symbol_id}: {sig.relevance_label}")
     """
-    return _get_diff_signatures(project, hunks, language=language)
+    return _get_diff_signatures(project, hunks, language=language, type_prune=type_prune)
 
 
 # CLI entry point

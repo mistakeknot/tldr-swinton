@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import sys
 
 from ..ast_extractor import FunctionInfo
 from ..cfg_extractor import (
@@ -22,6 +23,7 @@ from ..cfg_extractor import (
 from ..contextpack_engine import Candidate, ContextPackEngine
 from ..hybrid_extractor import HybridExtractor
 from ..project_index import ProjectIndex
+from ..type_pruner import prune_expansion
 from ..workspace import iter_workspace_files
 from ..zoom import ZoomLevel
 
@@ -174,6 +176,7 @@ def get_relevant_context(
     language: str = "python",
     include_docstrings: bool = False,
     disambiguate: bool = True,
+    type_prune: bool = False,
 ) -> RelevantContext:
     """
     Get token-efficient context for an LLM starting from an entry point.
@@ -291,6 +294,42 @@ def get_relevant_context(
                 if callee not in visited and current_depth < depth:
                     queue.append((callee, current_depth + 1))
 
+    if type_prune and result_functions:
+        callee_signature = ""
+        if resolved:
+            entry_symbol = resolved[0]
+            entry_info = idx.symbol_index.get(entry_symbol)
+            if entry_info:
+                callee_signature = idx.signature_overrides.get(entry_symbol, entry_info.signature())
+
+        expanded_candidates = [
+            Candidate(
+                symbol_id=func.name,
+                relevance=max(1, (depth - func.depth) + 1),
+                relevance_label=f"depth_{func.depth}",
+                order=i,
+                signature=func.signature,
+                code=None,
+                lines=(func.line, func.line) if func.line else None,
+                meta={"calls": func.calls},
+            )
+            for i, func in enumerate(result_functions)
+        ]
+        before_count = len(expanded_candidates)
+        pruned_candidates = prune_expansion(
+            expanded_candidates,
+            callee_signature=callee_signature,
+            callee_code=None,
+        )
+        after_count = len(pruned_candidates)
+        print(f"Type pruning: {before_count} → {after_count} candidates", file=sys.stderr)
+        by_symbol = {func.name: func for func in result_functions}
+        result_functions = [
+            by_symbol[candidate.symbol_id]
+            for candidate in pruned_candidates
+            if candidate.symbol_id in by_symbol
+        ]
+
     return RelevantContext(
         entry_point=entry_point,
         depth=depth,
@@ -310,6 +349,7 @@ def get_context_pack(
     zoom_level: ZoomLevel = ZoomLevel.L4,
     strip_comments: bool = False,
     compress_imports: bool = False,
+    type_prune: bool = False,
 ) -> dict:
     project_root = Path(project).resolve()
     ctx = get_relevant_context(
@@ -319,6 +359,7 @@ def get_context_pack(
         language=language,
         include_docstrings=include_docstrings,
         disambiguate=disambiguate,
+        type_prune=type_prune,
     )
     if ctx.ambiguous:
         from ..errors import ERR_AMBIGUOUS
@@ -433,6 +474,7 @@ def get_signatures_for_entry(
     depth: int = 2,
     language: str = "python",
     disambiguate: bool = True,
+    type_prune: bool = False,
 ) -> list[SymbolSignature] | dict:
     """Get symbol signatures without extracting code bodies.
 
@@ -462,7 +504,7 @@ def get_signatures_for_entry(
         # This is a module path, delegate to regular context for now
         ctx = get_relevant_context(
             project, entry_point, depth=depth, language=language,
-            include_docstrings=False, disambiguate=disambiguate
+            include_docstrings=False, disambiguate=disambiguate, type_prune=type_prune
         )
         if ctx.ambiguous:
             from ..errors import ERR_AMBIGUOUS
@@ -502,7 +544,7 @@ def get_signatures_for_entry(
         if module_file:
             ctx = get_relevant_context(
                 project, entry_point, depth=depth, language=language,
-                include_docstrings=False, disambiguate=disambiguate
+                include_docstrings=False, disambiguate=disambiguate, type_prune=type_prune
             )
             return [
                 SymbolSignature(
@@ -576,6 +618,35 @@ def get_signatures_for_entry(
             for callee in idx.adjacency.get(symbol_id, []):
                 if callee not in visited and current_depth < depth:
                     queue.append((callee, current_depth + 1))
+
+    if type_prune and result_signatures:
+        expanded_candidates = [
+            Candidate(
+                symbol_id=sig.symbol_id,
+                relevance=max(1, (depth - sig.depth) + 1),
+                relevance_label=f"depth_{sig.depth}",
+                order=i,
+                signature=sig.signature,
+                code=None,
+                lines=(sig.line, sig.line) if sig.line else None,
+                meta={"calls": sig.calls},
+            )
+            for i, sig in enumerate(result_signatures)
+        ]
+        before_count = len(expanded_candidates)
+        pruned_candidates = prune_expansion(
+            expanded_candidates,
+            callee_signature=result_signatures[0].signature,
+            callee_code=None,
+        )
+        after_count = len(pruned_candidates)
+        print(f"Type pruning: {before_count} → {after_count} candidates", file=sys.stderr)
+        by_symbol = {sig.symbol_id: sig for sig in result_signatures}
+        result_signatures = [
+            by_symbol[candidate.symbol_id]
+            for candidate in pruned_candidates
+            if candidate.symbol_id in by_symbol
+        ]
 
     return result_signatures
 

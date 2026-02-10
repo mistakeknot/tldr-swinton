@@ -17,7 +17,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+import subprocess
 from typing import Any, Literal
+
+from .distill_formatter import DistilledContext, distill_from_candidates
 
 
 @dataclass
@@ -346,6 +349,192 @@ class ContextDelegator:
             entry_points=entry_points,
             completion_criteria=criteria,
         )
+
+    def distill(
+        self,
+        project_root: str | Path,
+        task: str,
+        budget: int = 1500,
+        session_id: str | None = None,
+        language: str | None = None,
+    ) -> DistilledContext:
+        from .api import get_diff_context, get_symbol_context_pack
+        from .contextpack_engine import Candidate
+
+        lang = language or "python"
+        project_path = Path(project_root).resolve()
+        plan = self.create_plan(task)
+        all_candidates: list[Candidate] = []
+
+        def _is_git_repo(path: Path) -> bool:
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(path), "rev-parse", "--is-inside-work-tree"],
+                    text=True,
+                    capture_output=True,
+                )
+                return result.returncode == 0
+            except Exception:
+                return False
+
+        def _to_lines(raw: Any) -> tuple[int, int] | None:
+            if isinstance(raw, tuple) and len(raw) == 2:
+                return int(raw[0]), int(raw[1])
+            if isinstance(raw, list) and len(raw) >= 2:
+                return int(raw[0]), int(raw[1])
+            return None
+
+        def _relevance(label: str | None, fallback: int = 1) -> int:
+            if label is None:
+                return fallback
+            if label.startswith("depth_"):
+                try:
+                    depth = int(label.split("_", 1)[1])
+                    return max(1, 5 - depth)
+                except Exception:
+                    return fallback
+            mapping = {
+                "contains_diff": 5,
+                "entry_point": 5,
+                "caller": 4,
+                "callee": 3,
+                "adjacent": 2,
+            }
+            return mapping.get(label, fallback)
+
+        def _pack_to_candidates(pack: Any, start_order: int) -> list[Candidate]:
+            result: list[Candidate] = []
+            slices: list[Any]
+            if isinstance(pack, dict):
+                slices = list(pack.get("slices", []))
+            else:
+                slices = list(getattr(pack, "slices", []) or [])
+
+            for idx, item in enumerate(slices):
+                if isinstance(item, dict):
+                    symbol_id = str(item.get("id", ""))
+                    label = item.get("relevance")
+                    signature = item.get("signature")
+                    code = item.get("code")
+                    lines = _to_lines(item.get("lines"))
+                    meta = {
+                        key: value
+                        for key, value in item.items()
+                        if key not in {"id", "relevance", "signature", "code", "lines"}
+                    }
+                else:
+                    symbol_id = str(getattr(item, "id", ""))
+                    label = getattr(item, "relevance", None)
+                    signature = getattr(item, "signature", None)
+                    code = getattr(item, "code", None)
+                    lines = _to_lines(getattr(item, "lines", None))
+                    raw_meta = getattr(item, "meta", None)
+                    meta = raw_meta if isinstance(raw_meta, dict) else {}
+
+                if not symbol_id:
+                    continue
+
+                result.append(
+                    Candidate(
+                        symbol_id=symbol_id,
+                        relevance=_relevance(str(label) if label is not None else None),
+                        relevance_label=str(label) if label is not None else None,
+                        order=start_order + idx,
+                        signature=signature,
+                        code=code,
+                        lines=lines,
+                        meta=meta or None,
+                    )
+                )
+            return result
+
+        if _is_git_repo(project_path):
+            try:
+                if session_id:
+                    from .engines.delta import get_diff_context_with_delta
+
+                    diff_pack = get_diff_context_with_delta(
+                        project_path,
+                        session_id,
+                        budget_tokens=max(500, budget),
+                        language=lang,
+                    )
+                else:
+                    diff_pack = get_diff_context(
+                        project_path,
+                        budget_tokens=max(500, budget),
+                        language=lang,
+                    )
+                all_candidates.extend(_pack_to_candidates(diff_pack, len(all_candidates)))
+            except Exception:
+                pass
+
+        symbol_budget = max(200, budget // max(1, len(plan.entry_points)))
+        for entry in plan.entry_points:
+            try:
+                if session_id:
+                    from .engines.delta import get_context_pack_with_delta
+
+                    symbol_pack = get_context_pack_with_delta(
+                        str(project_path),
+                        entry,
+                        session_id,
+                        depth=2,
+                        language=lang,
+                        budget_tokens=symbol_budget,
+                    )
+                else:
+                    symbol_pack = get_symbol_context_pack(
+                        project_path,
+                        entry,
+                        depth=2,
+                        language=lang,
+                        budget_tokens=symbol_budget,
+                    )
+                all_candidates.extend(_pack_to_candidates(symbol_pack, len(all_candidates)))
+            except Exception:
+                continue
+
+        deduped: dict[str, Candidate] = {}
+        for candidate in all_candidates:
+            existing = deduped.get(candidate.symbol_id)
+            if existing is None:
+                deduped[candidate.symbol_id] = candidate
+                continue
+
+            existing_meta = existing.meta if isinstance(existing.meta, dict) else {}
+            candidate_meta = candidate.meta if isinstance(candidate.meta, dict) else {}
+            merged_meta = {**existing_meta, **candidate_meta} or None
+
+            prefer_candidate = (
+                candidate.relevance,
+                1 if candidate.code else 0,
+                1 if candidate.signature else 0,
+            ) > (
+                existing.relevance,
+                1 if existing.code else 0,
+                1 if existing.signature else 0,
+            )
+
+            preferred = candidate if prefer_candidate else existing
+            alternate = existing if prefer_candidate else candidate
+
+            deduped[candidate.symbol_id] = Candidate(
+                symbol_id=preferred.symbol_id,
+                relevance=max(existing.relevance, candidate.relevance),
+                relevance_label=preferred.relevance_label or alternate.relevance_label,
+                order=min(existing.order, candidate.order),
+                signature=preferred.signature or alternate.signature,
+                code=preferred.code or alternate.code,
+                lines=preferred.lines or alternate.lines,
+                meta=merged_meta,
+            )
+
+        merged_candidates = sorted(
+            deduped.values(),
+            key=lambda c: (-c.relevance, c.order, c.symbol_id),
+        )
+        return distill_from_candidates(merged_candidates, task, budget=budget)
 
     def _extract_entry_points(
         self, task_description: str, focus_areas: list[str]

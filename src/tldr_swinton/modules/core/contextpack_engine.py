@@ -9,6 +9,7 @@ from .import_compress import compress_imports_section
 from .strip import strip_code
 from .symbol_registry import SymbolRegistry
 from .token_utils import estimate_tokens as _estimate_tokens
+from .type_pruner import prune_expansion
 from .zoom import ZoomLevel, format_at_zoom
 
 
@@ -89,6 +90,7 @@ class ContextPackEngine:
         zoom_level: ZoomLevel = ZoomLevel.L4,
         strip_comments: bool = False,
         compress_imports: bool = False,
+        enable_type_pruning: bool = False,
     ) -> ContextPack:
         if not candidates:
             return ContextPack(slices=[])
@@ -96,6 +98,12 @@ class ContextPackEngine:
         if post_processors:
             for processor in post_processors:
                 ordered = processor(ordered)
+        if enable_type_pruning and ordered:
+            ordered = prune_expansion(
+                ordered,
+                callee_signature=ordered[0].signature or "",
+                callee_code=ordered[0].code,
+            )
         slices: list[ContextSlice] = []
         used = 0
 

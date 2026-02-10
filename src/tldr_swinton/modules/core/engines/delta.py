@@ -65,6 +65,7 @@ def get_context_pack_with_delta(
     zoom_level: ZoomLevel = ZoomLevel.L4,
     strip_comments: bool = False,
     compress_imports: bool = False,
+    type_prune: bool = False,
 ) -> "ContextPack":
     """Get context pack with delta detection against session cache.
 
@@ -89,6 +90,7 @@ def get_context_pack_with_delta(
         depth=depth,
         language=language,
         disambiguate=True,
+        type_prune=type_prune,
     )
 
     # Handle error case (ambiguous)
@@ -150,6 +152,7 @@ def get_context_pack_with_delta(
         zoom_level=zoom_level,
         strip_comments=strip_comments,
         compress_imports=compress_imports,
+        type_prune=type_prune,
     )
 
     # Handle ambiguous case
@@ -255,6 +258,7 @@ def get_diff_context_with_delta(
     zoom_level: ZoomLevel = ZoomLevel.L4,
     strip_comments: bool = False,
     compress_imports: bool = False,
+    type_prune: bool = False,
 ) -> "ContextPack":
     """Get diff context pack with delta detection against session cache.
 
@@ -295,6 +299,7 @@ def get_diff_context_with_delta(
             zoom_level=zoom_level,
             strip_comments=strip_comments,
             compress_imports=compress_imports,
+            type_prune=type_prune,
         )
         return ContextPack(
             slices=[],
@@ -304,7 +309,7 @@ def get_diff_context_with_delta(
         )
 
     # DELTA-FIRST: Get signatures only (no code extraction yet)
-    signatures = get_diff_signatures(project_root, hunks, language=language)
+    signatures = get_diff_signatures(project_root, hunks, language=language, type_prune=type_prune)
 
     if not signatures:
         return ContextPack(slices=[], unchanged=[], rehydrate={})
@@ -360,6 +365,7 @@ def get_diff_context_with_delta(
         zoom_level=zoom_level,
         strip_comments=strip_comments,
         compress_imports=compress_imports,
+        type_prune=type_prune,
     )
 
     slices_data = full_pack_dict.get("slices", [])
