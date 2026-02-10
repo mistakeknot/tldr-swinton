@@ -53,7 +53,7 @@ fi
 # Also check marketplace if the sibling repo exists
 MARKETPLACE="$REPO_ROOT/../interagency-marketplace/.claude-plugin/marketplace.json"
 if [ -f "$MARKETPLACE" ]; then
-    MARKETPLACE_VERSION=$(grep -A10 '"tldr-swinton"' "$MARKETPLACE" | grep '"version"' | sed 's/.*"\([0-9][^"]*\)".*/\1/')
+    MARKETPLACE_VERSION=$(grep -A10 '"tldr-swinton"' "$MARKETPLACE" | grep '"version"' | head -1 | sed 's/.*"\([0-9][^"]*\)".*/\1/')
     if [ -n "$MARKETPLACE_VERSION" ] && [ "$MARKETPLACE_VERSION" != "$PYPROJECT_VERSION" ]; then
         echo -e "${RED}Marketplace version drift!${NC}" >&2
         echo "" >&2

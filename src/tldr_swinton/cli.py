@@ -810,6 +810,14 @@ Semantic Search:
         "quickstart", help="Show quick reference guide for AI agents"
     )
 
+    # tldrs manifest - Machine-readable capability manifest
+    manifest_p = subparsers.add_parser(
+        "manifest", help="Print machine-readable manifest of tldrs capabilities (JSON)"
+    )
+    manifest_p.add_argument(
+        "--pretty", action="store_true", help="Pretty-print with indentation"
+    )
+
     # Module subcommands: vhs, wb, bench
     from .modules.vhs import cli as vhs_cli
     from .modules.workbench import cli as wb_cli
@@ -1873,6 +1881,12 @@ tldrs structure src/
 
 Full guide: https://github.com/mistakeknot/tldr-swinton/blob/main/docs/QUICKSTART.md
 """)
+
+        elif args.command == "manifest":
+            from .manifest import build_manifest
+            manifest = build_manifest(parser)
+            indent = 2 if getattr(args, "pretty", False) else None
+            print(json.dumps(manifest, indent=indent))
 
         # Module subcommands
         elif args.command == "vhs":

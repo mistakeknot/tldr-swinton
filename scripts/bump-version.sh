@@ -106,6 +106,14 @@ if $DRY_RUN; then
     exit 0
 fi
 
+# --- Check Ashpool sync (non-blocking warning) ---
+if command -v tldrs &>/dev/null && [ -f "$REPO_ROOT/../Ashpool/scripts/check_tldrs_sync.py" ]; then
+    echo ""
+    if ! tldrs manifest | python3 "$REPO_ROOT/../Ashpool/scripts/check_tldrs_sync.py" --quiet 2>/dev/null; then
+        echo -e "${YELLOW}Warning: Ashpool eval coverage has gaps. Run /tldrs-ashpool-sync to fix.${NC}"
+    fi
+fi
+
 # --- Commit and push tldr-swinton ---
 echo ""
 cd "$REPO_ROOT"

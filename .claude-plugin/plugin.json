@@ -13,7 +13,8 @@
   "skills": [
     "./.claude-plugin/skills/tldrs-session-start",
     "./.claude-plugin/skills/tldrs-find-code",
-    "./.claude-plugin/skills/tldrs-understand-symbol"
+    "./.claude-plugin/skills/tldrs-understand-symbol",
+    "./.claude-plugin/skills/tldrs-ashpool-sync"
   ],
   "commands": [
     "./.claude-plugin/commands/find.md",
