@@ -5,8 +5,11 @@ from dataclasses import dataclass, replace
 import hashlib
 from pathlib import Path
 
+from .import_compress import compress_imports_section
+from .strip import strip_code
 from .symbol_registry import SymbolRegistry
 from .token_utils import estimate_tokens as _estimate_tokens
+from .zoom import ZoomLevel, format_at_zoom
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,39 @@ class ContextPack:
     unchanged: list[str] | None = None  # Symbol IDs that were unchanged (delta mode)
     rehydrate: dict[str, str] | None = None  # symbol_id -> vhs_ref for rehydration
     cache_stats: dict | None = None  # hit_rate, hits, misses
+    import_compression: dict | None = None
+
+
+def _collect_import_compression(slices: list[ContextSlice]) -> dict | None:
+    file_imports: dict[str, list[str]] = {}
+
+    for item in slices:
+        if not isinstance(item.meta, dict):
+            continue
+        raw_imports = item.meta.get("imports")
+        if isinstance(raw_imports, str):
+            imports = [raw_imports]
+        elif isinstance(raw_imports, list):
+            imports = [imp for imp in raw_imports if isinstance(imp, str) and imp]
+        else:
+            continue
+
+        if not imports or ":" not in item.id:
+            continue
+
+        file_path = item.id.split(":", 1)[0]
+        if not file_path:
+            continue
+        file_imports.setdefault(file_path, []).extend(imports)
+
+    if not file_imports:
+        return None
+
+    common_header, per_file = compress_imports_section(file_imports)
+    if not common_header and not any(per_file.values()):
+        return None
+
+    return {"common_header": common_header, "per_file": per_file}
 
 
 class ContextPackEngine:
@@ -50,6 +86,9 @@ class ContextPackEngine:
         candidates: list[Candidate],
         budget_tokens: int | None = None,
         post_processors: list[Callable[[list[Candidate]], list[Candidate]]] | None = None,
+        zoom_level: ZoomLevel = ZoomLevel.L4,
+        strip_comments: bool = False,
+        compress_imports: bool = False,
     ) -> ContextPack:
         if not candidates:
             return ContextPack(slices=[])
@@ -70,22 +109,39 @@ class ContextPackEngine:
             if candidate.code is None and self._registry is not None and info is None:
                 info = self._registry.get(candidate.symbol_id)
             code = candidate.code if candidate.code is not None else (info.code if info else None)
+            if strip_comments and code:
+                code = strip_code(code, _infer_language_from_symbol_id(candidate.symbol_id))
             if candidate.lines is None and self._registry is not None and info is None:
                 info = self._registry.get(candidate.symbol_id)
             lines = candidate.lines if candidate.lines is not None else (info.lines if info else None)
 
+            language = _infer_language_from_symbol_id(candidate.symbol_id)
+            zoomed = format_at_zoom(
+                candidate.symbol_id,
+                signature,
+                code,
+                zoom_level,
+                language=language,
+            )
+            if zoom_level in (ZoomLevel.L0, ZoomLevel.L1):
+                effective_code = None
+            elif zoom_level is ZoomLevel.L2:
+                effective_code = _extract_zoom_code(zoomed, candidate.symbol_id, signature)
+            else:
+                effective_code = code
+
             sig_cost = _estimate_tokens(signature)
             full_cost = sig_cost
-            if code:
-                full_cost += _estimate_tokens(code)
+            if effective_code:
+                full_cost += _estimate_tokens(effective_code)
 
             if budget_tokens is None or used + full_cost <= budget_tokens:
-                etag = _compute_etag(signature, code)
+                etag = _compute_etag(signature, effective_code)
                 slices.append(
                     ContextSlice(
                         id=candidate.symbol_id,
                         signature=signature,
-                        code=code,
+                        code=effective_code,
                         lines=lines,
                         relevance=candidate.relevance_label,
                         meta=candidate.meta,
@@ -110,10 +166,13 @@ class ContextPackEngine:
             else:
                 break
 
+        import_compression = _collect_import_compression(slices) if compress_imports else None
+
         return ContextPack(
             slices=slices,
             budget_used=used,
             cache_stats={"hit_rate": 0.0, "hits": 0, "misses": len(slices)},
+            import_compression=import_compression,
         )
 
     def build_context_pack_delta(
@@ -122,6 +181,8 @@ class ContextPackEngine:
         delta_result: "DeltaResult",
         budget_tokens: int | None = None,
         post_processors: list[Callable[[list[Candidate]], list[Candidate]]] | None = None,
+        zoom_level: ZoomLevel = ZoomLevel.L4,
+        compress_imports: bool = False,
     ) -> ContextPack:
         """Build context pack with delta detection.
 
@@ -169,12 +230,27 @@ class ContextPackEngine:
                 info = self._registry.get(candidate.symbol_id)
             lines = candidate.lines if candidate.lines is not None else (info.lines if info else None)
 
+            language = _infer_language_from_symbol_id(candidate.symbol_id)
+            zoomed = format_at_zoom(
+                candidate.symbol_id,
+                signature,
+                code,
+                zoom_level,
+                language=language,
+            )
+            if zoom_level in (ZoomLevel.L0, ZoomLevel.L1):
+                effective_code = None
+            elif zoom_level is ZoomLevel.L2:
+                effective_code = _extract_zoom_code(zoomed, candidate.symbol_id, signature)
+            else:
+                effective_code = code
+
             sig_cost = _estimate_tokens(signature)
             full_cost = sig_cost
-            if code:
-                full_cost += _estimate_tokens(code)
+            if effective_code:
+                full_cost += _estimate_tokens(effective_code)
 
-            etag = _compute_etag(signature, code)
+            etag = _compute_etag(signature, effective_code)
 
             if is_unchanged:
                 # Unchanged: signature-only slice, count as hit
@@ -205,7 +281,7 @@ class ContextPackEngine:
                         ContextSlice(
                             id=candidate.symbol_id,
                             signature=signature,
-                            code=code,
+                            code=effective_code,
                             lines=lines,
                             relevance=candidate.relevance_label,
                             meta=candidate.meta,
@@ -232,12 +308,15 @@ class ContextPackEngine:
         total = hits + misses
         hit_rate = hits / total if total > 0 else 0.0
 
+        import_compression = _collect_import_compression(slices) if compress_imports else None
+
         return ContextPack(
             slices=slices,
             budget_used=used,
             unchanged=unchanged_ids,
             rehydrate=delta_result.rehydrate if delta_result.rehydrate else None,
             cache_stats={"hit_rate": hit_rate, "hits": hits, "misses": misses},
+            import_compression=import_compression,
         )
 
 
@@ -379,9 +458,9 @@ def include_symbol_bodies(
     project_root: str | Path,
     language: str = "python",
     budget_tokens: int | None = None,
+    strip_comments: bool = False,
 ) -> dict | ContextPack:
     """Populate `code` in context slices for symbol IDs of the form `file:symbol`."""
-    _ = language  # Reserved for future language-specific extraction behavior.
     root = Path(project_root).resolve()
 
     if isinstance(pack, ContextPack):
@@ -398,6 +477,8 @@ def include_symbol_bodies(
             body = bodies.get(item.id)
             if body and item.code is None:
                 code, lines = body
+                if strip_comments and code:
+                    code = strip_code(code, language)
                 enriched.append(
                     replace(
                         item,
@@ -449,6 +530,8 @@ def include_symbol_bodies(
         body = bodies.get(symbol_id) if isinstance(symbol_id, str) else None
         if body and out.get("code") is None:
             code, lines = body
+            if strip_comments and code:
+                code = strip_code(code, language)
             signature = out.get("signature", "") or ""
             out["code"] = code
             out["lines"] = list(lines)
@@ -478,3 +561,29 @@ def _compute_etag(signature: str, code: str | None) -> str:
     if code:
         payload = f"{signature}\n{code}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _extract_zoom_code(zoomed: str, symbol_id: str, signature: str) -> str | None:
+    prefix = format_at_zoom(symbol_id, signature, None, ZoomLevel.L1)
+    if not zoomed.startswith(prefix):
+        return None
+    body = zoomed[len(prefix):].lstrip("\n")
+    return body or None
+
+
+def _infer_language_from_symbol_id(symbol_id: str) -> str:
+    file_part = symbol_id.split(":", 1)[0]
+    if "." not in file_part:
+        return "python"
+    ext = Path(file_part).suffix.lower()
+    if ext in {".py", ".pyi", ".pyx"}:
+        return "python"
+    if ext in {".ts", ".tsx"}:
+        return "typescript"
+    if ext in {".js", ".jsx", ".mjs", ".cjs"}:
+        return "javascript"
+    if ext == ".go":
+        return "go"
+    if ext == ".rs":
+        return "rust"
+    return "python"

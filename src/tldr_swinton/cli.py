@@ -365,9 +365,9 @@ Semantic Search:
     ctx_p.add_argument("--depth", type=int, default=2, help="Call depth (default: 2)")
     ctx_p.add_argument(
         "--format",
-        choices=["text", "ultracompact", "cache-friendly"],
+        choices=["text", "ultracompact", "cache-friendly", "packed-json", "columnar-json"],
         default="text",
-        help="Output format (cache-friendly: optimized for LLM provider prompt caching)",
+        help="Output format (cache-friendly: optimized for LLM provider prompt caching; packed-json/columnar-json: compact ContextPack JSON)",
     )
     ctx_p.add_argument(
         "--budget",
@@ -379,6 +379,12 @@ Semantic Search:
         "--with-docs",
         action="store_true",
         help="Include docstrings in output",
+    )
+    ctx_p.add_argument(
+        "--strip-comments",
+        action="store_true",
+        default=False,
+        help="Strip comments and truncate docstrings (preserves TODO/FIXME markers)",
     )
     ctx_p.add_argument(
         "--include-body",
@@ -406,6 +412,13 @@ Semantic Search:
         help="Language",
     )
     ctx_p.add_argument(
+        "--zoom",
+        "-z",
+        default="L4",
+        choices=["L0", "L1", "L2", "L3", "L4", "l0", "l1", "l2", "l3", "l4"],
+        help="Zoom level: L0=module map, L1=signatures, L2=body sketch, L3=windowed, L4=full (default)",
+    )
+    ctx_p.add_argument(
         "--session-id",
         default=None,
         help="Session ID for ETag caching (enables delta mode)",
@@ -419,6 +432,12 @@ Semantic Search:
         "--no-delta",
         action="store_true",
         help="Disable delta mode even if session-id is provided",
+    )
+    ctx_p.add_argument(
+        "--compress-imports",
+        action="store_true",
+        default=False,
+        help="Deduplicate common imports across files (10-20%% savings)",
     )
 
     ctx_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
@@ -437,9 +456,9 @@ Semantic Search:
     )
     diff_p.add_argument(
         "--format",
-        choices=["ultracompact", "json", "json-pretty", "cache-friendly"],
+        choices=["ultracompact", "json", "json-pretty", "cache-friendly", "packed-json", "columnar-json"],
         default="ultracompact",
-        help="Output format (default: ultracompact; cache-friendly: optimized for LLM prompt caching)",
+        help="Output format (default: ultracompact; cache-friendly: optimized for LLM prompt caching; packed-json/columnar-json: compact JSON)",
     )
     diff_p.add_argument(
         "--lang",
@@ -447,6 +466,13 @@ Semantic Search:
         choices=["python", "typescript", "javascript", "go", "rust", "java", "c",
                  "cpp", "ruby", "php", "kotlin", "swift", "csharp", "scala", "lua", "elixir"],
         help="Language",
+    )
+    diff_p.add_argument(
+        "--zoom",
+        "-z",
+        default="L4",
+        choices=["L0", "L1", "L2", "L3", "L4", "l0", "l1", "l2", "l3", "l4"],
+        help="Zoom level: L0=module map, L1=signatures, L2=body sketch, L3=windowed, L4=full (default)",
     )
     diff_p.add_argument(
         "--session-id",
@@ -463,6 +489,24 @@ Semantic Search:
         action="store_true",
         help="Disable delta mode even if session-id provided",
     )
+    diff_p.add_argument(
+        "--incremental",
+        action="store_true",
+        default=False,
+        help="Send unified diffs for partially changed symbols instead of full code (delta mode only)",
+    )
+    diff_p.add_argument(
+        "--strip-comments",
+        action="store_true",
+        default=False,
+        help="Strip comments and truncate docstrings (preserves TODO/FIXME markers)",
+    )
+    diff_p.add_argument(
+        "--compress-imports",
+        action="store_true",
+        default=False,
+        help="Deduplicate common imports across files (10-20%% savings)",
+    )
 
     diff_p.add_argument(
         "--verify",
@@ -472,6 +516,15 @@ Semantic Search:
 
     diff_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
     diff_p.add_argument("--max-bytes", type=int, default=None, help="Cap output at N bytes")
+
+    hotspots_p = subparsers.add_parser(
+        "hotspots",
+        help="Show most frequently used symbols across sessions",
+    )
+    hotspots_p.add_argument("--top", type=int, default=20, help="Number of results")
+    hotspots_p.add_argument("--since", type=int, default=None, help="Days to look back")
+    hotspots_p.add_argument("--format", choices=["text", "json"], default="text")
+    hotspots_p.add_argument("--project", default=".", help="Project root")
 
     # tldr cfg <file> <function>
     cfg_p = subparsers.add_parser("cfg", help="Control flow graph")
@@ -954,6 +1007,8 @@ Semantic Search:
 
         elif args.command == "context":
             project_root = Path(args.project).resolve()
+            from .modules.core.zoom import ZoomLevel
+            zoom_level = ZoomLevel.from_string(args.zoom)
 
             # Determine if delta mode should be used
             use_delta = False
@@ -972,7 +1027,7 @@ Semantic Search:
                 # include-body is implemented for ultracompact/context-pack output.
                 fmt = "ultracompact"
 
-            if fmt == "ultracompact":
+            if fmt in ("ultracompact", "packed-json", "columnar-json"):
                 from .modules.core.output_formats import format_context_pack
                 from .modules.core.contextpack_engine import include_symbol_bodies
 
@@ -986,6 +1041,9 @@ Semantic Search:
                         language=args.lang,
                         budget_tokens=args.budget,
                         include_docstrings=args.with_docs,
+                        zoom_level=zoom_level,
+                        strip_comments=args.strip_comments,
+                        compress_imports=args.compress_imports,
                     )
                 else:
                     pack_kwargs = {
@@ -995,6 +1053,9 @@ Semantic Search:
                         "language": args.lang,
                         "budget_tokens": args.budget,
                         "include_docstrings": args.with_docs,
+                        "zoom_level": zoom_level,
+                        "strip_comments": args.strip_comments,
+                        "compress_imports": args.compress_imports,
                     }
                     if getattr(args, "include_body", False):
                         pack_kwargs["include_body"] = True
@@ -1011,9 +1072,10 @@ Semantic Search:
                         project_root,
                         language=args.lang,
                         budget_tokens=args.budget,
+                        strip_comments=args.strip_comments,
                     )
                 # Use json format for --machine flag
-                out_fmt = "json" if getattr(args, "machine", False) else "ultracompact"
+                out_fmt = "json" if getattr(args, "machine", False) else fmt
                 output = format_context_pack(pack, fmt=out_fmt)
             else:
                 from .modules.core.output_formats import format_context
@@ -1049,8 +1111,10 @@ Semantic Search:
                 print(output)
         elif args.command == "diff-context":
             from .modules.core.output_formats import format_context_pack
+            from .modules.core.zoom import ZoomLevel
             project = Path(args.project).resolve()
             base = args.base or _resolve_diff_base(project)
+            zoom_level = ZoomLevel.from_string(args.zoom)
 
             # Determine session ID and delta mode
             session_id = args.session_id
@@ -1071,6 +1135,10 @@ Semantic Search:
                     budget_tokens=args.budget,
                     language=args.lang,
                     compress=None if args.compress == "none" else args.compress,
+                    incremental=args.incremental,
+                    zoom_level=zoom_level,
+                    strip_comments=args.strip_comments,
+                    compress_imports=args.compress_imports,
                 )
             else:
                 pack = get_diff_context(
@@ -1080,6 +1148,9 @@ Semantic Search:
                     budget_tokens=args.budget,
                     language=args.lang,
                     compress=None if args.compress == "none" else args.compress,
+                    zoom_level=zoom_level,
+                    strip_comments=args.strip_comments,
+                    compress_imports=args.compress_imports,
                 )
             # Opt-in coherence verification
             if getattr(args, "verify", False) or os.environ.get("TLDRS_COHERENCE_VERIFY"):
@@ -1095,6 +1166,37 @@ Semantic Search:
                 from .modules.core.output_formats import truncate_output
                 diff_output = truncate_output(diff_output, max_lines=args.max_lines, max_bytes=args.max_bytes)
             print(diff_output)
+
+        elif args.command == "hotspots":
+            from .modules.core.attention_pruning import AttentionTracker
+
+            project = Path(args.project).resolve()
+            tracker = AttentionTracker(project)
+            hotspots = tracker.get_hotspots(top_n=args.top, since_days=args.since)
+
+            if getattr(args, "machine", False):
+                _machine_output(hotspots, args)
+            elif args.format == "json":
+                print(json.dumps(hotspots, indent=2))
+            else:
+                if not hotspots:
+                    print("No hotspots found.")
+                else:
+                    header = (
+                        f"{'Symbol':<60} {'Score':>7} {'Used':>6} {'Deliv':>6} "
+                        f"{'Last Used':<25} {'Last Delivered':<25}"
+                    )
+                    print(header)
+                    print("-" * len(header))
+                    for row in hotspots:
+                        symbol = row["symbol_id"]
+                        if len(symbol) > 60:
+                            symbol = symbol[:57] + "..."
+                        print(
+                            f"{symbol:<60} {row['popularity_score']:>7.3f} "
+                            f"{row['usage_count']:>6} {row['delivery_count']:>6} "
+                            f"{(row['last_used'] or '-'):25} {(row['last_delivered'] or '-'):25}"
+                        )
 
         elif args.command == "cfg":
             lang = args.lang or detect_language_from_extension(args.file)

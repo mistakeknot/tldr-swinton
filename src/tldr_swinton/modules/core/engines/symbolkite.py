@@ -23,6 +23,7 @@ from ..contextpack_engine import Candidate, ContextPackEngine
 from ..hybrid_extractor import HybridExtractor
 from ..project_index import ProjectIndex
 from ..workspace import iter_workspace_files
+from ..zoom import ZoomLevel
 
 
 @dataclass
@@ -306,7 +307,11 @@ def get_context_pack(
     include_docstrings: bool = False,
     disambiguate: bool = False,
     etag: str | None = None,
+    zoom_level: ZoomLevel = ZoomLevel.L4,
+    strip_comments: bool = False,
+    compress_imports: bool = False,
 ) -> dict:
+    project_root = Path(project).resolve()
     ctx = get_relevant_context(
         project,
         entry_point,
@@ -324,9 +329,34 @@ def get_context_pack(
             "candidates": ctx.candidates,
             "slices": [],
         }
+
+    extractor = HybridExtractor()
+    file_imports: dict[str, list[str]] = {}
+
+    def _imports_for_symbol(symbol_id: str) -> list[str]:
+        if ":" not in symbol_id:
+            return []
+        rel_path = symbol_id.split(":", 1)[0]
+        if rel_path in file_imports:
+            return file_imports[rel_path]
+        file_path = project_root / rel_path
+        if not file_path.is_file():
+            file_imports[rel_path] = []
+            return []
+        try:
+            info = extractor.extract(str(file_path))
+            file_imports[rel_path] = [imp.statement() for imp in info.imports]
+        except Exception:
+            file_imports[rel_path] = []
+        return file_imports[rel_path]
+
     candidates: list[Candidate] = []
     for order_idx, func in enumerate(ctx.functions):
         score = max(1, (depth - func.depth) + 1)
+        meta: dict[str, object] = {"calls": func.calls}
+        imports = _imports_for_symbol(func.name)
+        if imports:
+            meta["imports"] = imports
         candidates.append(
             Candidate(
                 symbol_id=func.name,
@@ -335,21 +365,24 @@ def get_context_pack(
                 order=order_idx,
                 signature=func.signature,
                 lines=(func.line, func.line) if func.line else None,
-                meta={"calls": func.calls},
+                meta=meta,
             )
         )
 
     # Build post-processors (attention reranking when available)
-    processors = _get_attention_processors(Path(project).resolve())
+    processors = _get_attention_processors(project_root)
 
     pack = ContextPackEngine(registry=None).build_context_pack(
         candidates,
         budget_tokens=budget_tokens,
         post_processors=processors or None,
+        zoom_level=zoom_level,
+        strip_comments=strip_comments,
+        compress_imports=compress_imports,
     )
 
     # Record delivery for attention tracking
-    _record_attention_delivery(Path(project).resolve(), pack)
+    _record_attention_delivery(project_root, pack)
 
     slices: list[dict] = []
     for item in pack.slices:
@@ -373,11 +406,14 @@ def get_context_pack(
             entry.update(item.meta)
         slices.append(entry)
 
-    return {
+    result = {
         "unchanged": False,
         "budget_used": pack.budget_used,
         "slices": slices,
     }
+    if pack.import_compression:
+        result["import_compression"] = pack.import_compression
+    return result
 
 
 @dataclass

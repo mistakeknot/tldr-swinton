@@ -19,7 +19,7 @@ import json
 import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -130,6 +130,19 @@ class AttentionTracker:
                     symbol_b TEXT NOT NULL,
                     count INTEGER DEFAULT 1,
                     PRIMARY KEY(symbol_a, symbol_b)
+                )
+                """
+            )
+
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS global_popularity (
+                    symbol_id TEXT PRIMARY KEY,
+                    delivery_count INTEGER DEFAULT 0,
+                    usage_count INTEGER DEFAULT 0,
+                    last_delivered TEXT,
+                    last_used TEXT,
+                    popularity_score REAL DEFAULT 0.0
                 )
                 """
             )
@@ -279,6 +292,168 @@ class AttentionTracker:
 
         return [(row[0], row[1]) for row in rows]
 
+    def update_global_popularity(self, session_id: str) -> None:
+        """Aggregate one session's deliveries/usages into global popularity."""
+        with self._conn() as conn:
+            delivered = conn.execute(
+                """
+                SELECT symbol_id, COUNT(*), MAX(delivered_at)
+                FROM slice_deliveries
+                WHERE session_id = ?
+                GROUP BY symbol_id
+                """,
+                (session_id,),
+            ).fetchall()
+
+            used = conn.execute(
+                """
+                SELECT symbol_id, COUNT(*), MAX(delivered_at)
+                FROM slice_deliveries
+                WHERE session_id = ? AND used = 1
+                GROUP BY symbol_id
+                """,
+                (session_id,),
+            ).fetchall()
+
+            for symbol_id, count, last_delivered in delivered:
+                conn.execute(
+                    """
+                    INSERT INTO global_popularity (symbol_id, delivery_count, last_delivered)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(symbol_id) DO UPDATE SET
+                        delivery_count = global_popularity.delivery_count + excluded.delivery_count,
+                        last_delivered = CASE
+                            WHEN global_popularity.last_delivered IS NULL THEN excluded.last_delivered
+                            WHEN excluded.last_delivered > global_popularity.last_delivered THEN excluded.last_delivered
+                            ELSE global_popularity.last_delivered
+                        END
+                    """,
+                    (symbol_id, int(count or 0), last_delivered),
+                )
+
+            for symbol_id, count, last_used in used:
+                conn.execute(
+                    """
+                    INSERT INTO global_popularity (symbol_id, usage_count, last_used)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(symbol_id) DO UPDATE SET
+                        usage_count = global_popularity.usage_count + excluded.usage_count,
+                        last_used = CASE
+                            WHEN global_popularity.last_used IS NULL THEN excluded.last_used
+                            WHEN excluded.last_used > global_popularity.last_used THEN excluded.last_used
+                            ELSE global_popularity.last_used
+                        END
+                    """,
+                    (symbol_id, int(count or 0), last_used),
+                )
+
+            rows = conn.execute(
+                """
+                SELECT symbol_id, delivery_count, usage_count, last_used
+                FROM global_popularity
+                """
+            ).fetchall()
+
+            now = datetime.now(timezone.utc)
+            for symbol_id, delivery_count, usage_count, last_used in rows:
+                deliveries = max(int(delivery_count or 0), 1)
+                usages = int(usage_count or 0)
+
+                usage_rate = usages / deliveries
+
+                recency_factor = 0.0
+                if last_used:
+                    try:
+                        last_used_dt = datetime.fromisoformat(last_used)
+                        if last_used_dt.tzinfo is None:
+                            last_used_dt = last_used_dt.replace(tzinfo=timezone.utc)
+                        days_since = max(
+                            0.0,
+                            (now - last_used_dt).total_seconds() / 86400.0,
+                        )
+                        recency_factor = 1.0 / (1.0 + days_since)
+                    except Exception:
+                        recency_factor = 0.0
+
+                delivery_frequency = min((int(delivery_count or 0) / 50.0), 1.0)
+                popularity_score = (
+                    0.6 * usage_rate
+                    + 0.3 * recency_factor
+                    + 0.1 * delivery_frequency
+                )
+
+                conn.execute(
+                    """
+                    UPDATE global_popularity
+                    SET popularity_score = ?
+                    WHERE symbol_id = ?
+                    """,
+                    (float(popularity_score), symbol_id),
+                )
+
+    def get_global_popularity(self, symbol_ids: list[str]) -> dict[str, float]:
+        """Return global popularity scores for symbols; missing symbols are 0.0."""
+        if not symbol_ids:
+            return {}
+
+        scores = {symbol_id: 0.0 for symbol_id in symbol_ids}
+        placeholders = ",".join("?" for _ in symbol_ids)
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT symbol_id, popularity_score
+                FROM global_popularity
+                WHERE symbol_id IN ({placeholders})
+                """,
+                symbol_ids,
+            ).fetchall()
+
+        for symbol_id, popularity_score in rows:
+            scores[symbol_id] = float(popularity_score or 0.0)
+        return scores
+
+    def get_hotspots(self, top_n: int = 20, since_days: int | None = None) -> list[dict]:
+        """Return top symbols by global popularity score."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT symbol_id, delivery_count, usage_count, popularity_score, last_delivered, last_used
+                FROM global_popularity
+                ORDER BY popularity_score DESC
+                """
+            ).fetchall()
+
+        if since_days is not None:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+            filtered = []
+            for row in rows:
+                last_delivered = row[4]
+                if not last_delivered:
+                    continue
+                try:
+                    delivered_dt = datetime.fromisoformat(last_delivered)
+                    if delivered_dt.tzinfo is None:
+                        delivered_dt = delivered_dt.replace(tzinfo=timezone.utc)
+                except Exception:
+                    continue
+                if delivered_dt >= cutoff:
+                    filtered.append(row)
+            rows = filtered
+
+        limit = max(0, int(top_n))
+        rows = rows[:limit]
+        return [
+            {
+                "symbol_id": row[0],
+                "delivery_count": int(row[1] or 0),
+                "usage_count": int(row[2] or 0),
+                "popularity_score": float(row[3] or 0.0),
+                "last_delivered": row[4],
+                "last_used": row[5],
+            }
+            for row in rows
+        ]
+
     def compute_attention_score(self, symbol_id: str) -> float:
         """Compute attention score for a symbol based on historical usage.
 
@@ -289,36 +464,48 @@ class AttentionTracker:
 
         if stats is None:
             # No history - use neutral score
-            return 0.5
+            session_score = 0.5
+        else:
+            # Base score from usage rate
+            base_score = stats.usage_rate
 
-        # Base score from usage rate
-        base_score = stats.usage_rate
+            # Boost for recently used symbols
+            recency_boost = 0.0
+            if stats.last_used:
+                try:
+                    last_used = datetime.fromisoformat(stats.last_used)
+                    age_hours = (datetime.now(timezone.utc) - last_used).total_seconds() / 3600
+                    if age_hours < 1:
+                        recency_boost = 0.2
+                    elif age_hours < 24:
+                        recency_boost = 0.1
+                except Exception:
+                    pass
 
-        # Boost for recently used symbols
-        recency_boost = 0.0
-        if stats.last_used:
-            try:
-                last_used = datetime.fromisoformat(stats.last_used)
-                age_hours = (datetime.now(timezone.utc) - last_used).total_seconds() / 3600
-                if age_hours < 1:
-                    recency_boost = 0.2
-                elif age_hours < 24:
-                    recency_boost = 0.1
-            except Exception:
-                pass
+            # Boost for frequently co-occurring symbols
+            cooccur_boost = 0.0
+            cooccurrences = self.get_cooccurring_symbols(symbol_id, limit=3)
+            if cooccurrences:
+                total_cooccur = sum(count for _, count in cooccurrences)
+                if total_cooccur > 5:
+                    cooccur_boost = min(0.1, total_cooccur / 100)
 
-        # Boost for frequently co-occurring symbols
-        cooccur_boost = 0.0
-        cooccurrences = self.get_cooccurring_symbols(symbol_id, limit=3)
-        if cooccurrences:
-            total_cooccur = sum(count for _, count in cooccurrences)
-            if total_cooccur > 5:
-                cooccur_boost = min(0.1, total_cooccur / 100)
+            # Session-specific score
+            session_score = min(1.0, base_score + recency_boost + cooccur_boost)
 
-        # Combine scores
-        score = min(1.0, base_score + recency_boost + cooccur_boost)
+        global_score = self.get_global_popularity([symbol_id]).get(symbol_id, 0.0)
+        with self._conn() as conn:
+            has_global_data = (
+                conn.execute(
+                    "SELECT 1 FROM global_popularity WHERE symbol_id = ? LIMIT 1",
+                    (symbol_id,),
+                ).fetchone()
+                is not None
+            )
 
-        return score
+        if has_global_data:
+            return 0.7 * session_score + 0.3 * global_score
+        return session_score
 
     def prune_candidates(
         self,

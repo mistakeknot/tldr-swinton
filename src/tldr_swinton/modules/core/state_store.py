@@ -20,6 +20,7 @@ class Delivery:
     representation: str
     vhs_ref: str | None
     token_estimate: int | None
+    code_snapshot: str | None
     last_accessed: str
 
 
@@ -32,11 +33,12 @@ class DeltaResult:
 
 
 class StateStore:
-    def __init__(self, project_root: Path) -> None:
+    def __init__(self, project_root: Path, attention_tracker: object | None = None) -> None:
         self.project_root = Path(project_root).resolve()
         self.root = self.project_root / ".tldrs"
         self.vhs = VHSStore(root=self.root)
         self.db_path = self.vhs.db_path
+        self.attention_tracker = attention_tracker
         self._init_db()
 
     def _conn(self) -> sqlite3.Connection:
@@ -69,6 +71,7 @@ class StateStore:
                     representation TEXT NOT NULL,
                     vhs_ref TEXT,
                     token_estimate INTEGER,
+                    code_snapshot TEXT,
                     last_accessed TEXT NOT NULL,
                     PRIMARY KEY(session_id, symbol_id)
                 )
@@ -77,6 +80,11 @@ class StateStore:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_deliveries_last_accessed ON deliveries(last_accessed)"
             )
+            # Migration: add code_snapshot column if missing on existing databases.
+            try:
+                conn.execute("ALTER TABLE deliveries ADD COLUMN code_snapshot TEXT")
+            except Exception:
+                pass
 
     def open_session(self, session_id: str, repo_fingerprint: str, default_language: str | None = None) -> None:
         now = self._now()
@@ -102,29 +110,32 @@ class StateStore:
         representation: str,
         vhs_ref: str | None = None,
         token_estimate: int | None = None,
+        code_snapshot: str | None = None,
     ) -> None:
         now = self._now()
+        snapshot = code_snapshot if representation in {"full", "incremental"} else None
         with self._conn() as conn:
             conn.execute(
                 """
                 INSERT INTO deliveries
-                (session_id, symbol_id, etag, representation, vhs_ref, token_estimate, last_accessed)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (session_id, symbol_id, etag, representation, vhs_ref, token_estimate, code_snapshot, last_accessed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(session_id, symbol_id) DO UPDATE SET
                     etag = excluded.etag,
                     representation = excluded.representation,
                     vhs_ref = excluded.vhs_ref,
                     token_estimate = excluded.token_estimate,
+                    code_snapshot = excluded.code_snapshot,
                     last_accessed = excluded.last_accessed
                 """,
-                (session_id, symbol_id, etag, representation, vhs_ref, token_estimate, now),
+                (session_id, symbol_id, etag, representation, vhs_ref, token_estimate, snapshot, now),
             )
 
     def get_delivery(self, session_id: str, symbol_id: str) -> dict | None:
         with self._conn() as conn:
             row = conn.execute(
                 """
-                SELECT session_id, symbol_id, etag, representation, vhs_ref, token_estimate, last_accessed
+                SELECT session_id, symbol_id, etag, representation, vhs_ref, token_estimate, code_snapshot, last_accessed
                 FROM deliveries WHERE session_id = ? AND symbol_id = ?
                 """,
                 (session_id, symbol_id),
@@ -138,9 +149,24 @@ class StateStore:
             "representation",
             "vhs_ref",
             "token_estimate",
+            "code_snapshot",
             "last_accessed",
         ]
         return dict(zip(keys, row))
+
+    def get_previous_code(self, session_id: str, symbol_id: str) -> str | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT code_snapshot FROM deliveries
+                WHERE session_id = ? AND symbol_id = ? AND code_snapshot IS NOT NULL
+                ORDER BY rowid DESC LIMIT 1
+                """,
+                (session_id, symbol_id),
+            ).fetchone()
+        if not row:
+            return None
+        return row[0]
 
     def cleanup_expired(self, ttl_seconds: int) -> dict:
         cutoff = datetime.now(timezone.utc).timestamp() - ttl_seconds
@@ -228,13 +254,14 @@ class StateStore:
             conn.executemany(
                 """
                 INSERT INTO deliveries
-                (session_id, symbol_id, etag, representation, vhs_ref, token_estimate, last_accessed)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (session_id, symbol_id, etag, representation, vhs_ref, token_estimate, code_snapshot, last_accessed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(session_id, symbol_id) DO UPDATE SET
                     etag = excluded.etag,
                     representation = excluded.representation,
                     vhs_ref = excluded.vhs_ref,
                     token_estimate = excluded.token_estimate,
+                    code_snapshot = excluded.code_snapshot,
                     last_accessed = excluded.last_accessed
                 """,
                 [
@@ -245,6 +272,7 @@ class StateStore:
                         d["representation"],
                         d.get("vhs_ref"),
                         d.get("token_estimate"),
+                        d.get("code_snapshot") if d.get("representation") in {"full", "incremental"} else None,
                         now,
                     )
                     for d in deliveries
@@ -293,6 +321,15 @@ class StateStore:
         fingerprint = _compute_repo_fingerprint(self.project_root)
         self.open_session(session_id, fingerprint, default_language)
         return session_id
+
+    def close_session(self, session_id: str, attention_tracker: object | None = None) -> None:
+        """Close a session and trigger global popularity aggregation when available."""
+        tracker = attention_tracker or self.attention_tracker
+        if tracker is None:
+            return
+        update_fn = getattr(tracker, "update_global_popularity", None)
+        if callable(update_fn):
+            update_fn(session_id)
 
 
 def _compute_repo_fingerprint(project_root: Path) -> str:

@@ -220,6 +220,7 @@ from .engines.delta import (
     get_context_pack_with_delta,
     get_diff_context_with_delta,
 )
+from .zoom import ZoomLevel
 from .path_utils import PathTraversalError, _resolve_source, _validate_path_containment
 
 
@@ -307,6 +308,9 @@ def build_diff_context_from_hunks(
     language: str = "python",
     budget_tokens: int | None = None,
     compress: str | None = None,
+    zoom_level: ZoomLevel = ZoomLevel.L4,
+    strip_comments: bool = False,
+    compress_imports: bool = False,
 ) -> dict:
     from .engines.difflens import (
         build_diff_context_from_hunks as _build_diff_context_from_hunks,
@@ -318,6 +322,9 @@ def build_diff_context_from_hunks(
         language=language,
         budget_tokens=budget_tokens,
         compress=compress,
+        zoom_level=zoom_level,
+        strip_comments=strip_comments,
+        compress_imports=compress_imports,
     )
 
 
@@ -328,6 +335,9 @@ def get_diff_context(
     budget_tokens: int | None = None,
     language: str = "python",
     compress: str | None = None,
+    zoom_level: ZoomLevel = ZoomLevel.L4,
+    strip_comments: bool = False,
+    compress_imports: bool = False,
 ) -> dict:
     from .engines.difflens import get_diff_context as _get_diff_context
 
@@ -338,6 +348,9 @@ def get_diff_context(
         budget_tokens=budget_tokens,
         language=language,
         compress=compress,
+        zoom_level=zoom_level,
+        strip_comments=strip_comments,
+        compress_imports=compress_imports,
     )
 
 
@@ -1031,6 +1044,9 @@ def get_symbol_context_pack(
     budget_tokens: int | None = None,
     include_docstrings: bool = False,
     etag: str | None = None,
+    zoom_level: ZoomLevel = ZoomLevel.L4,
+    strip_comments: bool = False,
+    compress_imports: bool = False,
 ) -> dict:
     return _get_symbol_context_pack(
         project,
@@ -1040,6 +1056,9 @@ def get_symbol_context_pack(
         budget_tokens=budget_tokens,
         include_docstrings=include_docstrings,
         etag=etag,
+        zoom_level=zoom_level,
+        strip_comments=strip_comments,
+        compress_imports=compress_imports,
     )
 
 

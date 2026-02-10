@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from typing import Iterable
@@ -57,6 +58,7 @@ def _dedupe_preserve(items: list[str]) -> list[str]:
 
 from .api import RelevantContext
 from .contextpack_engine import ContextPack, ContextSlice
+from .json_codec import ALIASES, elide_nulls, pack_json, to_columnar
 from .token_utils import estimate_tokens as _estimate_tokens
 
 
@@ -110,20 +112,24 @@ def format_context(
 
 
 def _contextpack_to_dict(pack: ContextPack) -> dict:
+    slices: list[dict] = []
+    for item in pack.slices:
+        slice_dict = {
+            "id": item.id,
+            "signature": item.signature,
+            "code": item.code,
+            "lines": list(item.lines) if item.lines else None,
+            "relevance": item.relevance,
+            "meta": item.meta,
+            "etag": item.etag,
+        }
+        if isinstance(item.meta, dict) and item.meta.get("representation") == "incremental" and item.code is not None:
+            slice_dict["diff"] = item.code
+        slices.append(slice_dict)
+
     result = {
         "budget_used": pack.budget_used,
-        "slices": [
-            {
-                "id": item.id,
-                "signature": item.signature,
-                "code": item.code,
-                "lines": list(item.lines) if item.lines else None,
-                "relevance": item.relevance,
-                "meta": item.meta,
-                "etag": item.etag,
-            }
-            for item in pack.slices
-        ],
+        "slices": slices,
     }
     # Include delta-specific fields if present (use `is not None` to preserve
     # the distinction between None=non-delta and []=delta-all-changed)
@@ -133,7 +139,118 @@ def _contextpack_to_dict(pack: ContextPack) -> dict:
         result["rehydrate"] = pack.rehydrate
     if pack.cache_stats is not None:
         result["cache_stats"] = pack.cache_stats
+    if pack.import_compression is not None:
+        result["import_compression"] = pack.import_compression
     return result
+
+
+def _pack_symbol_id(
+    symbol_id: str,
+    path_refs: dict[str, str],
+    path_dict: dict[str, str],
+) -> str:
+    if not isinstance(symbol_id, str) or ":" not in symbol_id:
+        return symbol_id
+    file_part, symbol = symbol_id.split(":", 1)
+    if not file_part:
+        return symbol_id
+    ref = path_refs.get(file_part)
+    if ref is None:
+        ref = f"P{len(path_refs)}"
+        path_refs[file_part] = ref
+        path_dict[ref] = file_part
+    return f"{ref}:{symbol}"
+
+
+def _format_packed_json(pack: dict | ContextPack) -> str:
+    pack_dict = _contextpack_to_dict(pack) if isinstance(pack, ContextPack) else copy.deepcopy(pack)
+    if not isinstance(pack_dict, dict):
+        return json.dumps(pack_dict, separators=(",", ":"), ensure_ascii=False)
+
+    path_refs: dict[str, str] = {}
+    path_dict: dict[str, str] = {}
+
+    slices = pack_dict.get("slices")
+    if isinstance(slices, list):
+        for item in slices:
+            if isinstance(item, dict) and item.get("id"):
+                item["id"] = _pack_symbol_id(item["id"], path_refs, path_dict)
+
+    unchanged = pack_dict.get("unchanged")
+    if isinstance(unchanged, list):
+        pack_dict["unchanged"] = [
+            _pack_symbol_id(symbol_id, path_refs, path_dict)
+            if isinstance(symbol_id, str)
+            else symbol_id
+            for symbol_id in unchanged
+        ]
+
+    rehydrate = pack_dict.get("rehydrate")
+    if isinstance(rehydrate, dict):
+        pack_dict["rehydrate"] = {
+            _pack_symbol_id(symbol_id, path_refs, path_dict)
+            if isinstance(symbol_id, str)
+            else symbol_id: ref
+            for symbol_id, ref in rehydrate.items()
+        }
+
+    packed = pack_json(elide_nulls(pack_dict))
+    output = {"_aliases": ALIASES, "_paths": path_dict}
+    if isinstance(packed, dict):
+        output.update(packed)
+    else:
+        output["value"] = packed
+    return json.dumps(output, separators=(",", ":"), ensure_ascii=False)
+
+
+def _format_columnar_json(pack: dict | ContextPack) -> str:
+    pack_dict = _contextpack_to_dict(pack) if isinstance(pack, ContextPack) else copy.deepcopy(pack)
+    if not isinstance(pack_dict, dict):
+        return json.dumps(pack_dict, separators=(",", ":"), ensure_ascii=False)
+
+    slices = pack_dict.get("slices")
+    path_refs: dict[str, str] = {}
+    path_dict: dict[str, str] = {}
+    if isinstance(slices, list):
+        for item in slices:
+            if not isinstance(item, dict):
+                continue
+            if item.get("id"):
+                item["id"] = _pack_symbol_id(item["id"], path_refs, path_dict)
+            meta = item.get("meta")
+            if isinstance(meta, dict) and isinstance(meta.get("file"), str):
+                file_ref = path_refs.get(meta["file"])
+                if file_ref is None:
+                    file_ref = f"P{len(path_refs)}"
+                    path_refs[meta["file"]] = file_ref
+                    path_dict[file_ref] = meta["file"]
+                meta["file"] = file_ref
+
+    unchanged = pack_dict.get("unchanged")
+    if isinstance(unchanged, list):
+        pack_dict["unchanged"] = [
+            _pack_symbol_id(symbol_id, path_refs, path_dict)
+            if isinstance(symbol_id, str)
+            else symbol_id
+            for symbol_id in unchanged
+        ]
+
+    rehydrate = pack_dict.get("rehydrate")
+    if isinstance(rehydrate, dict):
+        pack_dict["rehydrate"] = {
+            _pack_symbol_id(symbol_id, path_refs, path_dict)
+            if isinstance(symbol_id, str)
+            else symbol_id: ref
+            for symbol_id, ref in rehydrate.items()
+        }
+
+    slice_dicts = [item for item in slices if isinstance(item, dict)] if isinstance(slices, list) else []
+    columnar_slices = to_columnar(slice_dicts)
+    output = {key: value for key, value in pack_dict.items() if key != "slices"}
+    output["_schema"] = list(columnar_slices.keys())
+    output["_paths"] = path_dict
+    output["slices"] = columnar_slices
+    return json.dumps(output, separators=(",", ":"), ensure_ascii=False)
 
 
 def format_context_pack(pack: dict | ContextPack, fmt: str = "ultracompact") -> str:
@@ -147,11 +264,19 @@ def format_context_pack(pack: dict | ContextPack, fmt: str = "ultracompact") -> 
 
     # Handle structured unchanged response
     if isinstance(pack, dict) and pack.get("unchanged") is True and not pack.get("slices"):
+        if fmt == "packed-json":
+            return _format_packed_json(pack)
+        if fmt == "columnar-json":
+            return _format_columnar_json(pack)
         if fmt in ("json", "json-pretty"):
             return json.dumps(pack, indent=2 if fmt == "json-pretty" else None, ensure_ascii=False)
         return "# UNCHANGED (no changes since last request)"
     # Handle error responses (including ambiguous)
     if isinstance(pack, dict) and pack.get("error") is True:
+        if fmt == "packed-json":
+            return _format_packed_json(pack)
+        if fmt == "columnar-json":
+            return _format_columnar_json(pack)
         if fmt in ("json", "json-pretty"):
             return json.dumps(pack, indent=2 if fmt == "json-pretty" else None, ensure_ascii=False)
         # Text format for errors
@@ -174,6 +299,10 @@ def format_context_pack(pack: dict | ContextPack, fmt: str = "ultracompact") -> 
             "candidates": candidates,
             "slices": [],
         }
+        if fmt == "packed-json":
+            return _format_packed_json(structured)
+        if fmt == "columnar-json":
+            return _format_columnar_json(structured)
         if fmt in ("json", "json-pretty"):
             return json.dumps(structured, indent=2 if fmt == "json-pretty" else None, ensure_ascii=False)
         # Text format
@@ -185,6 +314,10 @@ def format_context_pack(pack: dict | ContextPack, fmt: str = "ultracompact") -> 
         return json.dumps(pack, separators=(",", ":"), ensure_ascii=False)
     if fmt == "json-pretty":
         return json.dumps(pack, indent=2, ensure_ascii=False)
+    if fmt == "packed-json":
+        return _format_packed_json(pack)
+    if fmt == "columnar-json":
+        return _format_columnar_json(pack)
     if fmt == "ultracompact":
         return "\n".join(_format_context_pack_ultracompact(pack))
     if fmt == "cache-friendly":
@@ -416,6 +549,23 @@ def _format_ultracompact_budgeted(ctx: RelevantContext, budget_tokens: int) -> s
     return "\n".join(lines)
 
 
+def _get_import_compression_meta(pack: dict) -> tuple[str, dict[str, str]]:
+    import_meta = pack.get("import_compression")
+    if not isinstance(import_meta, dict):
+        return "", {}
+    common_header = import_meta.get("common_header")
+    per_file = import_meta.get("per_file")
+    if not isinstance(common_header, str):
+        common_header = ""
+    if not isinstance(per_file, dict):
+        return common_header, {}
+    normalized: dict[str, str] = {}
+    for file_path, value in per_file.items():
+        if isinstance(file_path, str) and isinstance(value, str):
+            normalized[file_path] = value
+    return common_header, normalized
+
+
 def _format_cache_friendly(pack: dict) -> str:
     """Format context pack for LLM provider prompt caching optimization.
 
@@ -440,6 +590,7 @@ def _format_cache_friendly(pack: dict) -> str:
     slices = pack.get("slices", [])
     if not slices:
         return "# tldrs cache-friendly output\n\n# No symbols to display"
+    common_header, per_file_imports = _get_import_compression_meta(pack)
 
     # --- Classify slices ---
     unchanged_val = pack.get("unchanged")
@@ -466,9 +617,19 @@ def _format_cache_friendly(pack: dict) -> str:
         f"## CACHE PREFIX ({len(all_slices)} symbols)",
         "",
     ]
+    seen_import_files: set[str] = set()
 
     for item in all_slices:
         symbol_id = item.get("id", "?")
+        file_part, _ = _split_symbol(symbol_id, "")
+        if file_part and file_part not in seen_import_files:
+            seen_import_files.add(file_part)
+            unique_imports = per_file_imports.get(file_part, "").strip()
+            if unique_imports:
+                prefix_parts.append(f"# Unique imports: {file_part}")
+                for unique_line in unique_imports.splitlines():
+                    prefix_parts.append(f"#   {unique_line}")
+
         signature = item.get("signature", "")
         lines_range = item.get("lines") or []
         line_info = ""
@@ -482,10 +643,13 @@ def _format_cache_friendly(pack: dict) -> str:
 
     prefix_parts.append("")
     prefix_text = "\n".join(prefix_parts)
+    prefix_for_metrics = (
+        f"{common_header}\n\n{prefix_text}" if common_header else prefix_text
+    )
 
     # --- Compute prefix metrics ---
-    prefix_token_est = _estimate_tokens(prefix_text)
-    prefix_hash = hashlib.sha256(prefix_text.encode("utf-8")).hexdigest()[:16]
+    prefix_token_est = _estimate_tokens(prefix_for_metrics)
+    prefix_hash = hashlib.sha256(prefix_for_metrics.encode("utf-8")).hexdigest()[:16]
 
     # --- Build dynamic section: code bodies only ---
     dynamic_parts: list[str] = []
@@ -495,9 +659,15 @@ def _format_cache_friendly(pack: dict) -> str:
         for item in dynamic_body_slices:
             symbol_id = item.get("id", "?")
             signature = item.get("signature", "")
+            meta = item.get("meta") if isinstance(item.get("meta"), dict) else {}
+            representation = meta.get("representation")
+            code = item.get("code", "")
+            if representation == "incremental":
+                dynamic_parts.extend(str(code).splitlines())
+                dynamic_parts.append("")
+                continue
             dynamic_parts.append(f"### {symbol_id}")
             dynamic_parts.append(f"{signature}")
-            code = item.get("code", "")
             dynamic_parts.append("```")
             dynamic_parts.extend(code.splitlines())
             dynamic_parts.append("```")
@@ -510,7 +680,11 @@ def _format_cache_friendly(pack: dict) -> str:
     breakpoint_line = f"<!-- CACHE_BREAKPOINT: ~{prefix_token_est} tokens -->"
     hints_placeholder = "__CACHE_HINTS_PLACEHOLDER__"
 
-    final_parts: list[str] = [header, hints_placeholder, "", prefix_text, breakpoint_line]
+    final_parts: list[str] = [header, hints_placeholder, ""]
+    if common_header:
+        final_parts.extend(common_header.splitlines())
+        final_parts.append("")
+    final_parts.extend([prefix_text, breakpoint_line])
     if dynamic_parts:
         final_parts.append("")
         final_parts.extend(dynamic_parts)
@@ -551,6 +725,7 @@ def _format_cache_friendly(pack: dict) -> str:
 def _format_context_pack_ultracompact(pack: dict) -> list[str]:
     path_ids: dict[str, str] = {}
     lines: list[str] = []
+    common_header, per_file_imports = _get_import_compression_meta(pack)
 
     base = pack.get("base")
     head = pack.get("head")
@@ -565,6 +740,10 @@ def _format_context_pack_ultracompact(pack: dict) -> list[str]:
         hits = cache_stats.get("hits", 0)
         misses = cache_stats.get("misses", 0)
         lines.append(f"# Delta: {hits} unchanged, {misses} changed ({hit_rate:.0%} cache hit)")
+        lines.append("")
+
+    if common_header:
+        lines.extend(common_header.splitlines())
         lines.append("")
 
     for item in pack.get("slices", []):
@@ -582,8 +761,19 @@ def _format_context_pack_ultracompact(pack: dict) -> list[str]:
     else:
         unchanged_set = set(unchanged_val or [])
 
+    seen_import_files: set[str] = set()
     for item in pack.get("slices", []):
         symbol_id = item.get("id", "?")
+        file_part, _ = _split_symbol(symbol_id, "")
+        if file_part and file_part not in seen_import_files:
+            seen_import_files.add(file_part)
+            unique_imports = per_file_imports.get(file_part, "").strip()
+            if unique_imports:
+                file_label = path_ids.get(file_part, file_part)
+                lines.append(f"# Unique imports: {file_label}")
+                for unique_line in unique_imports.splitlines():
+                    lines.append(f"#   {unique_line}")
+
         display = _format_symbol(symbol_id, "", path_ids)
         signature = item.get("signature", "")
         lines_range = item.get("lines") or []
@@ -598,9 +788,14 @@ def _format_context_pack_ultracompact(pack: dict) -> list[str]:
 
         code = item.get("code")
         if code:
-            lines.append("```")
-            lines.extend(code.splitlines())
-            lines.append("```")
+            meta = item.get("meta")
+            representation = meta.get("representation") if isinstance(meta, dict) else None
+            if representation == "incremental":
+                lines.extend(code.splitlines())
+            else:
+                lines.append("```")
+                lines.extend(code.splitlines())
+                lines.append("```")
 
         lines.append("")
 

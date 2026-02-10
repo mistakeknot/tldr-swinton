@@ -11,6 +11,7 @@ from ..hybrid_extractor import HybridExtractor
 from ..project_index import ProjectIndex
 from ..workspace import iter_workspace_files
 from ..contextpack_engine import Candidate, ContextPackEngine
+from ..zoom import ZoomLevel
 
 
 @dataclass
@@ -568,6 +569,9 @@ def build_diff_context_from_hunks(
     language: str = "python",
     budget_tokens: int | None = None,
     compress: str | None = None,
+    zoom_level: ZoomLevel = ZoomLevel.L4,
+    strip_comments: bool = False,
+    compress_imports: bool = False,
 ) -> dict:
     project = Path(project).resolve()
     symbol_diff_lines = map_hunks_to_symbols(project, hunks, language=language)
@@ -622,6 +626,25 @@ def build_diff_context_from_hunks(
         return ranges
 
     candidates: list[Candidate] = []
+    import_extractor = HybridExtractor()
+    file_imports: dict[str, list[str]] = {}
+
+    def _imports_for_symbol(symbol_id: str) -> list[str]:
+        if ":" not in symbol_id:
+            return []
+        rel_path = symbol_id.split(":", 1)[0]
+        if rel_path in file_imports:
+            return file_imports[rel_path]
+        file_path = project / rel_path
+        if not file_path.is_file():
+            file_imports[rel_path] = []
+            return []
+        try:
+            info = import_extractor.extract(str(file_path))
+            file_imports[rel_path] = [imp.statement() for imp in info.imports]
+        except Exception:
+            file_imports[rel_path] = []
+        return file_imports[rel_path]
 
     relevance_score = {"contains_diff": 3, "caller": 2, "callee": 2, "adjacent": 1}
 
@@ -688,6 +711,15 @@ def build_diff_context_from_hunks(
             dropped_blocks = 0
 
         label = relevance.get(symbol_id, "adjacent")
+        meta: dict[str, object] = {
+            "diff_lines": _to_ranges(sorted(symbol_diff_lines.get(symbol_id, []))),
+            "block_count": block_count,
+            "dropped_blocks": dropped_blocks,
+            "summary": summary,
+        }
+        imports = _imports_for_symbol(symbol_id)
+        if imports:
+            meta["imports"] = imports
         candidates.append(
             Candidate(
                 symbol_id=symbol_id,
@@ -697,12 +729,7 @@ def build_diff_context_from_hunks(
                 signature=signature,
                 code=code,
                 lines=code_scope_range or lines_range,
-                meta={
-                    "diff_lines": _to_ranges(sorted(symbol_diff_lines.get(symbol_id, []))),
-                    "block_count": block_count,
-                    "dropped_blocks": dropped_blocks,
-                    "summary": summary,
-                },
+                meta=meta,
             )
         )
 
@@ -713,6 +740,9 @@ def build_diff_context_from_hunks(
         candidates,
         budget_tokens=budget_tokens,
         post_processors=processors or None,
+        zoom_level=zoom_level,
+        strip_comments=strip_comments,
+        compress_imports=compress_imports,
     )
 
     # Record delivery for attention tracking
@@ -731,12 +761,15 @@ def build_diff_context_from_hunks(
             entry.update(item.meta)
         slices.append(entry)
 
-    return {
+    result = {
         "base": None,
         "head": None,
         "budget_used": pack.budget_used,
         "slices": slices,
     }
+    if pack.import_compression:
+        result["import_compression"] = pack.import_compression
+    return result
 
 
 def _get_diff_processors(project: Path, file_sources: dict[str, str]) -> list:
@@ -885,6 +918,9 @@ def get_diff_context(
     budget_tokens: int | None = None,
     language: str = "python",
     compress: str | None = None,
+    zoom_level: ZoomLevel = ZoomLevel.L4,
+    strip_comments: bool = False,
+    compress_imports: bool = False,
 ) -> dict:
     project = Path(project).resolve()
     base_ref = base or "HEAD~1"
@@ -913,6 +949,9 @@ def get_diff_context(
         language=language,
         budget_tokens=budget_tokens,
         compress=compress,
+        zoom_level=zoom_level,
+        strip_comments=strip_comments,
+        compress_imports=compress_imports,
     )
     pack["base"] = base_ref
     pack["head"] = head_ref

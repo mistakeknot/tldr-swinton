@@ -14,6 +14,9 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ..incremental_diff import compute_symbol_diff, format_incremental, is_diff_worthwhile
+from ..zoom import ZoomLevel
+
 if TYPE_CHECKING:
     from ..contextpack_engine import ContextPack
 
@@ -58,6 +61,10 @@ def get_context_pack_with_delta(
     language: str = "python",
     budget_tokens: int | None = None,
     include_docstrings: bool = False,
+    incremental: bool = False,
+    zoom_level: ZoomLevel = ZoomLevel.L4,
+    strip_comments: bool = False,
+    compress_imports: bool = False,
 ) -> "ContextPack":
     """Get context pack with delta detection against session cache.
 
@@ -126,6 +133,8 @@ def get_context_pack_with_delta(
             candidates,
             delta_result,
             budget_tokens=budget_tokens,
+            zoom_level=zoom_level,
+            compress_imports=compress_imports,
         )
         return pack
 
@@ -138,6 +147,9 @@ def get_context_pack_with_delta(
         language=language,
         budget_tokens=None,  # Get all symbols first
         include_docstrings=include_docstrings,
+        zoom_level=zoom_level,
+        strip_comments=strip_comments,
+        compress_imports=compress_imports,
     )
 
     # Handle ambiguous case
@@ -151,10 +163,32 @@ def get_context_pack_with_delta(
     # Build candidates with code only for changed symbols
     slice_map = {s["id"]: s for s in slices_data}
     candidates = []
+    latest_code_by_symbol: dict[str, str] = {}
 
     for i, sig in enumerate(signatures):
         is_changed = sig.symbol_id in delta_result.changed
         slice_data = slice_map.get(sig.symbol_id, {})
+        raw_meta = {
+            k: v for k, v in slice_data.items()
+            if k not in ("id", "relevance", "signature", "code", "lines")
+        } or {"calls": sig.calls}
+        meta = raw_meta.copy() if isinstance(raw_meta, dict) else {"meta": raw_meta}
+        code = slice_data.get("code") if is_changed else None
+
+        if is_changed and isinstance(code, str):
+            latest_code_by_symbol[sig.symbol_id] = code
+            if incremental:
+                previous_code = store.get_previous_code(session_id, sig.symbol_id)
+                previous_delivery = store.get_delivery(session_id, sig.symbol_id)
+                if previous_code:
+                    diff = compute_symbol_diff(previous_code, code)
+                    if diff and is_diff_worthwhile(diff, code):
+                        base_etag = (previous_delivery or {}).get("etag") or ""
+                        code = format_incremental(sig.symbol_id, sig.signature, diff, base_etag)
+                        meta["representation"] = "incremental"
+                        meta["base_etag"] = base_etag
+            if "representation" not in meta:
+                meta["representation"] = "full"
 
         candidates.append(
             Candidate(
@@ -163,9 +197,9 @@ def get_context_pack_with_delta(
                 relevance_label=slice_data.get("relevance") or f"depth_{sig.depth}",
                 order=i,
                 signature=sig.signature,
-                code=slice_data.get("code") if is_changed else None,  # Only include code for changed
+                code=code,  # Only include code for changed
                 lines=tuple(slice_data["lines"]) if slice_data.get("lines") else None,
-                meta=slice_data.get("meta") or {"calls": sig.calls},
+                meta=meta,
             )
         )
 
@@ -174,6 +208,8 @@ def get_context_pack_with_delta(
         candidates,
         delta_result,
         budget_tokens=budget_tokens,
+        zoom_level=zoom_level,
+        compress_imports=compress_imports,
     )
 
     # Record deliveries for changed symbols
@@ -181,13 +217,22 @@ def get_context_pack_with_delta(
     for s in delta_pack.slices:
         if s.id in (delta_pack.unchanged or []):
             continue
-        deliveries.append({
+        representation = "signature"
+        if s.code:
+            if isinstance(s.meta, dict) and s.meta.get("representation") == "incremental":
+                representation = "incremental"
+            else:
+                representation = "full"
+        delivery = {
             "symbol_id": s.id,
             "etag": symbol_etags.get(s.id, ""),
-            "representation": "full" if s.code else "signature",
+            "representation": representation,
             "vhs_ref": None,
             "token_estimate": len(s.code) // 4 if s.code else len(s.signature) // 4,
-        })
+        }
+        if representation in {"full", "incremental"} and latest_code_by_symbol.get(s.id):
+            delivery["code_snapshot"] = latest_code_by_symbol[s.id]
+        deliveries.append(delivery)
 
     if deliveries:
         from ..state_store import _compute_repo_fingerprint
@@ -206,6 +251,10 @@ def get_diff_context_with_delta(
     budget_tokens: int | None = None,
     language: str = "python",
     compress: str | None = None,
+    incremental: bool = False,
+    zoom_level: ZoomLevel = ZoomLevel.L4,
+    strip_comments: bool = False,
+    compress_imports: bool = False,
 ) -> "ContextPack":
     """Get diff context pack with delta detection against session cache.
 
@@ -243,6 +292,9 @@ def get_diff_context_with_delta(
             budget_tokens=budget_tokens,
             language=language,
             compress=compress,
+            zoom_level=zoom_level,
+            strip_comments=strip_comments,
+            compress_imports=compress_imports,
         )
         return ContextPack(
             slices=[],
@@ -290,6 +342,8 @@ def get_diff_context_with_delta(
             candidates,
             delta_result,
             budget_tokens=budget_tokens,
+            zoom_level=zoom_level,
+            compress_imports=compress_imports,
         )
         return pack
 
@@ -303,6 +357,9 @@ def get_diff_context_with_delta(
         budget_tokens=None,  # Get all symbols first
         language=language,
         compress=compress,
+        zoom_level=zoom_level,
+        strip_comments=strip_comments,
+        compress_imports=compress_imports,
     )
 
     slices_data = full_pack_dict.get("slices", [])
@@ -313,10 +370,32 @@ def get_diff_context_with_delta(
     # Build candidates with code only for changed symbols
     relevance_score = {"contains_diff": 100, "caller": 80, "callee": 80, "adjacent": 50}
     candidates = []
+    latest_code_by_symbol: dict[str, str] = {}
 
     for i, sig in enumerate(signatures):
         is_changed = sig.symbol_id in delta_result.changed
         slice_data = slice_map.get(sig.symbol_id, {})
+        raw_meta = {
+            k: v for k, v in slice_data.items()
+            if k not in ("id", "relevance", "signature", "code", "lines")
+        } or {"diff_lines": sig.diff_lines}
+        meta = raw_meta.copy() if isinstance(raw_meta, dict) else {"meta": raw_meta}
+        code = slice_data.get("code") if is_changed else None
+
+        if is_changed and isinstance(code, str):
+            latest_code_by_symbol[sig.symbol_id] = code
+            if incremental:
+                previous_code = store.get_previous_code(session_id, sig.symbol_id)
+                previous_delivery = store.get_delivery(session_id, sig.symbol_id)
+                if previous_code:
+                    diff = compute_symbol_diff(previous_code, code)
+                    if diff and is_diff_worthwhile(diff, code):
+                        base_etag = (previous_delivery or {}).get("etag") or ""
+                        code = format_incremental(sig.symbol_id, sig.signature, diff, base_etag)
+                        meta["representation"] = "incremental"
+                        meta["base_etag"] = base_etag
+            if "representation" not in meta:
+                meta["representation"] = "full"
 
         candidates.append(
             Candidate(
@@ -325,9 +404,9 @@ def get_diff_context_with_delta(
                 relevance_label=slice_data.get("relevance") or sig.relevance_label,
                 order=i,
                 signature=sig.signature,
-                code=slice_data.get("code") if is_changed else None,  # Only include code for changed
+                code=code,  # Only include code for changed
                 lines=tuple(slice_data["lines"]) if slice_data.get("lines") and len(slice_data["lines"]) == 2 else None,
-                meta={k: v for k, v in slice_data.items() if k not in ("id", "relevance", "signature", "code", "lines")} or {"diff_lines": sig.diff_lines},
+                meta=meta,
             )
         )
 
@@ -336,6 +415,8 @@ def get_diff_context_with_delta(
         candidates,
         delta_result,
         budget_tokens=budget_tokens,
+        zoom_level=zoom_level,
+        compress_imports=compress_imports,
     )
 
     # Record deliveries for changed symbols
@@ -343,13 +424,22 @@ def get_diff_context_with_delta(
     for s in delta_pack.slices:
         if s.id in (delta_pack.unchanged or []):
             continue
-        deliveries.append({
+        representation = "signature"
+        if s.code:
+            if isinstance(s.meta, dict) and s.meta.get("representation") == "incremental":
+                representation = "incremental"
+            else:
+                representation = "full"
+        delivery = {
             "symbol_id": s.id,
             "etag": symbol_etags.get(s.id, ""),
-            "representation": "full" if s.code else "signature",
+            "representation": representation,
             "vhs_ref": None,
             "token_estimate": len(s.code) // 4 if s.code else len(s.signature) // 4,
-        })
+        }
+        if representation in {"full", "incremental"} and latest_code_by_symbol.get(s.id):
+            delivery["code_snapshot"] = latest_code_by_symbol[s.id]
+        deliveries.append(delivery)
 
     if deliveries:
         from ..state_store import _compute_repo_fingerprint
