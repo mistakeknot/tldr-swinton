@@ -42,9 +42,10 @@ if [ -f "$FILE" ] && [ "$(wc -l < "$FILE" 2>/dev/null || echo 999)" -lt 50 ]; th
     exit 0
 fi
 
-# Nudge the agent
-echo "tip: Run 'tldrs diff-context --project . --budget 2000' before reading code files to save 48-73% tokens."
-echo "tip: Or use 'tldrs context <symbol> --project . --depth 2' to understand a specific function."
+# Nudge the agent via structured JSON (plain text on stdout causes "hook error")
+cat <<'HOOK_JSON'
+{"additionalContext": "tip: Run 'tldrs diff-context --project . --budget 2000' before reading code files to save 48-73% tokens. Or use 'tldrs extract <file>' for a structured file overview."}
+HOOK_JSON
 
 # Create the flag so we only nudge once per session
 touch "$FLAG"

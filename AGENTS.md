@@ -80,6 +80,7 @@ The repo includes a Claude Code plugin at `.claude-plugin/`. Available commands:
 | `/tldrs-context <symbol>` | Symbol-level context |
 | `/tldrs-structural <pattern>` | Structural code search (ast-grep patterns) |
 | `/tldrs-quickstart` | Show quick reference guide |
+| `/tldrs-extract <file>` | Extract file structure (functions, classes, imports) |
 
 **Autonomous skills** (Claude invokes automatically based on task context):
 
@@ -88,11 +89,13 @@ The repo includes a Claude Code plugin at `.claude-plugin/`. Available commands:
 | `tldrs-session-start` | Before reading code for bugs, features, refactoring, tests, reviews, migrations |
 | `tldrs-find-code` | Searching for code by concept, pattern, or text |
 | `tldrs-understand-symbol` | Understanding how a function/class works, its callers, dependencies |
+| `tldrs-explore-file` | Debugging a function, tracing control/data flow, analyzing file structure |
+| `tldrs-map-codebase` | Understanding architecture, exploring unfamiliar projects, onboarding |
 | `tldrs-ashpool-sync` | Syncing Ashpool eval coverage after tldrs capability changes |
 
 **Hooks:**
 - `PreToolUse` on **Read** and **Grep**: Suggests running tldrs recon before reading files (once per session via flag file)
-- `SessionStart` (setup.sh): Checks tldrs install, semantic index, ast-grep availability
+- `SessionStart` (setup.sh): Checks tldrs install, semantic index, ast-grep availability; runs `prebuild` in background
 
 To use as a plugin:
 ```bash

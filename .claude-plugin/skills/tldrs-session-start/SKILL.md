@@ -48,6 +48,16 @@ After reading the output:
 2. Focus on `[contains_diff]` symbols
 3. Use `tldrs context <symbol> --project .` to understand specific functions before reading full files
 
+## Test Impact Analysis
+
+After reviewing the diff context, check which tests are affected by recent changes:
+
+```bash
+tldrs change-impact --git
+```
+
+Returns JSON with `affected_tests` and a suggested `test_command`. Run only the affected tests instead of the full suite.
+
 ## Budget by Codebase Size
 
 | Size | Budget |

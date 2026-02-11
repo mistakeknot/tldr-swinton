@@ -60,6 +60,21 @@ tldrs structure src/path/to/dir/
 tldrs impact authenticate --depth 3
 ```
 
+## Dependency Chain Analysis
+
+After understanding a symbol's call graph, trace its import dependencies:
+
+```bash
+# What does this file import?
+tldrs imports <file>
+
+# Who imports this module? (reverse lookup — essential before renaming/moving)
+tldrs importers <module_name> .
+```
+
+Use `imports` to understand a file's deps before modifying it.
+Use `importers` before renaming/moving a module to find all consumers.
+
 ## Output Caps
 
 If output is too large:

@@ -24,11 +24,14 @@ This project is available as a Claude Code plugin from the [interagency-marketpl
 - `/tldrs-context <symbol>` - Symbol-level context
 - `/tldrs-structural <pattern>` - Structural code search (ast-grep)
 - `/tldrs-quickstart` - Quick reference guide
+- `/tldrs-extract <file>` - Extract file structure (functions, classes, imports)
 
 **Autonomous skills** (Claude invokes these automatically):
 - `tldrs-session-start` - Runs diff-context before reading files
 - `tldrs-find-code` - Semantic/structural search instead of grep
 - `tldrs-understand-symbol` - Symbol context before reading files
+- `tldrs-explore-file` - Debug functions, trace control/data flow, analyze file structure
+- `tldrs-map-codebase` - Understand architecture, explore unfamiliar projects
 - `tldrs-ashpool-sync` - Sync Ashpool eval coverage with tldrs capabilities
 
 ## Plugin Publishing Runbook
@@ -56,15 +59,18 @@ Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../inte
 │   ├── diff-context.md
 │   ├── context.md
 │   ├── structural.md
-│   └── quickstart.md
+│   ├── quickstart.md
+│   └── extract.md
 ├── hooks/
 │   ├── hooks.json       # Hook definitions (Read + Grep PreToolUse, Setup)
-│   ├── setup.sh         # Setup hook script
+│   ├── setup.sh         # Setup hook script (+ prebuild cache warming)
 │   └── suggest-recon.sh # PreToolUse nudge for Read/Grep
-└── skills/              # 4 focused skills (Claude-invoked)
+└── skills/              # 6 focused skills (Claude-invoked)
     ├── tldrs-session-start/
     ├── tldrs-find-code/
     ├── tldrs-understand-symbol/
+    ├── tldrs-explore-file/
+    ├── tldrs-map-codebase/
     └── tldrs-ashpool-sync/
 ```
 

@@ -14,14 +14,17 @@
     "./.claude-plugin/skills/tldrs-session-start",
     "./.claude-plugin/skills/tldrs-find-code",
     "./.claude-plugin/skills/tldrs-understand-symbol",
-    "./.claude-plugin/skills/tldrs-ashpool-sync"
+    "./.claude-plugin/skills/tldrs-ashpool-sync",
+    "./.claude-plugin/skills/tldrs-explore-file",
+    "./.claude-plugin/skills/tldrs-map-codebase"
   ],
   "commands": [
     "./.claude-plugin/commands/find.md",
     "./.claude-plugin/commands/diff-context.md",
     "./.claude-plugin/commands/context.md",
     "./.claude-plugin/commands/structural.md",
-    "./.claude-plugin/commands/quickstart.md"
+    "./.claude-plugin/commands/quickstart.md",
+    "./.claude-plugin/commands/extract.md"
   ],
   "hooks": "./.claude-plugin/hooks/hooks.json"
 }
