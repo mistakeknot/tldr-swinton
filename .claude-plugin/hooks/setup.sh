@@ -24,7 +24,12 @@ if [ -d ".git" ]; then
 fi
 
 # Count project files
-PY_COUNT=$(find . -name '*.py' -not -path './.tldrs/*' -not -path './.git/*' -not -path './.venv/*' -not -path './venv/*' -not -path './.env/*' -not -path '*/__pycache__/*' -not -path './node_modules/*' -not -path './.uv-cache/*' 2>/dev/null | wc -l | tr -d ' ')
+# Count project Python files (use git ls-files if available, else find with exclusions)
+if [ -d ".git" ]; then
+    PY_COUNT=$(git ls-files '*.py' 2>/dev/null | wc -l | tr -d ' ')
+else
+    PY_COUNT=$(find . -name '*.py' -not -path '*/.venv/*' -not -path '*/venv/*' -not -path '*/__pycache__/*' -not -path '*/node_modules/*' 2>/dev/null | wc -l | tr -d ' ')
+fi
 
 # Check semantic index
 INDEX_STATUS="not built"
