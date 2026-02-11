@@ -19,6 +19,7 @@ from ..zoom import ZoomLevel
 
 if TYPE_CHECKING:
     from ..contextpack_engine import ContextPack
+    from ..project_index import ProjectIndex
 
 
 def relevance_to_int(label: str | None) -> int:
@@ -66,6 +67,7 @@ def get_context_pack_with_delta(
     strip_comments: bool = False,
     compress_imports: bool = False,
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> "ContextPack":
     """Get context pack with delta detection against session cache.
 
@@ -83,6 +85,13 @@ def get_context_pack_with_delta(
     project_root = Path(project).resolve()
     store = StateStore(project_root)
 
+    # Build index once for both signature and full context extraction
+    if _project_index is None:
+        from ..project_index import ProjectIndex
+        _project_index = ProjectIndex.build(
+            project_root, language, include_sources=True,
+        )
+
     # DELTA-FIRST: Get signatures only (no code extraction yet)
     signatures_result = get_signatures_for_entry(
         project,
@@ -91,6 +100,7 @@ def get_context_pack_with_delta(
         language=language,
         disambiguate=True,
         type_prune=type_prune,
+        _project_index=_project_index,
     )
 
     # Handle error case (ambiguous)
@@ -153,6 +163,7 @@ def get_context_pack_with_delta(
         strip_comments=strip_comments,
         compress_imports=compress_imports,
         type_prune=type_prune,
+        _project_index=_project_index,
     )
 
     # Handle ambiguous case
@@ -259,6 +270,7 @@ def get_diff_context_with_delta(
     strip_comments: bool = False,
     compress_imports: bool = False,
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> "ContextPack":
     """Get diff context pack with delta detection against session cache.
 
@@ -278,6 +290,16 @@ def get_diff_context_with_delta(
 
     project_root = project.resolve()
     store = StateStore(project_root)
+
+    # Build index once for both signature and full context extraction
+    if _project_index is None:
+        from ..project_index import ProjectIndex
+        _project_index = ProjectIndex.build(
+            project_root, language,
+            include_sources=True,
+            include_ranges=True,
+            include_reverse_adjacency=True,
+        )
 
     # Parse diff to get hunks
     base_ref = base or "HEAD~1"
@@ -300,6 +322,7 @@ def get_diff_context_with_delta(
             strip_comments=strip_comments,
             compress_imports=compress_imports,
             type_prune=type_prune,
+            _project_index=_project_index,
         )
         return ContextPack(
             slices=[],
@@ -309,7 +332,10 @@ def get_diff_context_with_delta(
         )
 
     # DELTA-FIRST: Get signatures only (no code extraction yet)
-    signatures = get_diff_signatures(project_root, hunks, language=language, type_prune=type_prune)
+    signatures = get_diff_signatures(
+        project_root, hunks, language=language, type_prune=type_prune,
+        _project_index=_project_index,
+    )
 
     if not signatures:
         return ContextPack(slices=[], unchanged=[], rehydrate={})
@@ -366,6 +392,7 @@ def get_diff_context_with_delta(
         strip_comments=strip_comments,
         compress_imports=compress_imports,
         type_prune=type_prune,
+        _project_index=_project_index,
     )
 
     slices_data = full_pack_dict.get("slices", [])

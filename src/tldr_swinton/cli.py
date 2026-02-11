@@ -1104,6 +1104,12 @@ Semantic Search:
                 # include-body is implemented for ultracompact/context-pack output.
                 fmt = "ultracompact"
 
+            # Build project index once for entire context command
+            from .modules.core.project_index import ProjectIndex
+            _project_index = ProjectIndex.build(
+                project_root, args.lang or "python", include_sources=True,
+            )
+
             if fmt in ("ultracompact", "packed-json", "columnar-json"):
                 from .modules.core.output_formats import format_context_pack
                 from .modules.core.contextpack_engine import include_symbol_bodies
@@ -1122,6 +1128,7 @@ Semantic Search:
                         strip_comments=args.strip_comments,
                         compress_imports=args.compress_imports,
                         type_prune=args.type_prune,
+                        _project_index=_project_index,
                     )
                 else:
                     pack_kwargs = {
@@ -1135,6 +1142,7 @@ Semantic Search:
                         "strip_comments": args.strip_comments,
                         "compress_imports": args.compress_imports,
                         "type_prune": args.type_prune,
+                        "_project_index": _project_index,
                     }
                     if getattr(args, "include_body", False):
                         pack_kwargs["include_body"] = True
@@ -1165,6 +1173,7 @@ Semantic Search:
                     language=args.lang,
                     include_docstrings=args.with_docs,
                     type_prune=args.type_prune,
+                    _project_index=_project_index,
                 )
                 output = format_context(ctx, fmt=args.format, budget_tokens=args.budget)
             if args.include:
@@ -1197,6 +1206,15 @@ Semantic Search:
             base = args.base or _resolve_diff_base(project)
             zoom_level = ZoomLevel.from_string(args.zoom)
 
+            # Build project index once for entire diff-context command
+            from .modules.core.project_index import ProjectIndex
+            _diff_project_index = ProjectIndex.build(
+                project, args.lang or "python",
+                include_sources=True,
+                include_ranges=True,
+                include_reverse_adjacency=True,
+            )
+
             # Determine session ID and delta mode
             session_id = args.session_id
             use_delta = not args.no_delta
@@ -1221,6 +1239,7 @@ Semantic Search:
                     strip_comments=args.strip_comments,
                     compress_imports=args.compress_imports,
                     type_prune=args.type_prune,
+                    _project_index=_diff_project_index,
                 )
             else:
                 pack = get_diff_context(
@@ -1234,6 +1253,7 @@ Semantic Search:
                     strip_comments=args.strip_comments,
                     compress_imports=args.compress_imports,
                     type_prune=args.type_prune,
+                    _project_index=_diff_project_index,
                 )
             # Opt-in coherence verification
             if getattr(args, "verify", False) or os.environ.get("TLDRS_COHERENCE_VERIFY"):

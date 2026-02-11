@@ -139,14 +139,43 @@ def map_hunks_to_symbols(
     project: str | Path,
     hunks: list[tuple[str, int, int]],
     language: str = "python",
+    _project_index: "ProjectIndex | None" = None,
 ) -> dict[str, set[int]]:
     """Map diff hunks to enclosing symbols. Returns {symbol_id: {diff_lines}}."""
     project = Path(project).resolve()
-    extractor = HybridExtractor()
     results: dict[str, set[int]] = defaultdict(set)
     hunks_by_file: dict[str, list[tuple[int, int]]] = defaultdict(list)
     for path, start, end in hunks:
         hunks_by_file[path].append((start, end))
+
+    # Fast path: use pre-built index ranges when available
+    if _project_index and _project_index.symbol_ranges:
+        # Group symbol_ranges by file for efficient lookup
+        ranges_by_file: dict[str, list[tuple[str, int, int]]] = defaultdict(list)
+        for symbol_id, (s_start, s_end) in _project_index.symbol_ranges.items():
+            if ":" in symbol_id:
+                rel_path = symbol_id.split(":", 1)[0]
+                ranges_by_file[rel_path].append((symbol_id, s_start, s_end))
+
+        for rel_path, hunk_ranges in hunks_by_file.items():
+            file_ranges = ranges_by_file.get(rel_path, [])
+            if not file_ranges:
+                continue
+            for start, end in hunk_ranges:
+                best_symbol: str | None = None
+                best_span: int | None = None
+                for symbol_id, s_start, s_end in file_ranges:
+                    if s_start <= end and s_end >= start:
+                        span = s_end - s_start
+                        if best_span is None or span < best_span:
+                            best_span = span
+                            best_symbol = symbol_id
+                if best_symbol:
+                    results[best_symbol].update(range(start, end + 1))
+        return results
+
+    # Fallback: scan files with HybridExtractor (no pre-built index)
+    extractor = HybridExtractor()
 
     for rel_path, ranges in hunks_by_file.items():
         file_path = project / rel_path
@@ -164,7 +193,7 @@ def map_hunks_to_symbols(
         except Exception:
             continue
 
-        symbol_ranges: list[tuple[str, int, int]] = []
+        symbol_ranges_list: list[tuple[str, int, int]] = []
         top_level: list[tuple[str, int, object]] = []
         for func in info.functions:
             top_level.append(("func", func.line_number, func))
@@ -179,11 +208,11 @@ def map_hunks_to_symbols(
 
             if kind == "func":
                 symbol_id = f"{rel_path}:{obj.name}"
-                symbol_ranges.append((symbol_id, start_line, end_line))
+                symbol_ranges_list.append((symbol_id, start_line, end_line))
                 continue
 
             class_symbol = f"{rel_path}:{obj.name}"
-            symbol_ranges.append((class_symbol, start_line, end_line))
+            symbol_ranges_list.append((class_symbol, start_line, end_line))
 
             methods = sorted(obj.methods, key=lambda m: m.line_number)
             for midx, method in enumerate(methods):
@@ -191,12 +220,12 @@ def map_hunks_to_symbols(
                 if midx + 1 < len(methods):
                     mend = max(method.line_number, methods[midx + 1].line_number - 1)
                 method_symbol = f"{rel_path}:{obj.name}.{method.name}"
-                symbol_ranges.append((method_symbol, method.line_number, mend))
+                symbol_ranges_list.append((method_symbol, method.line_number, mend))
 
         for start, end in ranges:
             best_symbol: str | None = None
             best_span: int | None = None
-            for symbol_id, s_start, s_end in symbol_ranges:
+            for symbol_id, s_start, s_end in symbol_ranges_list:
                 if s_start <= end and s_end >= start:
                     span = s_end - s_start
                     if best_span is None or span < best_span:
@@ -575,11 +604,14 @@ def build_diff_context_from_hunks(
     strip_comments: bool = False,
     compress_imports: bool = False,
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> dict:
     project = Path(project).resolve()
-    symbol_diff_lines = map_hunks_to_symbols(project, hunks, language=language)
+    symbol_diff_lines = map_hunks_to_symbols(
+        project, hunks, language=language, _project_index=_project_index,
+    )
 
-    idx = ProjectIndex.build(
+    idx = _project_index or ProjectIndex.build(
         project, language,
         include_sources=True,
         include_ranges=True,
@@ -840,6 +872,7 @@ def get_diff_signatures(
     hunks: list[tuple[str, int, int]],
     language: str = "python",
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> list[DiffSymbolSignature]:
     """Get signatures for symbols affected by diff hunks without extracting code.
 
@@ -856,9 +889,11 @@ def get_diff_signatures(
         List of DiffSymbolSignature objects
     """
     project = Path(project).resolve()
-    symbol_diff_lines = map_hunks_to_symbols(project, hunks, language=language)
+    symbol_diff_lines = map_hunks_to_symbols(
+        project, hunks, language=language, _project_index=_project_index,
+    )
 
-    idx = ProjectIndex.build(
+    idx = _project_index or ProjectIndex.build(
         project, language,
         include_sources=False,
         include_ranges=True,
@@ -982,6 +1017,7 @@ def get_diff_context(
     strip_comments: bool = False,
     compress_imports: bool = False,
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> dict:
     project = Path(project).resolve()
     base_ref = base or "HEAD~1"
@@ -1014,6 +1050,7 @@ def get_diff_context(
         strip_comments=strip_comments,
         compress_imports=compress_imports,
         type_prune=type_prune,
+        _project_index=_project_index,
     )
     pack["base"] = base_ref
     pack["head"] = head_ref

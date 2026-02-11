@@ -296,10 +296,11 @@ def map_hunks_to_symbols(
     project: str | Path,
     hunks: list[tuple[str, int, int]],
     language: str = "python",
+    _project_index: "ProjectIndex | None" = None,
 ) -> dict[str, set[int]]:
     from .engines.difflens import map_hunks_to_symbols as _map_hunks_to_symbols
 
-    return _map_hunks_to_symbols(project, hunks, language=language)
+    return _map_hunks_to_symbols(project, hunks, language=language, _project_index=_project_index)
 
 
 def build_diff_context_from_hunks(
@@ -312,6 +313,7 @@ def build_diff_context_from_hunks(
     strip_comments: bool = False,
     compress_imports: bool = False,
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> dict:
     from .engines.difflens import (
         build_diff_context_from_hunks as _build_diff_context_from_hunks,
@@ -327,6 +329,7 @@ def build_diff_context_from_hunks(
         strip_comments=strip_comments,
         compress_imports=compress_imports,
         type_prune=type_prune,
+        _project_index=_project_index,
     )
 
 
@@ -341,6 +344,7 @@ def get_diff_context(
     strip_comments: bool = False,
     compress_imports: bool = False,
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> dict:
     from .engines.difflens import get_diff_context as _get_diff_context
 
@@ -355,6 +359,7 @@ def get_diff_context(
         strip_comments=strip_comments,
         compress_imports=compress_imports,
         type_prune=type_prune,
+        _project_index=_project_index,
     )
 
 
@@ -1052,6 +1057,7 @@ def get_symbol_context_pack(
     strip_comments: bool = False,
     compress_imports: bool = False,
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> dict:
     return _get_symbol_context_pack(
         project,
@@ -1065,6 +1071,7 @@ def get_symbol_context_pack(
         strip_comments=strip_comments,
         compress_imports=compress_imports,
         type_prune=type_prune,
+        _project_index=_project_index,
     )
 
 
@@ -1075,6 +1082,7 @@ def get_signatures_for_entry(
     language: str = "python",
     disambiguate: bool = True,
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> list[SymbolSignature] | dict:
     """Get symbol signatures without extracting code bodies.
 
@@ -1104,6 +1112,7 @@ def get_signatures_for_entry(
         language=language,
         disambiguate=disambiguate,
         type_prune=type_prune,
+        _project_index=_project_index,
     )
 
 
@@ -1112,6 +1121,7 @@ def get_diff_signatures(
     hunks: list[tuple[str, int, int]],
     language: str = "python",
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> list[DiffSymbolSignature]:
     """Get signatures for symbols affected by diff hunks without extracting code.
 
@@ -1134,7 +1144,7 @@ def get_diff_signatures(
         >>> for sig in sigs:
         ...     print(f"{sig.symbol_id}: {sig.relevance_label}")
     """
-    return _get_diff_signatures(project, hunks, language=language, type_prune=type_prune)
+    return _get_diff_signatures(project, hunks, language=language, type_prune=type_prune, _project_index=_project_index)
 
 
 # CLI entry point

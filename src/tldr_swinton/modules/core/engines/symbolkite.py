@@ -177,6 +177,7 @@ def get_relevant_context(
     include_docstrings: bool = False,
     disambiguate: bool = True,
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> RelevantContext:
     """
     Get token-efficient context for an LLM starting from an entry point.
@@ -205,7 +206,7 @@ def get_relevant_context(
             module_path = str(rel_path.with_suffix(""))
             return _get_module_exports(project, module_path, language, include_docstrings)
 
-    idx = ProjectIndex.build(project, language, include_sources=True)
+    idx = _project_index or ProjectIndex.build(project, language, include_sources=True)
 
     cfg_extractors = {
         "python": extract_python_cfg,
@@ -350,6 +351,7 @@ def get_context_pack(
     strip_comments: bool = False,
     compress_imports: bool = False,
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> dict:
     project_root = Path(project).resolve()
     ctx = get_relevant_context(
@@ -360,6 +362,7 @@ def get_context_pack(
         include_docstrings=include_docstrings,
         disambiguate=disambiguate,
         type_prune=type_prune,
+        _project_index=_project_index,
     )
     if ctx.ambiguous:
         from ..errors import ERR_AMBIGUOUS
@@ -475,6 +478,7 @@ def get_signatures_for_entry(
     language: str = "python",
     disambiguate: bool = True,
     type_prune: bool = False,
+    _project_index: "ProjectIndex | None" = None,
 ) -> list[SymbolSignature] | dict:
     """Get symbol signatures without extracting code bodies.
 
@@ -504,7 +508,8 @@ def get_signatures_for_entry(
         # This is a module path, delegate to regular context for now
         ctx = get_relevant_context(
             project, entry_point, depth=depth, language=language,
-            include_docstrings=False, disambiguate=disambiguate, type_prune=type_prune
+            include_docstrings=False, disambiguate=disambiguate, type_prune=type_prune,
+            _project_index=_project_index,
         )
         if ctx.ambiguous:
             from ..errors import ERR_AMBIGUOUS
@@ -544,7 +549,8 @@ def get_signatures_for_entry(
         if module_file:
             ctx = get_relevant_context(
                 project, entry_point, depth=depth, language=language,
-                include_docstrings=False, disambiguate=disambiguate, type_prune=type_prune
+                include_docstrings=False, disambiguate=disambiguate, type_prune=type_prune,
+                _project_index=_project_index,
             )
             return [
                 SymbolSignature(
@@ -558,7 +564,7 @@ def get_signatures_for_entry(
                 for func in ctx.functions
             ]
 
-    idx = ProjectIndex.build(project, language, include_sources=False)
+    idx = _project_index or ProjectIndex.build(project, language, include_sources=False)
 
     resolved, candidates = idx.resolve_entry_symbols(entry_point, disambiguate)
     if candidates and not resolved:
