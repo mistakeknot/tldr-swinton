@@ -1,6 +1,6 @@
 ---
 name: tldrs-understand-symbol
-description: "Use when asked about how a function works, what calls it, or what it depends on. Gets call graph, signatures, and callers in ~85% fewer tokens than reading the full file."
+description: "Use when asked about how a function or class works, what calls it, what it depends on, or before modifying/extending a symbol. Gets call graph, signatures, and callers in ~85% fewer tokens than reading the full file."
 allowed-tools:
   - Bash
 ---

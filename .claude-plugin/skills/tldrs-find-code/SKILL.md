@@ -1,6 +1,6 @@
 ---
 name: tldrs-find-code
-description: "Use when searching for code by concept, pattern, or text instead of grep or Read-and-scan. Semantic search finds by meaning. Structural search finds by code shape."
+description: "Use when searching for code by concept, pattern, or text, or when asked 'where is X handled/defined/implemented'. Prefer over grep or Read-and-scan. Semantic search finds by meaning. Structural search finds by code shape."
 allowed-tools:
   - Bash
 ---

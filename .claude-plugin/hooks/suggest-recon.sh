@@ -1,8 +1,8 @@
 #!/bin/bash
-# tldrs PreToolUse hook for Read — nudge agent to use tldrs first
+# tldrs PreToolUse hook for Read/Grep — nudge agent to use tldrs first
 # Must be fast: only checks a flag file, never runs tldrs itself
 #
-# Input: JSON on stdin with { session_id, tool_name, tool_input: { file_path } }
+# Input: JSON on stdin with { session_id, tool_name, tool_input: { file_path | path } }
 
 # Fail-safe: any error → exit silently (never block reads)
 set +e
@@ -23,8 +23,8 @@ FLAG="/tmp/tldrs-session-${SESSION_ID}"
 # Check if tldrs is installed
 command -v tldrs &> /dev/null || exit 0
 
-# Extract the file path from tool_input
-FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // ""' 2>/dev/null) || exit 0
+# Extract the file path — Read uses file_path, Grep uses path
+FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // ""' 2>/dev/null) || exit 0
 
 # Skip if file path is empty
 [ -z "$FILE" ] && exit 0
@@ -37,6 +37,7 @@ case "$FILE" in
 esac
 
 # Skip if file is very short (< 50 lines) — not worth tldrs overhead
+# Only check for files (Grep may target directories)
 if [ -f "$FILE" ] && [ "$(wc -l < "$FILE" 2>/dev/null || echo 999)" -lt 50 ]; then
     exit 0
 fi

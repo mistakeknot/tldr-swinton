@@ -1,6 +1,6 @@
 ---
 name: tldrs-session-start
-description: "Use when asked to fix bugs, implement features, review code, or explore a codebase. Run BEFORE reading code files. Provides diff-focused context that saves 48-73% tokens."
+description: "Use when asked to fix bugs, debug issues, implement features, refactor code, write tests, review code, migrate/port code, or explore a codebase. Run BEFORE reading code files. Provides diff-focused context that saves 48-73% tokens."
 allowed-tools:
   - Bash
 ---
