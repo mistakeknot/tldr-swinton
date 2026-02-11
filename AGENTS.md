@@ -18,12 +18,22 @@ tldr-swinton is a token-efficient code analysis tool for LLMs. It's a fork of ll
 |---------|------|------|
 | **Ashpool** | Agent workbench: run capture + artifact store + eval/regression for tldrs outputs | `../Ashpool` |
 
-**Ashpool integration**: Ashpool captures tldrs runs as artifacts with metadata tagging, scores token efficiency, and A/B tests output formats. When adding new tldrs formats or flags, also update:
-- `../Ashpool/scripts/regression_suite.json` — add regression queries for new formats/flags
-- `../Ashpool/scripts/ab_formats.py` — add new formats to `DEFAULT_FORMATS`
-- `../Ashpool/demo-tldrs.sh` — add demo runs showcasing new features
+**Ashpool integration**: Ashpool captures tldrs runs as artifacts with metadata tagging, scores token efficiency, and A/B tests output formats. When adding new tldrs formats or flags, 4 files must be kept in sync:
+- `../Ashpool/scripts/regression_suite.json` — regression queries for each (command, format, flag) combination
+- `../Ashpool/scripts/ab_formats.py` — `DEFAULT_FORMATS` list for A/B testing
+- `../Ashpool/demo-tldrs.sh` — demo runs showcasing each format
+- `../Ashpool/scripts/score_tokens.py` — `parse_*` functions for scoring_hints formats
 
-See `../Ashpool/demo-tldrs.sh` for a working integration demo.
+**Sync workflow** (automated):
+```bash
+# Check for gaps between tldrs capabilities and Ashpool coverage
+tldrs manifest | python3 ../Ashpool/scripts/check_tldrs_sync.py
+
+# Or use the Claude Code skill for guided remediation
+/tldrs-ashpool-sync
+```
+
+The `tldrs manifest` command produces a machine-readable JSON of all eval-relevant commands, formats, flags, and scoring hints. The sync check script reads this and reports coverage gaps across all 4 Ashpool files. The `bump-version.sh` script runs the sync check automatically and warns if gaps exist.
 
 ## Quick Reference
 
@@ -71,9 +81,22 @@ The repo includes a Claude Code plugin at `.claude-plugin/`. Available commands:
 | `/tldrs-structural <pattern>` | Structural code search (ast-grep patterns) |
 | `/tldrs-quickstart` | Show quick reference guide |
 
+**Autonomous skills** (Claude invokes automatically based on task context):
+
+| Skill | Trigger |
+|-------|---------|
+| `tldrs-session-start` | Before reading code for bugs, features, refactoring, tests, reviews, migrations |
+| `tldrs-find-code` | Searching for code by concept, pattern, or text |
+| `tldrs-understand-symbol` | Understanding how a function/class works, its callers, dependencies |
+| `tldrs-ashpool-sync` | Syncing Ashpool eval coverage after tldrs capability changes |
+
+**Hooks:**
+- `PreToolUse` on **Read** and **Grep**: Suggests running tldrs recon before reading files (once per session via flag file)
+- `SessionStart` (setup.sh): Checks tldrs install, semantic index, ast-grep availability
+
 To use as a plugin:
 ```bash
-git clone https://github.com/mistakeknot/tldr-swinton .claude-plugins/tldrs
+/plugin install tldr-swinton   # From interagency-marketplace
 ```
 
 ## Codex Skill (Repo-Scoped)
@@ -221,6 +244,9 @@ tldrs structural 'def $FUNC($$$ARGS): return None' --lang python
 tldrs slice <file> <func> <line>
 tldrs cfg <file> <function>
 tldrs dfg <file> <function>
+
+# 7) Machine-readable capability manifest (for tooling/eval sync)
+tldrs manifest --pretty
 ```
 
 For large outputs, store as VHS refs:
@@ -508,10 +534,28 @@ The agent workflow eval tests real token savings for code modification tasks (no
 | `vector_store.py` | FAISS vector storage wrapper |
 | `index.py` | Semantic index management |
 | `engines/astgrep.py` | Structural code search via ast-grep |
+| `engines/delta.py` | Delta-mode orchestration (session tracking, etag comparison) |
+| `manifest.py` | Machine-readable capability manifest for eval sync |
 | `bm25_store.py` | BM25 keyword index for hybrid search |
 | `semantic.py` | Original semantic search (5-layer embeddings) |
 
 ## Version History
+
+- **0.6.2** - Ashpool sync automation, plugin effectiveness improvements
+  - Added `tldrs manifest` — machine-readable JSON of all eval-relevant capabilities
+  - Added `/tldrs-ashpool-sync` skill for guided Ashpool eval coverage sync
+  - Added `check_tldrs_sync.py` sync check script (reads manifest, reports gaps in 4 Ashpool files)
+  - Broadened skill triggers to match more task types (debug, refactor, tests, migrate)
+  - Added Grep `PreToolUse` hook (same suggest-recon as Read hook)
+  - Setup hook now emits usage guidance for any repo
+  - `bump-version.sh` warns if Ashpool coverage has gaps
+
+- **0.6.1** - Delta engine extraction, parser caching
+  - Extracted delta-mode orchestration from `cli.py` into `engines/delta.py`
+  - Cached tree-sitter parsers in `cross_file_calls.py` via `@lru_cache`
+
+- **0.6.0** - Wave 2+3 features wired into pipeline
+  - Wired Wave 2 and Wave 3 prompt-cache-friendly features into the output pipeline
 
 - **0.5.0** - Skill-first plugin, structural search, compression upgrades
   - Plugin restructured: 4 focused skills replace 1 broad skill
