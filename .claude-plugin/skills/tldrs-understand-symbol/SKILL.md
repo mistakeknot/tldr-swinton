@@ -7,94 +7,66 @@ allowed-tools:
 
 # Understand a Symbol
 
-Run this BEFORE reading a file when you need to understand a function or class.
+Run BEFORE reading a file when you need to understand a function or class.
 
-## Command
+## Decision Tree
 
+### What do you need?
+
+**Callers (who calls this?):**
 ```bash
-tldrs context <symbol_name> --project . --depth 2 --format ultracompact --budget 2000
+tldrs impact <symbol> --depth 3
 ```
 
-## Output
-
-Shows signature, call graph, callers, and related types:
-
-```
-handle_request(request) -> Response
-  calls: validate_input, process_data, format_response
-  called_by: main, api_handler
-  types: Request, Response
+**Callees (what does this call?):**
+```bash
+tldrs context <symbol> --project . --preset compact
 ```
 
-## Next Step
-
-After reading the output:
-1. If you need to edit the symbol, now Read the file (you know exactly where to look)
-2. If you need broader context, increase `--depth 3`
-3. For reverse impact analysis: `tldrs impact <symbol> --depth 3`
-
-## Disambiguation
-
-If ambiguous, tldrs returns candidates:
-
-```
-Ambiguous entry 'handle': found in 3 files
-  src/api.py:handle_request
-  src/ws.py:handle_message
-  src/cli.py:handle_command
+**Both callers and callees:**
+```bash
+tldrs context <symbol> --project . --preset compact --depth 2
 ```
 
-Re-run with qualified name: `tldrs context src/api.py:handle_request --project .`
+### About to modify a symbol?
 
-## Discovering Symbol Names
+**Always check callers before modifying a public function:**
+```bash
+tldrs impact <symbol> --depth 3
+```
 
-If you don't know the symbol name:
+Review the callers list. If callers depend on the current signature or return type, plan how to update them.
+
+### Symbol name is ambiguous?
+
+If tldrs returns multiple matches, re-run with qualified name:
+```bash
+tldrs context src/api.py:handle_request --project . --preset compact
+```
+
+### Don't know the symbol name?
 
 ```bash
 tldrs structure src/path/to/dir/
 ```
 
-## Reverse Call Graph (Who Calls This?)
-
-```bash
-tldrs impact authenticate --depth 3
-```
-
-## Dependency Chain Analysis
-
-After understanding a symbol's call graph, trace its import dependencies:
+## Import Dependencies
 
 ```bash
 # What does this file import?
 tldrs imports <file>
 
-# Who imports this module? (reverse lookup — essential before renaming/moving)
+# Who imports this module? (essential before renaming/moving)
 tldrs importers <module_name> .
 ```
 
-Use `imports` to understand a file's deps before modifying it.
-Use `importers` before renaming/moving a module to find all consumers.
+## Rules
 
-## Output Caps
-
-If output is too large:
-```bash
-tldrs context <symbol> --project . --depth 2 --max-lines 50
-```
-
-## Depth Tuning
-
-- `--depth 1`: direct calls only (minimal tokens)
-- `--depth 2`: calls + their calls (default, usually sufficient)
-- `--depth 3`: broad context (use for unfamiliar code)
-
-## Common Errors
-
-- **"Ambiguous entry"**: Multiple symbols match. Use `file.py:symbol` format.
-- **"No symbols found"**: Symbol name doesn't match. Try `tldrs structure` to discover names.
-- **Very large output**: Add `--max-lines 50` or reduce `--depth`.
+- Always use `--preset compact`
+- Always check callers (via `tldrs impact`) before modifying a public function
+- Use `--depth 1` for minimal tokens, `--depth 3` for broad unfamiliar context
 
 ## When to Skip
 
-- You are editing a single file under 200 lines AND you already know which file it is
+- File is under 200 lines and you already know its structure
 - You need the full implementation body, not architecture

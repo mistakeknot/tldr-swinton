@@ -7,78 +7,39 @@ allowed-tools:
 
 # Explore File Internals
 
-Run this BEFORE reading a file when you need to understand its structure, debug a function, or trace data flow.
+Run BEFORE reading a file when you need to understand its structure, debug a function, or trace data flow.
 
-## File Overview
+## Decision Tree
 
-Get all functions, classes, and imports in a file without reading the full source:
+### What are you doing?
 
+**Need file overview (functions, classes, imports):**
 ```bash
 tldrs extract <file>
 ```
 
-Output shows structured metadata:
-
-```
-FILE: src/auth.py (142 lines)
-IMPORTS: jwt, hashlib, datetime, .models.User
-CLASSES:
-  AuthManager (lines 15-142)
-FUNCTIONS:
-  login(username, password) -> Token  [lines 20-45]
-  verify(token) -> User  [lines 47-68]
-  refresh(token) -> Token  [lines 70-92]
-  _hash_password(password) -> str  [lines 94-110]
-```
-
-## Control Flow Analysis
-
-Trace the control flow of a specific function:
-
+**Debugging a function (branches, loops, early returns):**
 ```bash
 tldrs cfg <file> <function_name>
 ```
 
-Shows branching, loops, early returns, and exception paths. Use when debugging:
-- Why does this function sometimes return None?
-- Where are the error paths?
-- What conditions lead to which branches?
-
-## Data Flow Analysis
-
-Trace how variables are defined and used within a function:
-
+**Tracing data flow (variable definitions, uses, chains):**
 ```bash
 tldrs dfg <file> <function_name>
 ```
 
-Shows variable definitions, uses, and def-use chains. Use when:
-- Tracking where a value comes from
-- Finding unused variables
-- Understanding data transformations within a function
+**Need cross-file relationships:**
+Use `tldrs context <symbol> --project . --preset compact` instead.
 
 ## Workflow
 
-1. Start with `tldrs extract <file>` to see what's in the file
-2. Use `tldrs cfg <file> <function>` to understand control flow
-3. Use `tldrs dfg <file> <function>` to trace data flow
-4. Only then Read the specific lines you need to edit
+1. `tldrs extract <file>` → see what's in the file
+2. `tldrs cfg <file> <function>` → understand control flow
+3. `tldrs dfg <file> <function>` → trace data flow
+4. Read only the specific lines you need to edit
 
 ## When to Skip
 
-- File is under 100 lines (just Read it directly)
-- You need cross-file relationships (use `tldrs context <symbol>` instead)
-- You only need a function signature (use `tldrs context <symbol> --depth 1`)
-- You already know the file structure from a previous call
-
-## Next Step
-
-After identifying the structure:
-- Use `tldrs context <symbol> --project . --depth 2` for cross-file dependencies
-- Read the specific lines you need to edit (you now know exact line numbers)
-
-## Common Errors
-
-- **"No functions found"**: File may use a different naming convention. Try `tldrs structure <dir>` first.
-- **"Function not found"**: Use the exact function name from `tldrs extract` output.
-- **Very large output**: Focus on one function at a time with cfg/dfg.
+- File is under 100 lines — just Read it directly
+- You need cross-file relationships — use `tldrs context <symbol> --project . --preset compact` instead
+- You only need a function signature — use `tldrs context <symbol> --project . --preset compact --depth 1`

@@ -7,98 +7,69 @@ allowed-tools:
 
 # Session Start Reconnaissance
 
-Run this BEFORE opening any code files at the start of a task.
+BEFORE reading any code files, determine your starting point.
 
-## Command
+## Decision Tree
 
+### 1. Are there recent changes?
+
+Check: `git status` or `git diff --stat HEAD`
+
+**YES — changes exist:**
 ```bash
-tldrs diff-context --project . --budget 2000
+tldrs diff-context --project . --preset compact
 ```
 
-For large diffs, add compression (35-73% additional savings):
+**YES + large diff (>500 lines changed):**
 ```bash
-tldrs diff-context --project . --budget 1500 --compress two-stage
+tldrs diff-context --project . --preset minimal
 ```
 
-For multi-turn conversations, add a session ID (~60% savings on subsequent turns):
-```bash
-tldrs diff-context --project . --budget 2000 --session-id task-name
-```
-
-## Reading the Output
-
-Output lists changed symbols by priority file (P0 = most changed):
-
-```
-P0=src/auth.py P1=src/users.py
-
-P0:login def login(user, password)  [contains_diff]
-P0:verify def verify(token)  [caller_of_diff]
-P1:create_user def create_user(data)  [contains_diff]
-```
-
-- `[contains_diff]` — symbol was directly modified
-- `[caller_of_diff]` — symbol calls something that changed
-- `[dep_of_diff]` — symbol is called by something that changed
-
-## Next Step
-
-After reading the output:
-1. Read P0 files first (most changed)
-2. Focus on `[contains_diff]` symbols
-3. Use `tldrs context <symbol> --project .` to understand specific functions before reading full files
-
-## Test Impact Analysis
-
-After reviewing the diff context, check which tests are affected by recent changes:
-
-```bash
-tldrs change-impact --git
-```
-
-Returns JSON with `affected_tests` and a suggested `test_command`. Run only the affected tests instead of the full suite.
-
-## Budget by Codebase Size
-
-| Size | Budget |
-|------|--------|
-| Small (<50 files) | 1500 |
-| Medium (50-200) | 2000 |
-| Large (200+) | 3000 |
-
-## Output Caps
-
-If output is still too large after budgeting:
-```bash
-tldrs diff-context --project . --budget 2000 --max-lines 50
-tldrs diff-context --project . --budget 2000 --max-bytes 4096
-```
-
-## Clean Repo (No Changes)
-
-If working tree is clean and no branch divergence:
-
+**NO — clean working tree:**
 ```bash
 tldrs structure src/
 ```
 
-## Non-Python Repos
+### 2. Is this a multi-turn task?
 
-Add `--lang` flag:
-
+If you expect multiple rounds of queries on the same codebase:
 ```bash
-tldrs diff-context --project . --budget 2000 --lang typescript
+# Add --session-id auto to ALL tldrs calls this session
+tldrs diff-context --project . --preset compact --session-id auto
 ```
 
-Supported: python, typescript, javascript, rust, go, java, c, cpp, ruby, php, kotlin, swift, csharp, scala, lua, elixir
+### 3. After diff-context, identify targets
 
-## Common Errors
+- `[contains_diff]` symbols → `tldrs context <symbol> --project . --preset compact`
+- `[caller_of_diff]` symbols → check for breakage with `tldrs impact <symbol> --depth 3`
+- Unknown area? → `tldrs find "query"` before Reading files
 
-- **"No git repository"**: diff-context requires a git repo. Use `tldrs structure` instead.
-- **Empty output**: Working tree is clean with no uncommitted changes. Use `tldrs structure` to explore.
-- **Very large output**: Add `--compress two-stage` or lower `--budget`.
+### 4. Spawning a subagent for code work?
+
+Compress context for sub-agent consumption:
+```bash
+tldrs distill --task "description of the subtask" --budget 1500 --session-id auto
+```
+
+### 5. Test impact
+
+After reviewing diff context, check which tests are affected:
+```bash
+tldrs change-impact --git
+```
+
+Returns `affected_tests` and a suggested `test_command`. Run only affected tests.
+
+## Rules
+
+- Always use `--preset compact` unless you have a reason not to
+- Use `--preset minimal` for large diffs (>500 lines) or budget-constrained sessions
 
 ## When to Skip
 
-- You are editing a single file under 200 lines AND you already know which file it is
+- Editing a single file under 200 lines that you already know
 - Simple config file changes (.json, .yaml, .toml)
+
+## Non-Python Repos
+
+Add `--lang` flag: `tldrs diff-context --project . --preset compact --lang typescript`

@@ -449,6 +449,13 @@ Semantic Search:
 
     ctx_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
     ctx_p.add_argument("--max-bytes", type=int, default=None, help="Cap output at N bytes")
+    ctx_p.add_argument(
+        "--preset",
+        choices=["compact", "minimal", "multi-turn"],
+        default=None,
+        help="Flag preset: compact (ultracompact/2000/compress-imports/strip-comments), "
+             "minimal (two-stage/1500/type-prune), multi-turn (cache-friendly/delta/session-id auto)",
+    )
 
     diff_p = subparsers.add_parser("diff-context", help="Diff-first context pack")
     diff_p.add_argument("--project", default=".", help="Project root directory")
@@ -529,6 +536,13 @@ Semantic Search:
 
     diff_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
     diff_p.add_argument("--max-bytes", type=int, default=None, help="Cap output at N bytes")
+    diff_p.add_argument(
+        "--preset",
+        choices=["compact", "minimal", "multi-turn"],
+        default=None,
+        help="Flag preset: compact (ultracompact/2000/compress-imports/strip-comments), "
+             "minimal (two-stage/1500/type-prune), multi-turn (cache-friendly/delta/session-id auto)",
+    )
 
     distill_p = subparsers.add_parser(
         "distill",
@@ -540,6 +554,13 @@ Semantic Search:
     distill_p.add_argument("--session-id", default=None, help="Session ID for delta")
     distill_p.add_argument("--format", choices=["text", "json"], default="text")
     distill_p.add_argument("--language", default=None, help="Primary language")
+    distill_p.add_argument(
+        "--preset",
+        choices=["compact", "minimal", "multi-turn"],
+        default=None,
+        help="Flag preset: compact (ultracompact/2000/compress-imports/strip-comments), "
+             "minimal (two-stage/1500/type-prune), multi-turn (cache-friendly/delta/session-id auto)",
+    )
 
     hotspots_p = subparsers.add_parser(
         "hotspots",
@@ -818,6 +839,14 @@ Semantic Search:
         "--pretty", action="store_true", help="Pretty-print with indentation"
     )
 
+    # tldrs presets — list available flag presets
+    presets_p = subparsers.add_parser(
+        "presets", help="List available flag presets with their expansions"
+    )
+    presets_p.add_argument(
+        "--machine", action="store_true", help="JSON output"
+    )
+
     # Module subcommands: vhs, wb, bench
     from .modules.vhs import cli as vhs_cli
     from .modules.workbench import cli as wb_cli
@@ -828,6 +857,10 @@ Semantic Search:
     bench_cli.add_subparser(subparsers)
 
     args = parser.parse_args()
+    # Apply preset defaults (explicit flags override)
+    from .presets import apply_preset, emit_preset_hint
+    if hasattr(args, "preset") and args.command in ("context", "diff-context", "distill"):
+        apply_preset(args, args.command)
 
     # Import here to avoid slow startup for --help
     from .modules.core.api import (
@@ -1156,6 +1189,7 @@ Semantic Search:
                 print(_render_vhs_output(ref, summary, preview))
             else:
                 print(output)
+            emit_preset_hint(args.command, args)
         elif args.command == "diff-context":
             from .modules.core.output_formats import format_context_pack
             from .modules.core.zoom import ZoomLevel
@@ -1215,6 +1249,7 @@ Semantic Search:
                 from .modules.core.output_formats import truncate_output
                 diff_output = truncate_output(diff_output, max_lines=args.max_lines, max_bytes=args.max_bytes)
             print(diff_output)
+            emit_preset_hint(args.command, args)
 
         elif args.command == "distill":
             from .modules.core.context_delegation import ContextDelegator
@@ -1882,6 +1917,18 @@ tldrs structure src/
 Full guide: https://github.com/mistakeknot/tldr-swinton/blob/main/docs/QUICKSTART.md
 """)
 
+        elif args.command == "presets":
+            from .presets import PRESETS
+            if getattr(args, "machine", False):
+                print(json.dumps(PRESETS, indent=2))
+            else:
+                for name, flags in PRESETS.items():
+                    expanded = " ".join(
+                        f"--{k.replace('_', '-')}" + (f" {v}" if not isinstance(v, bool) else "")
+                        for k, v in flags.items()
+                        if v is not False
+                    )
+                    print(f"  {name:12s} → {expanded}")
         elif args.command == "manifest":
             from .manifest import build_manifest
             manifest = build_manifest(parser)

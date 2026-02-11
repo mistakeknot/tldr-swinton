@@ -1,5 +1,5 @@
 {
-  "description": "tldrs plugin hooks — token-efficient reconnaissance nudging",
+  "description": "tldrs plugin hooks — token-efficient reconnaissance",
   "hooks": {
     "Setup": [
       {
@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/setup.sh",
-            "timeout": 5
+            "timeout": 10
           }
         ]
       }
@@ -30,6 +30,18 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/suggest-recon.sh\"",
             "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-read-extract.sh\"",
+            "timeout": 8
           }
         ]
       }
