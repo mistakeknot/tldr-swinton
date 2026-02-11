@@ -29,7 +29,7 @@ This project is available as a Claude Code plugin from the [interagency-marketpl
 - `tldrs-session-start` - Runs diff-context before reading files
 - `tldrs-find-code` - Semantic/structural search instead of grep
 - `tldrs-understand-symbol` - Symbol context before reading files
-- `tldrs-compress-context` - Compression and caching for large outputs
+- `tldrs-ashpool-sync` - Sync Ashpool eval coverage with tldrs capabilities
 
 ## Plugin Publishing Runbook
 
@@ -58,13 +58,14 @@ Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../inte
 │   ├── structural.md
 │   └── quickstart.md
 ├── hooks/
-│   ├── hooks.json       # Hook definitions
-│   └── setup.sh         # Setup hook script
+│   ├── hooks.json       # Hook definitions (Read + Grep PreToolUse, Setup)
+│   ├── setup.sh         # Setup hook script
+│   └── suggest-recon.sh # PreToolUse nudge for Read/Grep
 └── skills/              # 4 focused skills (Claude-invoked)
     ├── tldrs-session-start/
     ├── tldrs-find-code/
     ├── tldrs-understand-symbol/
-    └── tldrs-compress-context/
+    └── tldrs-ashpool-sync/
 ```
 
 **Version sync:** All three locations must match: `pyproject.toml`, `.claude-plugin/plugin.json`, and `interagency-marketplace/.claude-plugin/marketplace.json`. Always bump all three together.
@@ -75,4 +76,4 @@ Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../inte
 
 ## Claude Code-Specific Notes
 
-**After adding formats/flags:** Also update `../Ashpool` (regression suite, A/B scripts, demo). See AGENTS.md "Related Projects".
+**After adding formats/flags:** Run `tldrs manifest | python3 ../Ashpool/scripts/check_tldrs_sync.py` to detect gaps, then use `/tldrs-ashpool-sync` to fix them. Also update `../Ashpool` manually if needed. See AGENTS.md "Related Projects".
