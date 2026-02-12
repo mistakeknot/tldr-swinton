@@ -22,8 +22,9 @@ __all__ = [
 
 # Optional: structural search (requires ast-grep-py at runtime)
 try:
-    from .astgrep import get_structural_search
+    from .astgrep import get_structural_search, get_structural_context
 
     __all__.append("get_structural_search")
+    __all__.append("get_structural_context")
 except ImportError:
     pass

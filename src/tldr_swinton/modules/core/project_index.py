@@ -14,6 +14,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .ast_cache import ASTCache
 from .ast_extractor import FunctionInfo
 from .cross_file_calls import build_project_call_graph
 from .hybrid_extractor import HybridExtractor
@@ -228,6 +229,7 @@ class ProjectIndex:
 
         idx = cls(project=project, language=language)
         extractor = HybridExtractor()
+        ast_cache = ASTCache(project)
 
         for file_path in iter_workspace_files(project, extensions=extensions):
             try:
@@ -235,7 +237,10 @@ class ProjectIndex:
                 if include_sources:
                     idx.file_sources[str(file_path)] = source
 
-                info = extractor.extract(str(file_path))
+                info = ast_cache.get(file_path)
+                if info is None:
+                    info = extractor.extract(str(file_path))
+                    ast_cache.put(file_path, info)
                 rel_path = str(file_path.relative_to(project))
 
                 for func in info.functions:

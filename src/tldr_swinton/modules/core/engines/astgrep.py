@@ -191,3 +191,25 @@ def structural_matches_to_candidates(
             )
         )
     return candidates
+
+
+def get_structural_context(
+    project_path: str,
+    pattern: str,
+    language: str | None = None,
+    budget_tokens: int = 4000,
+    max_results: int = 50,
+) -> list[Candidate]:
+    """Engine entry point: structural search producing Candidates for ContextPack pipeline.
+
+    This is the engine-pattern wrapper around get_structural_search +
+    structural_matches_to_candidates.
+    """
+    result = get_structural_search(
+        project_path=project_path,
+        pattern=pattern,
+        language=language,
+        budget_tokens=budget_tokens,
+        max_results=max_results,
+    )
+    return structural_matches_to_candidates(result.matches)
