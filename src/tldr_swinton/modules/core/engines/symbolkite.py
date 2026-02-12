@@ -413,8 +413,10 @@ def get_context_pack(
             )
         )
 
-    # Build post-processors (attention reranking when available)
-    processors = _get_attention_processors(project_root)
+    # Build post-processors (attention reranking + edit locality when available)
+    processors = _get_symbol_processors(
+        project_root, getattr(_project_index, 'file_sources', None),
+    )
 
     pack = ContextPackEngine(registry=None).build_context_pack(
         candidates,
@@ -657,17 +659,29 @@ def get_signatures_for_entry(
     return result_signatures
 
 
-def _get_attention_processors(project: Path) -> list:
-    """Build attention-based post-processors if attention DB exists."""
+def _get_symbol_processors(project: Path, file_sources: dict[str, str] | None = None) -> list:
+    """Build post-processors for symbol context (attention + edit locality)."""
+    processors = []
+
+    # Attention reranking
     db_path = project / ".tldrs" / "attention.db"
-    if not db_path.exists():
-        return []
-    try:
-        from ..attention_pruning import AttentionTracker, create_candidate_reranker
-        tracker = AttentionTracker(project)
-        return [create_candidate_reranker(tracker)]
-    except Exception:
-        return []
+    if db_path.exists():
+        try:
+            from ..attention_pruning import AttentionTracker, create_candidate_reranker
+            tracker = AttentionTracker(project)
+            processors.append(create_candidate_reranker(tracker))
+        except Exception:
+            pass
+
+    # Edit locality enrichment
+    if file_sources:
+        try:
+            from ..edit_locality import create_edit_locality_enricher
+            processors.append(create_edit_locality_enricher(project, file_sources))
+        except Exception:
+            pass
+
+    return processors
 
 
 def _record_attention_delivery(project: Path, pack) -> None:

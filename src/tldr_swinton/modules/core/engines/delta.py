@@ -54,6 +54,31 @@ def _collect_diff_text(project_root: Path, base_ref: str, head_ref: str) -> str:
     return diff_text
 
 
+def _get_delta_processors(project: Path, file_sources: dict[str, str] | None = None) -> list:
+    """Build post-processors for delta context (attention + edit locality)."""
+    processors = []
+
+    # Attention reranking
+    db_path = project / ".tldrs" / "attention.db"
+    if db_path.exists():
+        try:
+            from ..attention_pruning import AttentionTracker, create_candidate_reranker
+            tracker = AttentionTracker(project)
+            processors.append(create_candidate_reranker(tracker))
+        except Exception:
+            pass
+
+    # Edit locality enrichment (only when file sources available)
+    if file_sources:
+        try:
+            from ..edit_locality import create_edit_locality_enricher
+            processors.append(create_edit_locality_enricher(project, file_sources))
+        except Exception:
+            pass
+
+    return processors
+
+
 def get_context_pack_with_delta(
     project: str,
     entry_point: str,
@@ -141,10 +166,12 @@ def get_context_pack_with_delta(
         ]
 
         engine = ContextPackEngine()
+        processors = _get_delta_processors(project_root)
         pack = engine.build_context_pack_delta(
             candidates,
             delta_result,
             budget_tokens=budget_tokens,
+            post_processors=processors or None,
             zoom_level=zoom_level,
             compress_imports=compress_imports,
         )
@@ -218,10 +245,14 @@ def get_context_pack_with_delta(
         )
 
     engine = ContextPackEngine()
+    processors = _get_delta_processors(
+        project_root, getattr(_project_index, 'file_sources', None),
+    )
     delta_pack = engine.build_context_pack_delta(
         candidates,
         delta_result,
         budget_tokens=budget_tokens,
+        post_processors=processors or None,
         zoom_level=zoom_level,
         compress_imports=compress_imports,
     )
@@ -369,10 +400,12 @@ def get_diff_context_with_delta(
         ]
 
         engine = ContextPackEngine()
+        processors = _get_delta_processors(project_root)
         pack = engine.build_context_pack_delta(
             candidates,
             delta_result,
             budget_tokens=budget_tokens,
+            post_processors=processors or None,
             zoom_level=zoom_level,
             compress_imports=compress_imports,
         )
@@ -444,10 +477,14 @@ def get_diff_context_with_delta(
         )
 
     engine = ContextPackEngine()
+    processors = _get_delta_processors(
+        project_root, getattr(_project_index, 'file_sources', None),
+    )
     delta_pack = engine.build_context_pack_delta(
         candidates,
         delta_result,
         budget_tokens=budget_tokens,
+        post_processors=processors or None,
         zoom_level=zoom_level,
         compress_imports=compress_imports,
     )
@@ -479,5 +516,18 @@ def get_diff_context_with_delta(
         fingerprint = _compute_repo_fingerprint(project_root)
         store.open_session(session_id, fingerprint, language)
         store.record_deliveries_batch(session_id, deliveries)
+
+    # Auto-verify coherence for multi-file packs
+    if delta_pack.slices:
+        files = {s.id.split(":", 1)[0] for s in delta_pack.slices if ":" in s.id}
+        if len(files) >= 2:
+            try:
+                from ..coherence_verify import verify_from_context_pack, format_coherence_report_for_agent
+                pack_dict = {"slices": [{"id": s.id} for s in delta_pack.slices]}
+                report = verify_from_context_pack(project_root, pack_dict)
+                if not report.is_coherent:
+                    delta_pack.coherence_warnings = format_coherence_report_for_agent(report)
+            except Exception:
+                pass
 
     return delta_pack

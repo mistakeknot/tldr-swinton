@@ -357,6 +357,7 @@ class ContextDelegator:
         budget: int = 1500,
         session_id: str | None = None,
         language: str | None = None,
+        _project_index=None,
     ) -> DistilledContext:
         from .api import get_diff_context, get_symbol_context_pack
         from .contextpack_engine import Candidate
@@ -458,12 +459,14 @@ class ContextDelegator:
                         session_id,
                         budget_tokens=max(500, budget),
                         language=lang,
+                        _project_index=_project_index,
                     )
                 else:
                     diff_pack = get_diff_context(
                         project_path,
                         budget_tokens=max(500, budget),
                         language=lang,
+                        _project_index=_project_index,
                     )
                 all_candidates.extend(_pack_to_candidates(diff_pack, len(all_candidates)))
             except Exception:
@@ -482,6 +485,7 @@ class ContextDelegator:
                         depth=2,
                         language=lang,
                         budget_tokens=symbol_budget,
+                        _project_index=_project_index,
                     )
                 else:
                     symbol_pack = get_symbol_context_pack(
@@ -490,6 +494,7 @@ class ContextDelegator:
                         depth=2,
                         language=lang,
                         budget_tokens=symbol_budget,
+                        _project_index=_project_index,
                     )
                 all_candidates.extend(_pack_to_candidates(symbol_pack, len(all_candidates)))
             except Exception:

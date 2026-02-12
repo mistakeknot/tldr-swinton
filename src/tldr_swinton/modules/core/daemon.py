@@ -746,7 +746,12 @@ class TLDRDaemon:
         ]
 
         engine = ContextPackEngine()
-        delta_pack = engine.build_context_pack_delta(candidates, delta_result, budget_tokens=budget)
+        from .engines.delta import _get_delta_processors
+        processors = _get_delta_processors(self.project)
+        delta_pack = engine.build_context_pack_delta(
+            candidates, delta_result, budget_tokens=budget,
+            post_processors=processors or None,
+        )
 
         # Record deliveries for changed symbols
         deliveries = []

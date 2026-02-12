@@ -153,6 +153,21 @@ def _resolve_diff_base(project: Path) -> str:
     return "HEAD~1"
 
 
+def _should_auto_verify(pack) -> bool:
+    """Check if a context pack has symbols from multiple files (worth coherence checking)."""
+    files: set[str] = set()
+    # Handle both dict and ContextPack objects
+    if isinstance(pack, dict):
+        slices = pack.get("slices", [])
+    else:
+        slices = getattr(pack, "slices", []) or []
+    for s in slices:
+        symbol_id = s.get("id", "") if isinstance(s, dict) else getattr(s, "id", "")
+        if ":" in symbol_id:
+            files.add(symbol_id.split(":", 1)[0])
+    return len(files) >= 2
+
+
 # Extension to language mapping for auto-detection
 EXTENSION_TO_LANGUAGE = {
     '.java': 'java',
@@ -447,6 +462,13 @@ Semantic Search:
         help="Prune self-documenting and stdlib symbols from caller/callee expansion",
     )
 
+    ctx_p.add_argument(
+        "--delegate",
+        type=str,
+        default=None,
+        metavar="TASK",
+        help="Use context delegation to auto-plan retrieval for the given task description",
+    )
     ctx_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
     ctx_p.add_argument("--max-bytes", type=int, default=None, help="Cap output at N bytes")
     ctx_p.add_argument(
@@ -531,7 +553,12 @@ Semantic Search:
     diff_p.add_argument(
         "--verify",
         action="store_true",
-        help="Run coherence verification on diff context (checks cross-file compatibility)",
+        help="Force coherence verification even on single-file diffs",
+    )
+    diff_p.add_argument(
+        "--no-verify",
+        action="store_true",
+        help="Disable automatic coherence verification on multi-file diffs",
     )
 
     diff_p.add_argument("--max-lines", type=int, default=None, help="Cap output at N lines")
@@ -1110,7 +1137,33 @@ Semantic Search:
                 project_root, args.lang or "python", include_sources=True,
             )
 
-            if fmt in ("ultracompact", "packed-json", "columnar-json"):
+            # Delegation mode: use ContextDelegator for smart retrieval planning
+            if getattr(args, "delegate", None):
+                from .modules.core.context_delegation import ContextDelegator
+                from .modules.core.distill_formatter import format_distilled
+                from dataclasses import asdict
+
+                delegator = ContextDelegator(project_root)
+                distilled = delegator.distill(
+                    project_root,
+                    args.delegate,
+                    budget=args.budget or 4000,
+                    session_id=session_id,
+                    language=args.lang or "python",
+                    _project_index=_project_index,
+                )
+                out_fmt = "json" if getattr(args, "machine", False) else fmt
+                if out_fmt == "json":
+                    output = json.dumps(asdict(distilled), indent=2)
+                else:
+                    output = format_distilled(distilled, budget=args.budget or 4000)
+                if args.max_lines or args.max_bytes:
+                    from .modules.core.output_formats import truncate_output
+                    output = truncate_output(output, max_lines=args.max_lines, max_bytes=args.max_bytes)
+                print(output)
+                emit_preset_hint(args.command, args)
+
+            elif fmt in ("ultracompact", "packed-json", "columnar-json"):
                 from .modules.core.output_formats import format_context_pack
                 from .modules.core.contextpack_engine import include_symbol_bodies
 
@@ -1255,12 +1308,29 @@ Semantic Search:
                     type_prune=args.type_prune,
                     _project_index=_diff_project_index,
                 )
-            # Opt-in coherence verification
-            if getattr(args, "verify", False) or os.environ.get("TLDRS_COHERENCE_VERIFY"):
-                from .modules.core.coherence_verify import verify_from_context_pack, format_coherence_report_for_agent
-                report = verify_from_context_pack(project, pack)
-                if not report.is_coherent:
-                    print(format_coherence_report_for_agent(report), file=sys.stderr)
+            # Coherence verification: auto for multi-file diffs, forced with --verify
+            # Disable with --no-verify or TLDRS_NO_COHERENCE_VERIFY=1
+            if not getattr(args, "no_verify", False) and not os.environ.get("TLDRS_NO_COHERENCE_VERIFY"):
+                should_verify = getattr(args, "verify", False) or os.environ.get("TLDRS_COHERENCE_VERIFY")
+                if not should_verify:
+                    should_verify = _should_auto_verify(pack)
+                if should_verify:
+                    try:
+                        from .modules.core.coherence_verify import verify_from_context_pack, format_coherence_report_for_agent
+                        # Convert ContextPack to dict for verify_from_context_pack
+                        if not isinstance(pack, dict):
+                            pack_dict = {"slices": [{"id": s.id} for s in (pack.slices or [])]}
+                        else:
+                            pack_dict = pack
+                        report = verify_from_context_pack(project, pack_dict)
+                        if not report.is_coherent:
+                            warnings_text = format_coherence_report_for_agent(report)
+                            print(warnings_text, file=sys.stderr)
+                            # Also embed in ContextPack if possible
+                            if hasattr(pack, "coherence_warnings"):
+                                pack.coherence_warnings = warnings_text
+                    except Exception:
+                        pass  # Never block on verification failure
 
             # Force JSON format when --machine flag is set
             fmt = "json" if getattr(args, "machine", False) else args.format

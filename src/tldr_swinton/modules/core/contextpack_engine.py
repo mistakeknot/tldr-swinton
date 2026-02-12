@@ -44,6 +44,7 @@ class ContextPack:
     rehydrate: dict[str, str] | None = None  # symbol_id -> vhs_ref for rehydration
     cache_stats: dict | None = None  # hit_rate, hits, misses
     import_compression: dict | None = None
+    coherence_warnings: str | None = None  # Cross-file coherence issues (auto-verified)
 
 
 def _collect_import_compression(slices: list[ContextSlice]) -> dict | None:
