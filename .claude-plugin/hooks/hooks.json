@@ -12,28 +12,6 @@
         ]
       }
     ],
-    "PreToolUse": [
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/suggest-recon.sh\"",
-            "timeout": 3
-          }
-        ]
-      },
-      {
-        "matcher": "Grep",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/suggest-recon.sh\"",
-            "timeout": 3
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Read",
