@@ -722,21 +722,21 @@ def compact_extract(file_path: str, base_path: str | None = None) -> dict:
 
     compact_funcs = []
     for f in full.get("functions", []):
-        entry: dict = {"name": f["name"], "signature": f["signature"], "line": f["line_number"]}
+        entry: dict = {"name": f["name"], "signature": f["signature"], "line_number": f["line_number"]}
         if f.get("decorators"):
             entry["decorators"] = f["decorators"]
-        if f.get("docstring"):
-            entry["doc"] = f["docstring"].split("\n")[0]  # First line only
+        if first_line := (f.get("docstring") or "").split("\n")[0].strip():
+            entry["doc"] = first_line
         compact_funcs.append(entry)
 
     compact_classes = []
     for c in full.get("classes", []):
-        cls_entry: dict = {"name": c["name"], "line": c.get("line_number", 0)}
+        cls_entry: dict = {"name": c["name"], "line_number": c.get("line_number", 0)}
         if c.get("bases"):
             cls_entry["bases"] = c["bases"]
         methods = []
         for m in c.get("methods", []):
-            m_entry: dict = {"name": m["name"], "signature": m["signature"], "line": m["line_number"]}
+            m_entry: dict = {"name": m["name"], "signature": m["signature"], "line_number": m["line_number"]}
             if m.get("decorators"):
                 m_entry["decorators"] = m["decorators"]
             methods.append(m_entry)

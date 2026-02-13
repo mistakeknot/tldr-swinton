@@ -185,14 +185,16 @@ def search(project: str, pattern: str, max_results: int = 100) -> dict:
 
 @mcp.tool()
 def extract(file: str, compact: bool = False) -> dict:
-    """Extract full code structure from a file.
-
-    Returns imports, functions, classes, and intra-file call graph.
+    """Extract code structure from a file.
 
     Args:
         file: Path to source file
         compact: If True, return signatures and line numbers only (~87% smaller).
-                 Use for LLM context injection; omits call_graph, params, is_async.
+                 Omits call_graph, imports, params, is_async. Bypasses daemon.
+
+    Returns:
+        When compact=False: Full structure with imports, functions, classes, call_graph.
+        When compact=True: Minimal structure with names, signatures, line numbers only.
     """
     if compact:
         from .api import compact_extract
