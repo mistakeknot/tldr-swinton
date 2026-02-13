@@ -19,7 +19,7 @@ PRESETS = {
     "minimal": {
         "format": "ultracompact",
         "budget": 1500,
-        "compress": "two-stage",
+        "compress": "blocks",
         "compress_imports": True,
         "strip_comments": True,
         "type_prune": True,
