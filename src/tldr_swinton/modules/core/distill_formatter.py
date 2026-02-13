@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .token_utils import estimate_tokens as _estimate_tokens
+
 
 @dataclass
 class DistilledContext:
@@ -16,10 +18,6 @@ class DistilledContext:
     # Each: {"location": str, "risk": str}
     summary: str = ""
     token_estimate: int = 0
-
-
-def _estimate_tokens(text: str) -> int:
-    return max(0, len(text) // 4)
 
 
 def _split_symbol_id(symbol_id: str) -> tuple[str, str]:
@@ -96,15 +94,52 @@ def format_distilled(context: DistilledContext, budget: int = 1500) -> str:
     risk_areas = list(context.risk_areas)
     summary = (context.summary or "").strip() or "No distilled summary available."
 
+    def _compress_path(symbol_id: str, path_ids: dict[str, str]) -> str:
+        """Replace file path prefix with short path ID (e.g. 'p1:func')."""
+        if ":" not in symbol_id:
+            return symbol_id
+        path, name = symbol_id.split(":", 1)
+        if path in path_ids:
+            return f"{path_ids[path]}:{name}"
+        return symbol_id
+
+    def _build_path_dict() -> dict[str, str]:
+        """Build path dictionary from all paths appearing in the context."""
+        paths: set[str] = set()
+        for item in files_to_edit:
+            p = str(item.get("path", ""))
+            if p and p != "?":
+                paths.add(p)
+        for item in key_functions:
+            for call in (item.get("calls") or []):
+                s = str(call)
+                if ":" in s:
+                    paths.add(s.split(":", 1)[0])
+        for item in dependencies:
+            p = str(item.get("path", ""))
+            if p and p != "?":
+                paths.add(p)
+        if len(paths) < 2:
+            return {}
+        return {path: f"p{i}" for i, path in enumerate(sorted(paths), 1)}
+
     def render() -> str:
-        lines: list[str] = ["## Files to Edit"]
+        path_ids = _build_path_dict()
+        lines: list[str] = []
+
+        if path_ids:
+            lines.append(" ".join(f"{pid}={path}" for path, pid in path_ids.items()))
+            lines.append("")
+
+        lines.append("## Files to Edit")
         if files_to_edit:
             for item in files_to_edit:
                 path = str(item.get("path", "?"))
+                display_path = path_ids.get(path, path) if path_ids else path
                 symbol = str(item.get("symbol", "?"))
                 reason = str(item.get("reason", "")).strip()
                 span = _render_lines(_coerce_lines(item.get("lines")))
-                entry = f"- {path}: {symbol} ({span})"
+                entry = f"- {display_path}: {symbol} ({span})"
                 if reason:
                     entry += f" — {reason}"
                 lines.append(entry)
@@ -120,32 +155,30 @@ def format_distilled(context: DistilledContext, budget: int = 1500) -> str:
                 calls = item.get("calls")
                 if not isinstance(calls, list):
                     calls = []
-                calls_text = ", ".join(str(call) for call in calls) if calls else "none"
+                compressed = [_compress_path(str(c), path_ids) for c in calls] if path_ids and calls else [str(c) for c in calls]
+                calls_text = ", ".join(compressed) if compressed else "none"
                 lines.append(f"- {signature} → {returns}, calls: {calls_text}")
         else:
             lines.append("- None")
 
-        lines.append("")
-        lines.append("## Dependencies (will break if changed)")
         if dependencies:
+            lines.append("")
+            lines.append("## Dependencies (will break if changed)")
             for item in dependencies:
                 caller = str(item.get("caller", "?"))
                 path = str(item.get("path", "?"))
+                display_path = path_ids.get(path, path) if path_ids else path
                 line = int(item.get("line", 0) or 0)
                 relationship = str(item.get("relationship", "calls target directly"))
-                lines.append(f"- {caller} ({path}:{line}) {relationship}")
-        else:
-            lines.append("- None")
+                lines.append(f"- {caller} ({display_path}:{line}) {relationship}")
 
-        lines.append("")
-        lines.append("## Risk Areas")
         if risk_areas:
+            lines.append("")
+            lines.append("## Risk Areas")
             for item in risk_areas:
                 location = str(item.get("location", "?"))
                 risk = str(item.get("risk", "Unknown risk"))
                 lines.append(f"- {location}: {risk}")
-        else:
-            lines.append("- None")
 
         lines.append("")
         lines.append("## Summary")
