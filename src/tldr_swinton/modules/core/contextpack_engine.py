@@ -191,6 +191,7 @@ class ContextPackEngine:
         budget_tokens: int | None = None,
         post_processors: list[Callable[[list[Candidate]], list[Candidate]]] | None = None,
         zoom_level: ZoomLevel = ZoomLevel.L4,
+        strip_comments: bool = False,
         compress_imports: bool = False,
     ) -> ContextPack:
         """Build context pack with delta detection.
@@ -234,6 +235,8 @@ class ContextPackEngine:
             if candidate.code is None and self._registry is not None and info is None:
                 info = self._registry.get(candidate.symbol_id)
             code = candidate.code if candidate.code is not None else (info.code if info else None)
+            if strip_comments and code:
+                code = strip_code(code, _infer_language_from_symbol_id(candidate.symbol_id))
 
             if candidate.lines is None and self._registry is not None and info is None:
                 info = self._registry.get(candidate.symbol_id)

@@ -173,6 +173,7 @@ def get_context_pack_with_delta(
             budget_tokens=budget_tokens,
             post_processors=processors or None,
             zoom_level=zoom_level,
+            strip_comments=strip_comments,
             compress_imports=compress_imports,
         )
         return pack
@@ -254,6 +255,7 @@ def get_context_pack_with_delta(
         budget_tokens=budget_tokens,
         post_processors=processors or None,
         zoom_level=zoom_level,
+        strip_comments=strip_comments,
         compress_imports=compress_imports,
     )
 
@@ -407,6 +409,7 @@ def get_diff_context_with_delta(
             budget_tokens=budget_tokens,
             post_processors=processors or None,
             zoom_level=zoom_level,
+            strip_comments=strip_comments,
             compress_imports=compress_imports,
         )
         return pack
@@ -486,6 +489,7 @@ def get_diff_context_with_delta(
         budget_tokens=budget_tokens,
         post_processors=processors or None,
         zoom_level=zoom_level,
+        strip_comments=strip_comments,
         compress_imports=compress_imports,
     )
 
