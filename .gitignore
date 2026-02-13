@@ -78,3 +78,8 @@ results/
 tldr-bench/vendor/openhands-benchmarks/
 logs/
 .venv311/
+
+# Workspace / tool artifacts
+.remote-source
+.serena/
+.workbench/

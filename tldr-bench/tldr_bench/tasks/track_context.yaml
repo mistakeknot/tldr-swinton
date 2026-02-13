@@ -1,7 +1,7 @@
 - id: ctx-001
   title: "Context-only: baselines"
   repo: "tldr-swinton"
-  entry: "tldr_swinton/api.py:get_relevant_context"
+  entry: "src/tldr_swinton/modules/core/engines/symbolkite.py:get_relevant_context"
   runner: "static"
   variant: "baselines"
   budget: 2000

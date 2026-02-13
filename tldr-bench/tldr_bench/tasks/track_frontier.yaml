@@ -3,25 +3,25 @@
   repo: "local"
   runner: "cli"
   bench_command:
-    ["uv", "run", "python", "tldr-bench/scripts/shim_client.py", "--model", "codex:default", "--prompt", "Summarize the change request.", "--project-root", ".", "--context-entry", "tldr_swinton/api.py:get_relevant_context", "--context-format", "text", "--context-depth", "2"]
+    ["uv", "run", "python", "tldr-bench/scripts/shim_client.py", "--model", "codex:default", "--prompt", "Summarize the change request.", "--project-root", ".", "--context-entry", "src/tldr_swinton/modules/core/engines/symbolkite.py:get_relevant_context", "--context-format", "text", "--context-depth", "2"]
 
 - id: frontier-001-ultra
   title: "Frontier: codex via shim (ultracompact context)"
   repo: "local"
   runner: "cli"
   bench_command:
-    ["uv", "run", "python", "tldr-bench/scripts/shim_client.py", "--model", "codex:default", "--prompt", "Summarize the change request.", "--project-root", ".", "--context-entry", "tldr_swinton/api.py:get_relevant_context", "--context-format", "ultracompact", "--context-depth", "2"]
+    ["uv", "run", "python", "tldr-bench/scripts/shim_client.py", "--model", "codex:default", "--prompt", "Summarize the change request.", "--project-root", ".", "--context-entry", "src/tldr_swinton/modules/core/engines/symbolkite.py:get_relevant_context", "--context-format", "ultracompact", "--context-depth", "2"]
 
 - id: frontier-002-text
   title: "Frontier: claude via shim (text context)"
   repo: "local"
   runner: "cli"
   bench_command:
-    ["uv", "run", "python", "tldr-bench/scripts/shim_client.py", "--model", "claude:default", "--prompt", "Summarize the change request.", "--project-root", ".", "--context-entry", "tldr_swinton/api.py:get_relevant_context", "--context-format", "text", "--context-depth", "2"]
+    ["uv", "run", "python", "tldr-bench/scripts/shim_client.py", "--model", "claude:default", "--prompt", "Summarize the change request.", "--project-root", ".", "--context-entry", "src/tldr_swinton/modules/core/engines/symbolkite.py:get_relevant_context", "--context-format", "text", "--context-depth", "2"]
 
 - id: frontier-002-ultra
   title: "Frontier: claude via shim (ultracompact context)"
   repo: "local"
   runner: "cli"
   bench_command:
-    ["uv", "run", "python", "tldr-bench/scripts/shim_client.py", "--model", "claude:default", "--prompt", "Summarize the change request.", "--project-root", ".", "--context-entry", "tldr_swinton/api.py:get_relevant_context", "--context-format", "ultracompact", "--context-depth", "2"]
+    ["uv", "run", "python", "tldr-bench/scripts/shim_client.py", "--model", "claude:default", "--prompt", "Summarize the change request.", "--project-root", ".", "--context-entry", "src/tldr_swinton/modules/core/engines/symbolkite.py:get_relevant_context", "--context-format", "ultracompact", "--context-depth", "2"]

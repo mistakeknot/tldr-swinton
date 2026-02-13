@@ -1,8 +1,8 @@
 - id: cur-001
   title: "Trim docstring noise in embeddings"
   repo: "tldr-swinton"
-  entry: "tldr_swinton/index.py:_clean_doc"
-  expected_files: ["src/tldr_swinton/index.py"]
+  entry: "src/tldr_swinton/modules/semantic/index.py:_clean_doc"
+  expected_files: ["src/tldr_swinton/modules/semantic/index.py"]
   expected_lines: [204, 218, 228]
   type: "small_refactor"
   notes: "Docstring truncation path used by embed text builder."
@@ -10,8 +10,8 @@
 - id: cur-002
   title: "Reduce path pollution in embedding text"
   repo: "tldr-swinton"
-  entry: "tldr_swinton/index.py:_short_path"
-  expected_files: ["src/tldr_swinton/index.py"]
+  entry: "src/tldr_swinton/modules/semantic/index.py:_short_path"
+  expected_files: ["src/tldr_swinton/modules/semantic/index.py"]
   expected_lines: [218, 228]
   type: "small_refactor"
   notes: "Shorten paths for embeddings without losing intent."
@@ -19,8 +19,8 @@
 - id: cur-003
   title: "Improve relevant context selection"
   repo: "tldr-swinton"
-  entry: "tldr_swinton/api.py:get_relevant_context"
-  expected_files: ["src/tldr_swinton/api.py"]
+  entry: "src/tldr_swinton/modules/core/engines/symbolkite.py:get_relevant_context"
+  expected_files: ["src/tldr_swinton/modules/core/engines/symbolkite.py"]
   expected_lines: [520]
   type: "feature_tweak"
   notes: "Token-efficient context flow and call graph traversal."
@@ -28,8 +28,8 @@
 - id: cur-004
   title: "Cache invalidation on file change"
   repo: "tldr-swinton"
-  entry: "tldr_swinton/daemon.py:TLDRDaemon._handle_notify"
-  expected_files: ["src/tldr_swinton/daemon.py"]
+  entry: "src/tldr_swinton/modules/core/daemon.py:TLDRDaemon._handle_notify"
+  expected_files: ["src/tldr_swinton/modules/core/daemon.py"]
   expected_lines: [718]
   type: "bug_fix"
   notes: "Dirty file tracking + reindex triggers."
@@ -37,8 +37,8 @@
 - id: cur-005
   title: "Compute stable file hash for vector store"
   repo: "tldr-swinton"
-  entry: "tldr_swinton/vector_store.py:get_file_hash"
-  expected_files: ["src/tldr_swinton/vector_store.py"]
+  entry: "src/tldr_swinton/modules/semantic/vector_store.py:get_file_hash"
+  expected_files: ["src/tldr_swinton/modules/semantic/vector_store.py"]
   expected_lines: [331]
   type: "small_refactor"
   notes: "Hashing used for dedup and incremental indexing."
@@ -46,8 +46,8 @@
 - id: cur-006
   title: "Git diff discovery for change impact"
   repo: "tldr-swinton"
-  entry: "tldr_swinton/change_impact.py:get_git_changed_files"
-  expected_files: ["src/tldr_swinton/change_impact.py"]
+  entry: "src/tldr_swinton/modules/core/change_impact.py:get_git_changed_files"
+  expected_files: ["src/tldr_swinton/modules/core/change_impact.py"]
   expected_lines: [256]
   type: "feature_tweak"
   notes: "Changed file detection for affected tests."
