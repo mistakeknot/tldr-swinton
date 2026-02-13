@@ -1,6 +1,6 @@
 ---
 name: tldrs-map-codebase
-description: "Use when asked to understand a codebase's architecture, explore an unfamiliar project, onboard to a new repo, or identify which modules exist. Provides structural overview without reading individual files."
+description: "Use when asked to understand a codebase's architecture, explore an unfamiliar project, onboard to a new repo, identify which modules exist, find entry points, or get a bird's-eye view before diving into code. Also use when the user says 'what does this project do' or 'show me the structure'. Provides structural overview without reading individual files."
 allowed-tools:
   - Bash
 ---

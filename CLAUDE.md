@@ -27,12 +27,12 @@ This project is available as a Claude Code plugin from the [interagency-marketpl
 - `/tldrs-extract <file>` - Extract file structure (functions, classes, imports)
 
 **Autonomous skills** (Claude invokes these automatically):
-- `tldrs-session-start` - Runs diff-context before reading files
-- `tldrs-find-code` - Semantic/structural search instead of grep
-- `tldrs-understand-symbol` - Symbol context before reading files
-- `tldrs-explore-file` - Debug functions, trace control/data flow, analyze file structure
+- `tldrs-session-start` - Runs diff-context before reading files (any coding task)
 - `tldrs-map-codebase` - Understand architecture, explore unfamiliar projects
 - `tldrs-ashpool-sync` - Sync Ashpool eval coverage with tldrs capabilities
+
+**MCP tools** (direct tool calls, replace retired skills):
+- `tldr-code` MCP server provides `find`, `context`, `impact`, `cfg`, `dfg`, `extract`, `structural` etc. as native tools
 
 ## Plugin Publishing Runbook
 
@@ -53,7 +53,7 @@ Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../inte
 **Plugin structure:**
 ```
 .claude-plugin/
-├── plugin.json          # Manifest (version, metadata, references)
+├── plugin.json          # Manifest (version, metadata, MCP server, references)
 ├── commands/            # Slash commands (/tldrs-find, etc.)
 │   ├── find.md
 │   ├── diff-context.md
@@ -62,14 +62,11 @@ Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../inte
 │   ├── quickstart.md
 │   └── extract.md
 ├── hooks/
-│   ├── hooks.json       # Hook definitions (Read + Grep PreToolUse, Setup)
+│   ├── hooks.json       # Hook definitions (Setup, PostToolUse:Read)
 │   ├── setup.sh         # Setup hook script (+ prebuild cache warming)
-│   └── suggest-recon.sh # PreToolUse nudge for Read/Grep
-└── skills/              # 6 focused skills (Claude-invoked)
+│   └── suggest-recon.sh # (legacy, not registered)
+└── skills/              # 3 orchestration skills (Claude-invoked)
     ├── tldrs-session-start/
-    ├── tldrs-find-code/
-    ├── tldrs-understand-symbol/
-    ├── tldrs-explore-file/
     ├── tldrs-map-codebase/
     └── tldrs-ashpool-sync/
 ```
