@@ -116,13 +116,23 @@ def _send_raw(project: str, command: dict) -> dict:
 def _send_command(project: str, command: dict) -> dict:
     """Send command to daemon, auto-starting if needed."""
     _ensure_daemon(project)
-    return _send_raw(project, command)
+    response = _send_raw(project, command)
+    if (
+        isinstance(response, dict)
+        and response.get("status") == "ok"
+        and "result" in response
+    ):
+        return response["result"]
+    return response
 
 
-def _format_context_result(result: dict, fmt: str) -> str:
-    if result.get("status") != "ok":
+def _format_context_result(result: dict | str, fmt: str) -> str:
+    if isinstance(result, dict) and result.get("status") not in (None, "ok"):
         return str(result)
-    ctx = result.get("result", {})
+    if isinstance(result, dict) and result.get("status") == "ok":
+        ctx = result.get("result", {})
+    else:
+        ctx = result
     if isinstance(ctx, str):
         return ctx
     if fmt in ("ultracompact", "json", "json-pretty"):
@@ -339,6 +349,16 @@ def slice(
 # === CODEBASE ANALYSIS TOOLS ===
 
 
+def _strip_impact_noise(node: dict) -> dict:
+    """Remove redundant fields from impact tree nodes."""
+    cleaned = {"function": node["function"], "file": node["file"]}
+    if node.get("truncated"):
+        cleaned["truncated"] = True
+    if node.get("callers"):
+        cleaned["callers"] = [_strip_impact_noise(c) for c in node["callers"]]
+    return cleaned
+
+
 @mcp.tool()
 def impact(project: str, function: str) -> dict:
     """Find all callers of a function (reverse call graph).
@@ -349,7 +369,12 @@ def impact(project: str, function: str) -> dict:
         project: Project root directory
         function: Function name to find callers of
     """
-    return _send_command(project, {"cmd": "impact", "func": function})
+    result = _send_command(project, {"cmd": "impact", "func": function})
+    if isinstance(result, dict) and "targets" in result:
+        result["targets"] = {
+            k: _strip_impact_noise(v) for k, v in result["targets"].items()
+        }
+    return result
 
 
 @mcp.tool()
@@ -576,6 +601,8 @@ def diff_context(
     language: str = "python",
     session_id: str | None = None,
     delta: bool = False,
+    max_lines: int | None = None,
+    max_bytes: int | None = None,
 ) -> str:
     """Get git-aware diff context with symbol mapping and adaptive windowing.
 
@@ -596,6 +623,8 @@ def diff_context(
         language: Programming language (python, typescript, go, rust, etc.)
         session_id: Session ID for delta caching (required for multi-turn preset)
         delta: Enable delta mode — unchanged symbols show [UNCHANGED] marker
+        max_lines: Cap output at this many lines (truncates at symbol boundary)
+        max_bytes: Cap output at this many bytes
 
     Returns:
         Formatted diff context string
@@ -648,7 +677,13 @@ def diff_context(
             type_prune=type_prune,
         )
 
-    return format_context_pack(result, fmt=fmt)
+    result_text = format_context_pack(result, fmt=fmt)
+
+    if max_lines is not None or max_bytes is not None:
+        from .output_formats import truncate_output
+        result_text = truncate_output(result_text, max_lines=max_lines, max_bytes=max_bytes)
+
+    return result_text
 
 
 @mcp.tool()
