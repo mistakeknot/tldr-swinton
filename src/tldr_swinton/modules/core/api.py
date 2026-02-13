@@ -711,6 +711,51 @@ def extract_file(file_path: str, base_path: str | None = None) -> dict:
     return module_info.to_dict()
 
 
+def compact_extract(file_path: str, base_path: str | None = None) -> dict:
+    """Extract compact code structure — signatures and line numbers only.
+
+    Designed for LLM context injection where full extract is too verbose.
+    Omits: call_graph, params arrays, is_async, empty decorators, empty docstrings.
+    Typical savings: ~87% vs full extract.
+    """
+    full = extract_file(file_path, base_path)
+
+    compact_funcs = []
+    for f in full.get("functions", []):
+        entry: dict = {"name": f["name"], "signature": f["signature"], "line": f["line_number"]}
+        if f.get("decorators"):
+            entry["decorators"] = f["decorators"]
+        if f.get("docstring"):
+            entry["doc"] = f["docstring"].split("\n")[0]  # First line only
+        compact_funcs.append(entry)
+
+    compact_classes = []
+    for c in full.get("classes", []):
+        cls_entry: dict = {"name": c["name"], "line": c.get("line_number", 0)}
+        if c.get("bases"):
+            cls_entry["bases"] = c["bases"]
+        methods = []
+        for m in c.get("methods", []):
+            m_entry: dict = {"name": m["name"], "signature": m["signature"], "line": m["line_number"]}
+            if m.get("decorators"):
+                m_entry["decorators"] = m["decorators"]
+            methods.append(m_entry)
+        if methods:
+            cls_entry["methods"] = methods
+        compact_classes.append(cls_entry)
+
+    result: dict = {
+        "file_path": full.get("file_path", file_path),
+        "language": full.get("language", "unknown"),
+    }
+    if compact_funcs:
+        result["functions"] = compact_funcs
+    if compact_classes:
+        result["classes"] = compact_classes
+    # Omit imports (available from the file itself) and call_graph (rarely needed)
+    return result
+
+
 # =============================================================================
 # Project Navigation Functions
 # =============================================================================

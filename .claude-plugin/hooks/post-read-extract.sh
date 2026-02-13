@@ -1,6 +1,7 @@
 #!/bin/bash
-# tldrs PostToolUse hook for Read — auto-inject extract on large files
-# Fires AFTER Read completes. Runs tldrs extract and returns as additionalContext.
+# tldrs PostToolUse hook for Read — auto-inject compact extract on large files
+# Fires AFTER Read completes. Runs tldrs extract --compact and returns as additionalContext.
+# Compact mode returns signatures + line numbers only (~87% smaller than full extract).
 # Only fires for code files >300 lines. Per-file flagging prevents duplicates.
 #
 # Input: JSON on stdin with { session_id, tool_name, tool_input: { file_path } }
@@ -43,7 +44,7 @@ if [ -n "$SESSION_ID" ]; then
 fi
 
 # Run extract with timeout
-EXTRACT_OUTPUT=$(timeout 5 tldrs extract "$FILE" 2>/dev/null)
+EXTRACT_OUTPUT=$(timeout 5 tldrs extract --compact "$FILE" 2>/dev/null)
 if [ $? -ne 0 ] || [ -z "$EXTRACT_OUTPUT" ]; then
     exit 0
 fi

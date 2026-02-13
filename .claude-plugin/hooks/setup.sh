@@ -1,7 +1,7 @@
 #!/bin/bash
 # tldrs Setup Hook — Dynamic Briefing
-# Runs at session start. Auto-runs diff-context and injects output.
-# Fallback chain: diff-context → structure → static tip
+# Runs at session start. Provides lightweight project summary.
+# Fallback chain: structure → static tip
 # Must complete within 10s (Claude Code setup hook timeout).
 
 set +e  # Never fail the hook
@@ -48,19 +48,9 @@ if [ -d ".git" ]; then
     fi
 fi
 
-# --- Attempt to run tldrs diff-context or structure ---
+# --- Lightweight project structure (diff-context is handled by session-start skill) ---
 TLDRS_OUTPUT=""
-if [ "$CHANGED_COUNT" -gt 0 ]; then
-    # Has changes — run diff-context with timeout
-    TLDRS_OUTPUT=$(timeout 7 tldrs diff-context --project . --preset compact 2>/dev/null)
-    if [ $? -ne 0 ] || [ -z "$TLDRS_OUTPUT" ]; then
-        # diff-context failed or timed out — try structure
-        TLDRS_OUTPUT=$(timeout 3 tldrs structure src/ 2>/dev/null || true)
-    fi
-else
-    # Clean tree — run structure
-    TLDRS_OUTPUT=$(timeout 5 tldrs structure src/ 2>/dev/null || true)
-fi
+TLDRS_OUTPUT=$(timeout 5 tldrs structure src/ 2>/dev/null || true)
 
 # --- Format output ---
 echo "Project: $(basename "$(pwd)") (${PY_COUNT} Python files, ${CHANGED_COUNT} changed since last commit)"
@@ -76,9 +66,7 @@ if [ -n "$TLDRS_OUTPUT" ]; then
     echo "$TLDRS_OUTPUT"
 else
     # Final fallback — static tip
-    echo "Run 'tldrs diff-context --project . --preset compact' before reading code."
-    echo "Use 'tldrs extract <file>' for file structure."
+    echo "The tldrs-session-start skill will run diff-context when you begin coding."
 fi
 
 echo ""
-echo "Available presets: compact, minimal, multi-turn"

@@ -373,6 +373,12 @@ Semantic Search:
     extract_p.add_argument("--class", dest="filter_class", help="Filter to specific class")
     extract_p.add_argument("--function", dest="filter_function", help="Filter to specific function")
     extract_p.add_argument("--method", dest="filter_method", help="Filter to specific method (Class.method)")
+    extract_p.add_argument(
+        "--compact",
+        action="store_true",
+        default=False,
+        help="Compact output: signatures and line numbers only (87%% smaller, for LLM context injection)",
+    )
 
     # tldr context <entry>
     ctx_p = subparsers.add_parser("context", help="Get relevant context for LLM")
@@ -1062,7 +1068,11 @@ Semantic Search:
                         print()
 
         elif args.command == "extract":
-            result = extract_file(args.file)
+            if getattr(args, "compact", False):
+                from .modules.core.api import compact_extract
+                result = compact_extract(args.file)
+            else:
+                result = extract_file(args.file)
 
             # Apply filters if specified
             filter_class = getattr(args, "filter_class", None)

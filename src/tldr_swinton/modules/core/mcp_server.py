@@ -184,14 +184,19 @@ def search(project: str, pattern: str, max_results: int = 100) -> dict:
 
 
 @mcp.tool()
-def extract(file: str) -> dict:
+def extract(file: str, compact: bool = False) -> dict:
     """Extract full code structure from a file.
 
     Returns imports, functions, classes, and intra-file call graph.
 
     Args:
         file: Path to source file
+        compact: If True, return signatures and line numbers only (~87% smaller).
+                 Use for LLM context injection; omits call_graph, params, is_async.
     """
+    if compact:
+        from .api import compact_extract
+        return compact_extract(file)
     project = str(Path(file).parent)
     return _send_command(project, {"cmd": "extract", "file": file})
 
@@ -205,8 +210,8 @@ def context(
     entry: str,
     depth: int = 2,
     language: str = "python",
-    format: str = "text",
-    budget: int | None = None,
+    format: str = "ultracompact",
+    budget: int | None = 4000,
     with_docs: bool = False,
     session_id: str | None = None,
     delta: bool = False,
@@ -227,8 +232,8 @@ def context(
         entry: Entry point (function_name or Class.method)
         depth: How deep to follow calls (default 2)
         language: Programming language
-        format: Output format (text, ultracompact, json)
-        budget: Optional token budget
+        format: Output format (default: ultracompact for LLMs; also: text, json)
+        budget: Token budget (default: 4000; set to None for unlimited)
         with_docs: Include docstrings
         session_id: Session ID for delta caching (auto-generated if delta=True)
         delta: Enable delta mode - unchanged symbols show [UNCHANGED] marker

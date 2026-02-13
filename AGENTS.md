@@ -87,15 +87,13 @@ The repo includes a Claude Code plugin at `.claude-plugin/`. Available commands:
 | Skill | Trigger |
 |-------|---------|
 | `tldrs-session-start` | Before reading code for bugs, features, refactoring, tests, reviews, migrations |
-| `tldrs-find-code` | Searching for code by concept, pattern, or text |
-| `tldrs-understand-symbol` | Understanding how a function/class works, its callers, dependencies |
-| `tldrs-explore-file` | Debugging a function, tracing control/data flow, analyzing file structure |
 | `tldrs-map-codebase` | Understanding architecture, exploring unfamiliar projects, onboarding |
 | `tldrs-ashpool-sync` | Syncing Ashpool eval coverage after tldrs capability changes |
 
 **Hooks:**
-- `PreToolUse` on **Read** and **Grep**: Suggests running tldrs recon before reading files (once per session via flag file)
-- `SessionStart` (setup.sh): Checks tldrs install, semantic index, ast-grep availability; runs `prebuild` in background
+- `PreToolUse` on **Serena replace_symbol_body** and **rename_symbol**: Runs `tldrs impact` to show callers before edits
+- `PostToolUse` on **Read**: Runs compact `tldrs extract` on large code files (>300 lines, once per file per session)
+- `SessionStart` (setup.sh): Checks tldrs install, semantic index, ast-grep availability; provides project summary
 
 To use as a plugin:
 ```bash
@@ -549,7 +547,7 @@ The agent workflow eval tests real token savings for code modification tasks (no
   - Added `/tldrs-ashpool-sync` skill for guided Ashpool eval coverage sync
   - Added `check_tldrs_sync.py` sync check script (reads manifest, reports gaps in 4 Ashpool files)
   - Broadened skill triggers to match more task types (debug, refactor, tests, migrate)
-  - Added Grep `PreToolUse` hook (same suggest-recon as Read hook)
+  - Added Grep `PreToolUse` hook (same suggest-recon as Read hook) — later removed (v0.5+)
   - Setup hook now emits usage guidance for any repo
   - `bump-version.sh` warns if Ashpool coverage has gaps
 
