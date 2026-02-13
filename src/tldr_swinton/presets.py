@@ -24,6 +24,13 @@ PRESETS = {
         "strip_comments": True,
         "type_prune": True,
     },
+    "agent": {
+        "format": "ultracompact",
+        "budget": 4000,
+        "compress_imports": True,
+        "strip_comments": True,
+        "type_prune": True,
+    },
     "multi-turn": {
         "format": "cache-friendly",
         "budget": 2000,
