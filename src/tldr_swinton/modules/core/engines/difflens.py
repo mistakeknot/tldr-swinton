@@ -699,7 +699,7 @@ def build_diff_context_from_hunks(
         code = None
         summary = None
         code_scope_range = lines_range
-        if compress == "two-stage" and symbol_id in symbol_diff_lines and lines_range:
+        if compress in ("two-stage", "blocks") and symbol_id in symbol_diff_lines and lines_range:
             rel_part, qual_part = symbol_id.split(":", 1)
             if "." in qual_part:
                 class_name = qual_part.split(".", 1)[0]
@@ -716,7 +716,7 @@ def build_diff_context_from_hunks(
                 start = max(1, start)
                 end = min(len(src_lines), end)
                 diff_line_list = sorted(symbol_diff_lines.get(symbol_id, []))
-                if compress in ("two-stage", "chunk-summary"):
+                if compress in ("two-stage", "blocks", "chunk-summary"):
                     code = "\n".join(src_lines[start - 1:end])
                 else:
                     if diff_line_list:
@@ -728,13 +728,24 @@ def build_diff_context_from_hunks(
                         )
                     else:
                         code = "\n".join(src_lines[start - 1:end])
-                if code and compress == "two-stage":
-                    code, block_count, dropped_blocks = _two_stage_prune(
-                        code,
-                        start,
-                        diff_line_list,
-                        budget_tokens,
-                    )
+                if code and compress in ("two-stage", "blocks"):
+                    if compress == "blocks":
+                        from ..block_compress import compress_function_body
+                        code, block_count, dropped_blocks = compress_function_body(
+                            code,
+                            code_start=start,
+                            diff_lines=diff_line_list,
+                            budget_tokens=budget_tokens,
+                            language=language,
+                            use_ast=True,
+                        )
+                    else:
+                        code, block_count, dropped_blocks = _two_stage_prune(
+                            code,
+                            start,
+                            diff_line_list,
+                            budget_tokens,
+                        )
                 else:
                     block_count = 0
                     dropped_blocks = 0

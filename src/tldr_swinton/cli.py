@@ -486,9 +486,9 @@ Semantic Search:
     diff_p.add_argument("--budget", type=int, default=None, help="Approx token budget for output")
     diff_p.add_argument(
         "--compress",
-        choices=["none", "two-stage", "chunk-summary"],
+        choices=["none", "two-stage", "chunk-summary", "blocks"],
         default="none",
-        help="Experimental compression mode (default: none)",
+        help="Compression mode: blocks (AST-based block selection), two-stage (indent-based), chunk-summary (text summary), none (default)",
     )
     diff_p.add_argument(
         "--format",
