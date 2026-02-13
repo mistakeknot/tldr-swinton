@@ -444,8 +444,8 @@ def _format_ultracompact(
     for func in ctx.functions:
         display = _format_symbol(func.name, func.file, path_ids)
         signature = func.signature
-        line_info = f"@{func.line}" if func.line else ""
-        lines.append(f"{display} {signature} {line_info}".rstrip())
+        line_info = f" @{func.line}" if func.line else ""
+        lines.append(f"{display} {signature}{line_info}")
 
         if func.calls:
             calls_list = _dedupe_preserve(func.calls)
@@ -454,8 +454,6 @@ def _format_ultracompact(
             calls = ", ".join(_format_symbol(c, "", path_ids) for c in shown)
             suffix = f" (+{more})" if more > 0 else ""
             lines.append(f"  calls: {calls}{suffix}")
-
-        lines.append("")
 
     return lines
 
@@ -478,8 +476,8 @@ def _format_ultracompact_budgeted(ctx: RelevantContext, budget_tokens: int) -> s
         else:
             display = _format_symbol(func.name, func.file, path_ids)
         signature = func.signature
-        line_info = f"@{func.line}" if func.line else ""
-        func_lines.append(f"{display} {signature} {line_info}".rstrip())
+        line_info = f" @{func.line}" if func.line else ""
+        func_lines.append(f"{display} {signature}{line_info}")
         if include_calls and func.calls:
             calls_list = _dedupe_preserve(func.calls)
             shown = calls_list[:max_calls]
@@ -490,7 +488,6 @@ def _format_ultracompact_budgeted(ctx: RelevantContext, budget_tokens: int) -> s
                 calls = ", ".join(_format_symbol(c, "", path_ids) for c in shown)
             suffix = f" (+{more})" if more > 0 else ""
             func_lines.append(f"  calls: {calls}{suffix}")
-        func_lines.append("")
         return func_lines
 
     collected: list[str] = []
