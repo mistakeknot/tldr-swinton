@@ -220,6 +220,7 @@ def extract(file: str, compact: bool = False) -> dict:
 def context(
     project: str,
     entry: str,
+    preset: str | None = None,
     depth: int = 2,
     language: str = "python",
     format: str = "ultracompact",
@@ -242,6 +243,9 @@ def context(
     Args:
         project: Project root directory
         entry: Entry point (function_name or Class.method)
+        preset: Optional preset name (compact, minimal, agent, multi-turn).
+                When set, overrides format/budget/delta/session_id defaults.
+                Explicit parameters still take precedence over preset values.
         depth: How deep to follow calls (default 2)
         language: Programming language
         format: Output format (default: ultracompact for LLMs; also: text, json)
@@ -253,6 +257,19 @@ def context(
     Returns:
         LLM-ready formatted context string
     """
+    # Apply preset defaults (explicit params take precedence)
+    if preset is not None:
+        from ...presets import PRESETS, resolve_auto_session_id
+        preset_config = PRESETS.get(preset, PRESETS["compact"])
+        if format == "ultracompact":  # only override if still at default
+            format = preset_config.get("format", format)
+        if budget == 4000:  # only override if still at default
+            budget = preset_config.get("budget", budget)
+        if not delta and preset_config.get("delta"):
+            delta = True
+        if session_id is None and preset_config.get("session_id") == "auto":
+            session_id = resolve_auto_session_id(project)
+
     result = _send_command(
         project,
         {
