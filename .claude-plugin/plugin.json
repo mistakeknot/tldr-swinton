@@ -1,6 +1,6 @@
 {
   "name": "tldr-swinton",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Token-efficient code reconnaissance for LLMs. Autonomous skills save 48-85% tokens via diff-context, semantic search, structural patterns, and symbol analysis.",
   "author": {
     "name": "MK",
@@ -26,5 +26,12 @@
     "./.claude-plugin/commands/quickstart.md",
     "./.claude-plugin/commands/extract.md"
   ],
-  "hooks": "./.claude-plugin/hooks/hooks.json"
+  "hooks": "./.claude-plugin/hooks/hooks.json",
+  "mcpServers": {
+    "tldr-code": {
+      "type": "stdio",
+      "command": "tldr-mcp",
+      "args": ["--project", "."]
+    }
+  }
 }

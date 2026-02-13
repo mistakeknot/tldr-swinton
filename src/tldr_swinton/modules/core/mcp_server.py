@@ -554,6 +554,215 @@ def verify_coherence(
     return format_coherence_report_for_agent(report)
 
 
+# === DIRECT-CALL TOOLS (bypass daemon, call Python APIs directly) ===
+# These tools wrap tldrs's unique capabilities that have no daemon handler yet.
+# Because the MCP server is a persistent process, direct calls incur no startup cost.
+
+
+@mcp.tool()
+def diff_context(
+    project: str = ".",
+    preset: str = "compact",
+    base: str | None = None,
+    head: str | None = None,
+    budget: int | None = None,
+    language: str = "python",
+    session_id: str | None = None,
+    delta: bool = False,
+) -> str:
+    """Get git-aware diff context with symbol mapping and adaptive windowing.
+
+    This is tldrs's flagship feature — analyzes git diffs, maps hunks to enclosing
+    symbols, follows callers/callees, and returns token-efficient context.
+
+    Presets control output shape:
+    - compact: ultracompact format, 2000 token budget, import compression, no comments
+    - minimal: ultracompact + two-stage block pruning + type pruning, 1500 budget
+    - multi-turn: cache-friendly format with delta tracking for session continuity
+
+    Args:
+        project: Project root directory
+        preset: Output preset (compact, minimal, multi-turn) — controls format/budget/compression
+        base: Git base ref (default: HEAD~1)
+        head: Git head ref (default: HEAD)
+        budget: Override token budget from preset
+        language: Programming language (python, typescript, go, rust, etc.)
+        session_id: Session ID for delta caching (required for multi-turn preset)
+        delta: Enable delta mode — unchanged symbols show [UNCHANGED] marker
+
+    Returns:
+        Formatted diff context string
+    """
+    from ...presets import PRESETS, resolve_auto_session_id
+    from .engines.difflens import get_diff_context as _get_diff_context
+    from .output_formats import format_context_pack
+
+    # Apply preset defaults
+    preset_config = PRESETS.get(preset, PRESETS["compact"])
+    fmt = preset_config.get("format", "ultracompact")
+    effective_budget = budget if budget is not None else preset_config.get("budget")
+    compress = preset_config.get("compress")
+    strip_comments = preset_config.get("strip_comments", False)
+    compress_imports = preset_config.get("compress_imports", False)
+    type_prune = preset_config.get("type_prune", False)
+
+    # Handle session_id / delta from preset or explicit args
+    effective_session_id = session_id
+    effective_delta = delta
+    if preset_config.get("delta") and not delta:
+        effective_delta = True
+    if preset_config.get("session_id") == "auto" and effective_session_id is None:
+        effective_session_id = resolve_auto_session_id(project)
+
+    if effective_delta and effective_session_id:
+        from .engines.delta import get_diff_context_with_delta
+        result = get_diff_context_with_delta(
+            project,
+            effective_session_id,
+            base=base,
+            head=head,
+            budget_tokens=effective_budget,
+            language=language,
+            compress=compress,
+            strip_comments=strip_comments,
+            compress_imports=compress_imports,
+            type_prune=type_prune,
+        )
+    else:
+        result = _get_diff_context(
+            project,
+            base=base,
+            head=head,
+            budget_tokens=effective_budget,
+            language=language,
+            compress=compress,
+            strip_comments=strip_comments,
+            compress_imports=compress_imports,
+            type_prune=type_prune,
+        )
+
+    return format_context_pack(result, fmt=fmt)
+
+
+@mcp.tool()
+def structural_search(
+    project: str,
+    pattern: str,
+    language: str | None = None,
+    max_results: int = 50,
+) -> dict:
+    """Search for structural code patterns using ast-grep (tree-sitter CSTs).
+
+    Unlike regex search, this matches code *structure*. Use meta-variables:
+    - $VAR matches any single node
+    - $$$ARGS matches multiple nodes (variadic)
+
+    Example patterns:
+    - "def $FUNC($$$ARGS): $$$BODY return None" — functions that return None
+    - "if $COND: $$$BODY" — all if statements
+    - "$OBJ.$METHOD($$$ARGS)" — all method calls
+
+    Args:
+        project: Project root directory
+        pattern: ast-grep pattern with meta-variables ($VAR, $$$ARGS)
+        language: Language to search (auto-detected from extensions if None)
+        max_results: Maximum number of matches to return
+
+    Returns:
+        Dict with pattern, language, and matches list
+    """
+    from .engines.astgrep import get_structural_search
+
+    result = get_structural_search(
+        project_path=project,
+        pattern=pattern,
+        language=language,
+        max_results=max_results,
+    )
+
+    return {
+        "pattern": result.pattern,
+        "language": result.language,
+        "matches": [
+            {
+                "file": m.file,
+                "line": m.line,
+                "end_line": m.end_line,
+                "text": m.text,
+                "meta_vars": m.meta_vars,
+            }
+            for m in result.matches
+        ],
+    }
+
+
+@mcp.tool()
+def distill(
+    project: str,
+    task: str,
+    budget: int = 1500,
+    session_id: str | None = None,
+    language: str | None = None,
+) -> str:
+    """Get compressed, prescriptive context for a task.
+
+    Distill analyzes git diffs and symbol graphs to produce a focused summary:
+    files to edit, key function signatures, dependencies, and risk areas.
+    Ideal for sub-agent consumption where full code isn't needed.
+
+    Args:
+        project: Project root directory
+        task: Description of what you're trying to accomplish
+        budget: Token budget for output (default 1500)
+        session_id: Optional session ID for delta tracking
+        language: Programming language (default: python)
+
+    Returns:
+        Formatted distilled context string
+    """
+    from .context_delegation import ContextDelegator
+    from .distill_formatter import format_distilled
+
+    delegator = ContextDelegator(Path(project))
+    distilled = delegator.distill(
+        project_root=project,
+        task=task,
+        budget=budget,
+        session_id=session_id,
+        language=language,
+    )
+
+    return format_distilled(distilled, budget=budget)
+
+
+@mcp.tool()
+def hotspots(
+    project: str = ".",
+    top_n: int = 20,
+    since_days: int | None = None,
+) -> list[dict]:
+    """Show frequently accessed symbols across sessions (attention hotspots).
+
+    Uses the attention tracking database to identify which symbols agents
+    interact with most. Helps focus on high-traffic code areas.
+
+    Requires .tldrs/attention.db to exist (created by attention_pruning module).
+
+    Args:
+        project: Project root directory
+        top_n: Number of top symbols to return (default 20)
+        since_days: Only include symbols accessed within this many days
+
+    Returns:
+        List of dicts with symbol_id, delivery_count, usage_count,
+        popularity_score, last_delivered, last_used
+    """
+    from .attention_pruning import AttentionTracker
+
+    tracker = AttentionTracker(Path(project))
+    return tracker.get_hotspots(top_n=top_n, since_days=since_days)
+
+
 # === DAEMON MANAGEMENT ===
 
 

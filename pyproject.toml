@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tldr-swinton"
-version = "0.7.1"
+version = "0.7.2"
 description = "Centralized platform for improving coding agent performance - token-efficient code analysis, session artifacts, and benchmarking"
 readme = "README.md"
 license = "MIT"
@@ -82,10 +82,15 @@ all = [
 ]
 # Structural code search — kept as alias for backwards compatibility
 structural = []
+# MCP server (Model Context Protocol)
+mcp-server = [
+    "mcp>=1.0.0",
+]
 
 [project.scripts]
 tldr-swinton = "tldr_swinton.cli:main"
 tldrs = "tldr_swinton.cli:main"
+tldr-mcp = "tldr_swinton.modules.core.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/mistakeknot/tldr-swinton"
