@@ -121,7 +121,7 @@ def _contextpack_to_dict(pack: ContextPack) -> dict:
             "lines": list(item.lines) if item.lines else None,
             "relevance": item.relevance,
             "meta": item.meta,
-            "etag": item.etag,
+            "etag": item.etag[:16] if item.etag else item.etag,
         }
         if isinstance(item.meta, dict) and item.meta.get("representation") == "incremental" and item.code is not None:
             slice_dict["diff"] = item.code

@@ -757,12 +757,16 @@ def build_diff_context_from_hunks(
             dropped_blocks = 0
 
         label = relevance.get(symbol_id, "adjacent")
-        meta: dict[str, object] = {
-            "diff_lines": _to_ranges(sorted(symbol_diff_lines.get(symbol_id, []))),
-            "block_count": block_count,
-            "dropped_blocks": dropped_blocks,
-            "summary": summary,
-        }
+        meta: dict[str, object] = {}
+        diff_ranges = _to_ranges(sorted(symbol_diff_lines.get(symbol_id, [])))
+        if diff_ranges:
+            meta["diff_lines"] = diff_ranges
+        if block_count:
+            meta["block_count"] = block_count
+        if dropped_blocks:
+            meta["dropped_blocks"] = dropped_blocks
+        if summary is not None:
+            meta["summary"] = summary
         imports = _imports_for_symbol(symbol_id)
         if imports:
             meta["imports"] = imports
