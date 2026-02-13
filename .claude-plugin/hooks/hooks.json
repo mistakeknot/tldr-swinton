@@ -12,6 +12,28 @@
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__plugin_serena_serena__replace_symbol_body",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-serena-edit.sh\"",
+            "timeout": 8
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__plugin_serena_serena__rename_symbol",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-serena-edit.sh\"",
+            "timeout": 8
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Read",
