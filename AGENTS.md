@@ -40,8 +40,9 @@ The `tldrs manifest` command produces a machine-readable JSON of all eval-releva
 ```bash
 # Install (development)
 uv pip install -e .
-uv pip install -e ".[semantic-ollama]"  # Ollama-only semantic search (FAISS + NumPy)
-uv pip install -e ".[semantic]"  # With sentence-transformers fallback (includes torch)
+uv pip install -e ".[semantic-ollama]"  # FAISS backend: Ollama embeddings (768d, lightweight)
+uv pip install -e ".[semantic-colbert]" # ColBERT backend: PyLate + PLAID (48d per-token, best quality, ~1.7GB PyTorch)
+uv pip install -e ".[semantic]"  # FAISS + sentence-transformers fallback (includes torch)
 uv pip install -e ".[full]"      # Full stack (includes Ollama + tiktoken)
 uv pip install -e ".[structural]"  # Structural code search (ast-grep)
 
@@ -193,6 +194,8 @@ Session state is stored in `.tldrs/state.sqlite3` and tracks:
 
 - MCP server requires `uv pip install mcp`.
 - MCP context uses ContextPack for `json/json-pretty/ultracompact` formats.
+- Semantic tools: `semantic()` (search), `semantic_index()` (build/rebuild), `semantic_info()` (metadata).
+- `semantic_index()` routes through daemon (cache invalidation); `semantic_info()` calls backend directly.
 
 ## Output Caps (`--max-lines` / `--max-bytes`)
 
@@ -301,21 +304,33 @@ ModuleInfo with FunctionInfo objects
 .to_dict() for JSON serialization
 ```
 
-### Semantic Search Pipeline (v0.2.0)
+### Semantic Search Pipeline (v0.7.5)
 
 ```
-tldrs index .  → embeddings.py (Ollama/sentence-transformers)
+tldrs index .  → index.py:build_index()
                       ↓
-               vector_store.py (FAISS IndexFlatIP)
+               backend.py:get_backend("auto"|"faiss"|"colbert")
                       ↓
-               .tldrs/index/{vectors.faiss, units.json, meta.json}
+               ┌──────────────────────┬─────────────────────────┐
+               │  FAISSBackend        │  ColBERTBackend          │
+               │  (faiss_backend.py)  │  (colbert_backend.py)    │
+               │  768d single-vector  │  48d per-token (PLAID)   │
+               │  Ollama/SentenceT    │  PyLate + LateOn-Code    │
+               └──────┬───────────────┴──────────┬──────────────┘
+                      ↓                          ↓
+               .tldrs/index/{meta.json}    .tldrs/index/plaid/
+               vectors.faiss, units.json   PLAID index files
 
-tldrs find "query" → index.py:search_index() → VectorStore.search()
+tldrs find "query" → index.py:search_index()
                           ↓
-                    Lexical fast-path for identifiers (exact match)
+                    Lexical fast-path for identifiers (BM25 exact match)
                           ↓
-                    Semantic search for natural language queries
+                    Backend.search() → hybrid RRF fusion (semantic + BM25)
 ```
+
+**SearchBackend Protocol** (`backend.py`): `build()`, `search()`, `load()`, `save()`, `info()`.
+Both backends implement this runtime-checkable protocol. `get_backend("auto")` reads
+existing index metadata to select the right backend, or prefers ColBERT if available.
 
 ### Key Data Structures
 
@@ -341,7 +356,7 @@ The `language` field is critical - it determines the output format of `signature
 
 **ModuleInfo** (`ast_extractor.py:131`): Container for file analysis results.
 
-**CodeUnit** (`vector_store.py`): Minimal metadata for semantic search results.
+**CodeUnit** (`semantic/backend.py`): Minimal metadata for semantic search results (id, name, file, line, unit_type, signature, file_hash).
 
 ### Language Support
 
@@ -386,16 +401,21 @@ for prefix in ("export ", "async ", "default "):
         name = name[len(prefix):]
 ```
 
-### Embeddings Must Be L2-Normalized
+### Embeddings Must Be L2-Normalized (FAISS Backend)
 
 FAISS IndexFlatIP expects normalized vectors for cosine similarity:
 ```python
 embedding = embedding / np.linalg.norm(embedding)  # Required!
 ```
+This is handled internally by `_l2_normalize()` in `faiss_backend.py`. ColBERT uses per-token
+late interaction scoring (MaxSim), not cosine — normalization is not needed there.
 
 ### Incremental Index Updates
 
-`build_index()` reconstructs vectors for unchanged files (via `store.reconstruct_all_vectors()`). Only new/changed files get re-embedded.
+Both backends support incremental updates: only new/changed files get re-embedded.
+- **FAISS**: reconstructs vectors for unchanged files via `faiss.reconstruct()`
+- **ColBERT**: uses PLAID `add_documents()` for incremental adds. Cannot delete — triggers
+  full rebuild when deletions >= 20% of index. Hard rebuild forced after 50 incremental updates.
 
 ## Common Tasks
 
@@ -421,20 +441,39 @@ elif self.language == "rust":
 
 ### Semantic Search Backends
 
+Two backends available via the `SearchBackend` protocol:
+
+| Backend | Model | Dimensions | Install | Quality |
+|---------|-------|-----------|---------|---------|
+| **FAISS** | `nomic-embed-text-v2-moe` (475M) | 768d single-vector | `[semantic-ollama]` | Good |
+| **ColBERT** | `LateOn-Code-edge` (17M) | 48d per-token | `[semantic-colbert]` | Best (late interaction) |
+
 ```bash
-# Check available backends
-python -c "from tldr_swinton.embeddings import check_backends; print(check_backends())"
-
-# Ollama (preferred - fast, local)
+# FAISS backend (lightweight, Ollama embeddings)
+uv pip install -e ".[semantic-ollama]"
 ollama pull nomic-embed-text-v2-moe
-tldrs index . --backend ollama
+tldrs index . --backend faiss
 
-# sentence-transformers (fallback - 1.3GB download)
-tldrs index . --backend sentence-transformers
+# ColBERT backend (best quality, requires PyTorch ~1.7GB)
+uv pip install -e ".[semantic-colbert]"
+tldrs index . --backend colbert
 
-# Auto (tries Ollama first, falls back)
+# Auto-detect: uses existing index's backend, or prefers ColBERT if available
 tldrs index . --backend auto
+
+# Force full rebuild (reset incremental updates)
+tldrs index . --rebuild
+
+# Check index info
+tldrs index --info
 ```
+
+**ColBERT limits:** PLAID indexes can't delete documents — rebuild triggers at >= 20% deletions.
+Centroid drift enforced: hard rebuild after 50 incremental updates, warning at 20.
+
+**Concurrency:** Both backends use `threading.RLock` with snapshot pattern for safe concurrent
+build/search. Build swaps state atomically under lock; search snapshots state under lock then
+releases before expensive operations.
 
 ## Debugging
 
@@ -531,16 +570,29 @@ The agent workflow eval tests real token savings for code modification tasks (no
 | `dfg_extractor.py` | Data flow graph extraction |
 | `pdg_extractor.py` | Program dependency graph |
 | `signature_extractor_pygments.py` | Fallback signature extraction |
-| `embeddings.py` | Ollama/sentence-transformers embedding backend |
-| `vector_store.py` | FAISS vector storage wrapper |
-| `index.py` | Semantic index management |
+| `semantic/backend.py` | SearchBackend protocol, CodeUnit, SearchResult, get_backend() factory |
+| `semantic/faiss_backend.py` | FAISSBackend — Ollama/sentence-transformers + FAISS IndexFlatIP |
+| `semantic/colbert_backend.py` | ColBERTBackend — PyLate + PLAID indexing (LateOn-Code-edge) |
+| `semantic/index.py` | Thin orchestrator: build_index(), search_index() |
+| `semantic/embeddings.py` | Backward-compat shim (re-exports from faiss_backend) |
+| `semantic/vector_store.py` | Backward-compat shim (aliases FAISSBackend) |
+| `semantic/bm25_store.py` | BM25 keyword index for hybrid search (RRF fusion) |
+| `semantic/semantic.py` | Original 5-layer semantic search (legacy) |
 | `engines/astgrep.py` | Structural code search via ast-grep |
 | `engines/delta.py` | Delta-mode orchestration (session tracking, etag comparison) |
 | `manifest.py` | Machine-readable capability manifest for eval sync |
-| `bm25_store.py` | BM25 keyword index for hybrid search |
-| `semantic.py` | Original semantic search (5-layer embeddings) |
 
 ## Version History
+
+- **0.7.5** - ColBERT late-interaction search backend
+  - Added `SearchBackend` protocol (`backend.py`) with dual backend support
+  - Added `ColBERTBackend` via PyLate + PLAID indexing (LateOn-Code-edge, 17M params, 48d/token)
+  - Refactored FAISS code into `FAISSBackend` implementing the same protocol
+  - Added `semantic_index()` and `semantic_info()` MCP tools for agent parity
+  - Thread-safe concurrent build/search via RLock snapshot pattern
+  - PLAID centroid drift enforcement (hard rebuild at 50 incremental updates)
+  - New optional dep group: `[semantic-colbert]` for pylate
+  - `embeddings.py` and `vector_store.py` are now backward-compat shims
 
 - **0.6.2** - Ashpool sync automation, plugin effectiveness improvements
   - Added `tldrs manifest` — machine-readable JSON of all eval-relevant capabilities
