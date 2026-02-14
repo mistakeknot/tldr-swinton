@@ -17,6 +17,7 @@ import fcntl
 import json
 import logging
 import os
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -259,7 +260,8 @@ class FAISSBackend:
         self._embed_backend = embed_backend
         self._embed_model = embed_model
 
-        # In-memory state
+        # In-memory state (protected by _instance_lock for concurrent access)
+        self._instance_lock = threading.RLock()
         self._faiss_index = None
         self._units: list[CodeUnit] = []
         self._id_to_idx: dict[str, int] = {}
@@ -376,23 +378,25 @@ class FAISSBackend:
             # Build FAISS index
             matrix = np.vstack(all_vectors).astype(np.float32)
             dimension = matrix.shape[1]
-            self._faiss_index = faiss.IndexFlatIP(dimension)
-            self._faiss_index.add(matrix)
+            new_index = faiss.IndexFlatIP(dimension)
+            new_index.add(matrix)
 
-            self._units = all_units
-            self._id_to_idx = {u.id: i for i, u in enumerate(self._units)}
-
-            # Update metadata
+            # Atomically swap in-memory state so concurrent search() sees
+            # a consistent snapshot (index + units + id_to_idx together).
             actual_backend = "ollama" if isinstance(embedder, _OllamaEmbedder) else "sentence-transformers"
             actual_model = embedder.model if isinstance(embedder, _OllamaEmbedder) else embedder.model_name
-            self._metadata = _VectorStoreMetadata(
-                backend="faiss",
-                embed_model=actual_model,
-                embed_backend=actual_backend,
-                dimension=dimension,
-                count=len(all_units),
-                project_root=str(self.project),
-            )
+            with self._instance_lock:
+                self._faiss_index = new_index
+                self._units = all_units
+                self._id_to_idx = {u.id: i for i, u in enumerate(self._units)}
+                self._metadata = _VectorStoreMetadata(
+                    backend="faiss",
+                    embed_model=actual_model,
+                    embed_backend=actual_backend,
+                    dimension=dimension,
+                    count=len(all_units),
+                    project_root=str(self.project),
+                )
             stats.embed_model = actual_model
 
             # Remove sentinel on success
@@ -404,29 +408,36 @@ class FAISSBackend:
 
     def search(self, query: str, k: int = 10) -> list[SearchResult]:
         """Search the FAISS index with optional BM25 RRF fusion."""
-        if self._faiss_index is None or not self._units:
+        # Snapshot state under lock to prevent seeing partial updates
+        # from a concurrent build().
+        with self._instance_lock:
+            faiss_index = self._faiss_index
+            units = self._units
+            metadata = self._metadata
+
+        if faiss_index is None or not units:
             return []
 
         np = _require_numpy()
 
         # Embed query
         embedder = _get_embedder(
-            self._embed_backend if self._embed_backend != "auto" else self._metadata.embed_backend or "auto",
-            self._embed_model or self._metadata.embed_model or None,
+            self._embed_backend if self._embed_backend != "auto" else metadata.embed_backend or "auto",
+            self._embed_model or metadata.embed_model or None,
         )
         query_vec = _l2_normalize(embedder.embed(query))
         query_arr = query_vec.reshape(1, -1).astype(np.float32)
 
-        # FAISS search
-        actual_k = min(k, len(self._units))
-        scores, indices = self._faiss_index.search(query_arr, actual_k)
+        # FAISS search (uses snapshotted index)
+        actual_k = min(k, len(units))
+        scores, indices = faiss_index.search(query_arr, actual_k)
 
         semantic_results = []
         for rank, (score, idx) in enumerate(zip(scores[0], indices[0])):
-            if idx < 0 or idx >= len(self._units):
+            if idx < 0 or idx >= len(units):
                 continue
             semantic_results.append(SearchResult(
-                unit=self._units[idx], score=float(score), rank=rank,
+                unit=units[idx], score=float(score), rank=rank,
             ))
 
         # Try BM25 hybrid fusion

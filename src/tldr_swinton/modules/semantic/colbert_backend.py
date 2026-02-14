@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import shutil
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -41,11 +42,13 @@ class ColBERTBackend:
     POOL_FACTOR = int(os.environ.get("TLDRS_COLBERT_POOL_FACTOR", "2"))
     INDEX_SUBDIR = "plaid"
     REBUILD_THRESHOLD = 0.20  # rebuild when >= 20% units deleted
+    REBUILD_MAX_INCREMENTAL = 50  # force rebuild after N incremental updates (centroid drift)
 
     def __init__(self, project_path: str):
         self.project = Path(project_path).resolve()
         self.index_dir = self.project / ".tldrs" / "index" / self.INDEX_SUBDIR
         self._model = None  # Lazy-loaded, kept resident
+        self._instance_lock = threading.RLock()
         self._index = None
         self._retriever = None
         self._units: dict[str, CodeUnit] = {}  # id -> unit
@@ -156,8 +159,16 @@ class ColBERTBackend:
                     )
                     needs_full_rebuild = True
 
-            # Warn about centroid drift
-            if self._incremental_updates >= 20 and not needs_full_rebuild:
+            # Enforce centroid drift limit: force rebuild after too many
+            # incremental updates (PLAID centroids become stale).
+            if self._incremental_updates >= self.REBUILD_MAX_INCREMENTAL and not needs_full_rebuild:
+                logger.info(
+                    "Index has %d incremental updates (>= %d limit), "
+                    "forcing full rebuild for quality.",
+                    self._incremental_updates, self.REBUILD_MAX_INCREMENTAL,
+                )
+                needs_full_rebuild = True
+            elif self._incremental_updates >= 20 and not needs_full_rebuild:
                 logger.warning(
                     "Index has %d incremental updates since last rebuild. "
                     "Consider --rebuild for best quality.",
@@ -212,7 +223,12 @@ class ColBERTBackend:
             if not self.load():
                 return []
 
-        if self._retriever is None:
+        # Snapshot state under lock for concurrent safety
+        with self._instance_lock:
+            retriever = self._retriever
+            units = dict(self._units)  # shallow copy for consistent read
+
+        if retriever is None:
             return []
 
         # Encode query
@@ -220,22 +236,22 @@ class ColBERTBackend:
             [query], is_query=True,
         )
 
-        # Retrieve
+        # Retrieve using snapshotted retriever
         try:
-            results = self._retriever.retrieve(
-                query_embeddings, k=min(k, len(self._units)),
+            results = retriever.retrieve(
+                query_embeddings, k=min(k, len(units)),
             )
         except Exception as e:
             logger.warning("ColBERT retrieval failed: %s", e)
             return []
 
-        # Map results back to CodeUnits
+        # Map results back to CodeUnits (using snapshotted units)
         search_results = []
         for rank, result_list in enumerate(results):
             for item in result_list:
                 doc_id = str(item.get("id", ""))
                 score = float(item.get("score", 0.0))
-                unit = self._units.get(doc_id)
+                unit = units.get(doc_id)
                 if unit:
                     search_results.append(SearchResult(
                         unit=unit, score=score, rank=rank,
@@ -299,10 +315,10 @@ class ColBERTBackend:
             "hashes": self._unit_hashes,
         }
 
-        # Atomic write to PLAID meta
-        self._write_meta_atomic(self._meta_path, meta_data)
-
-        # Also write top-level meta.json for backend detection
+        # Write top-level meta.json FIRST — it's the source of truth for
+        # backend detection via _read_index_backend(). Writing it before PLAID
+        # meta prevents a race where concurrent get_backend("auto") reads stale
+        # backend type during the gap between the two writes.
         top_meta = {
             "backend": "colbert",
             "version": "1.0",
@@ -314,6 +330,9 @@ class ColBERTBackend:
         top_meta_path = self._parent_meta_path
         top_meta_path.parent.mkdir(parents=True, exist_ok=True)
         self._write_meta_atomic(top_meta_path, top_meta)
+
+        # Then write detailed PLAID meta
+        self._write_meta_atomic(self._meta_path, meta_data)
 
     def info(self) -> BackendInfo:
         return BackendInfo(
@@ -360,14 +379,14 @@ class ColBERTBackend:
             if old_dir.exists():
                 shutil.rmtree(old_dir, ignore_errors=True)
 
-            # Update in-memory state
-            self._units = {uid: incoming[uid][0] for uid in ids}
-            self._unit_hashes = {uid: incoming[uid][0].file_hash for uid in ids}
-
-            # Reload retriever
+            # Update in-memory state atomically for concurrent search()
             from pylate import retrieve
-            self._index = index
-            self._retriever = retrieve.ColBERT(index=self._index)
+            new_retriever = retrieve.ColBERT(index=index)
+            with self._instance_lock:
+                self._units = {uid: incoming[uid][0] for uid in ids}
+                self._unit_hashes = {uid: incoming[uid][0].file_hash for uid in ids}
+                self._index = index
+                self._retriever = new_retriever
 
         except Exception:
             # Clean up temp on failure
@@ -396,19 +415,16 @@ class ColBERTBackend:
                 documents_embeddings=embeddings,
             )
 
-        # Update in-memory state
-        # Keep unchanged units, add/update encoded units
-        for uid in ids_to_encode:
-            self._units[uid] = incoming[uid][0]
-            self._unit_hashes[uid] = incoming[uid][0].file_hash
-
-        # Note: deleted IDs remain as stale entries in PLAID
-        # (can't delete from PLAID, tracked for rebuild threshold)
-        for uid in deleted_ids:
-            self._units.pop(uid, None)
-            self._unit_hashes.pop(uid, None)
-
-        self._retriever = retrieve.ColBERT(index=self._index)
+        # Update in-memory state atomically for concurrent search()
+        new_retriever = retrieve.ColBERT(index=self._index)
+        with self._instance_lock:
+            for uid in ids_to_encode:
+                self._units[uid] = incoming[uid][0]
+                self._unit_hashes[uid] = incoming[uid][0].file_hash
+            for uid in deleted_ids:
+                self._units.pop(uid, None)
+                self._unit_hashes.pop(uid, None)
+            self._retriever = new_retriever
 
     def _cleanup_partial(self):
         """Remove partial build artifacts."""

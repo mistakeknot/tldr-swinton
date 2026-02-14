@@ -40,7 +40,10 @@ COST LADDER (cheapest first):
 3. context(entry) ~400 tok — call graph around symbol. Use INSTEAD OF reading caller files.
 4. diff_context(project) ~800 tok — changed-code context. Use INSTEAD OF git diff + Read.
 5. impact(function) ~300 tok — reverse call graph. Use BEFORE refactoring any function.
-6. semantic(query) ~300 tok — meaning-based search. Use INSTEAD OF Grep for concepts.\
+6. semantic(query) ~300 tok — meaning-based search. Use INSTEAD OF Grep for concepts.
+
+SEMANTIC INDEX: Run semantic_index() once before semantic(). Check semantic_info() for status. \
+Backends: faiss (lighter, Ollama embeddings) or colbert (better retrieval, heavier).\
 """
 
 
@@ -440,6 +443,52 @@ def semantic(
     return _send_command(
         project, {"cmd": "semantic", "action": "search", "query": query, "k": k}
     )
+
+
+@mcp.tool(description=(
+    "Build or rebuild the semantic search index. "
+    "Run once per project (or after major refactors) before using semantic(). "
+    "Supports FAISS (default) and ColBERT backends."
+))
+def semantic_index(
+    project: Annotated[str, Field(description="Project root directory")],
+    backend: Annotated[str, Field(description="Backend: 'auto' (detect/prefer colbert), 'faiss', or 'colbert'")] = "auto",
+    rebuild: Annotated[bool, Field(description="Force full rebuild (ignore incremental)")] = False,
+    language: Annotated[str, Field(description="Programming language")] = "python",
+) -> dict:
+    """Build or update the semantic search index."""
+    return _send_command(
+        project,
+        {"cmd": "semantic", "action": "index", "backend": backend,
+         "rebuild": rebuild, "language": language},
+    )
+
+
+@mcp.tool(description=(
+    "Get semantic index metadata — backend type, model, unit count, index path. "
+    "Use to check if an index exists and which backend is active."
+))
+def semantic_info(
+    project: Annotated[str, Field(description="Project root directory")] = ".",
+) -> dict:
+    """Get semantic index info (backend, model, count)."""
+    from ..semantic.backend import get_backend
+
+    try:
+        backend = get_backend(project)
+        if not backend.load():
+            return {"status": "no_index", "message": "No semantic index found. Run semantic_index() first."}
+        bi = backend.info()
+        return {
+            "backend": bi.backend_name,
+            "model": bi.model,
+            "dimension": bi.dimension,
+            "count": bi.count,
+            "index_path": bi.index_path,
+            **bi.extra,
+        }
+    except RuntimeError as e:
+        return {"status": "no_backend", "message": str(e)}
 
 
 # === QUALITY TOOLS ===

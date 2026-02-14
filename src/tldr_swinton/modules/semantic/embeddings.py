@@ -24,13 +24,16 @@ BackendType = EmbedBackendType
 
 # Re-export these so `from tldr_swinton.embeddings import check_backends` works
 from dataclasses import dataclass
-import numpy as np
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 @dataclass
 class EmbeddingResult:
     """Result of an embedding operation."""
-    vector: np.ndarray
+    vector: np.ndarray  # Evaluated as string at runtime (from __future__ annotations)
     model: str
     backend: str
     dimension: int

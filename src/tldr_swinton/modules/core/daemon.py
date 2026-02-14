@@ -598,8 +598,10 @@ class TLDRDaemon:
                 from ..semantic.index import build_index
                 language = command.get("language", "python")
                 backend = command.get("backend", "auto")
+                rebuild = command.get("rebuild", False)
                 stats = build_index(
                     str(self.project), language=language, backend=backend,
+                    rebuild=rebuild,
                 )
                 # Invalidate cached backend so next search reloads
                 self._semantic_backend = None
