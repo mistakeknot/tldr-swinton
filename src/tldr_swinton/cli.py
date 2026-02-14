@@ -756,9 +756,15 @@ Semantic Search:
     index_p.add_argument("path", nargs="?", default=".", help="Project root")
     index_p.add_argument("--lang", default="python", help="Language")
     index_p.add_argument(
+        "--backend",
+        choices=["auto", "faiss", "colbert"],
+        default="auto",
+        help="Search backend: auto, faiss, or colbert",
+    )
+    index_p.add_argument(
         "--model",
         default=None,
-        help="Embedding model: bge-large-en-v1.5 (1.3GB, default) or all-MiniLM-L6-v2 (80MB)",
+        help="Embedding model (FAISS backend only)",
     )
 
     # tldr semantic search <query>
@@ -820,9 +826,9 @@ Semantic Search:
     index_p.add_argument("path", nargs="?", default=".", help="Project root")
     index_p.add_argument(
         "--backend",
-        choices=["auto", "ollama", "sentence-transformers"],
+        choices=["auto", "faiss", "colbert"],
         default="auto",
-        help="Embedding backend (auto tries Ollama first)",
+        help="Search backend: auto (colbert if available, else faiss), faiss, or colbert",
     )
     index_p.add_argument(
         "--model",
@@ -854,9 +860,9 @@ Semantic Search:
     find_p.add_argument("-k", type=int, default=10, help="Number of results (default: 10)")
     find_p.add_argument(
         "--backend",
-        choices=["auto", "ollama", "sentence-transformers"],
+        choices=["auto", "faiss", "colbert"],
         default="auto",
-        help="Embedding backend (should match index)",
+        help="Search backend (auto-detects from index metadata)",
     )
 
     # tldrs quickstart - Show agent-focused quick reference
@@ -1658,9 +1664,11 @@ Semantic Search:
             if args.action == "index":
                 respect_ignore = not getattr(args, 'no_ignore', False)
                 respect_gitignore = getattr(args, 'respect_gitignore', False)
+                backend = getattr(args, 'backend', 'auto')
                 stats = build_index(
                     args.path,
                     language=args.lang,
+                    backend=backend,
                     embed_model=args.model,
                     respect_ignore=respect_ignore,
                     respect_gitignore=respect_gitignore,
@@ -1668,7 +1676,7 @@ Semantic Search:
                 print(f"Indexed {stats.total_units} code units")
 
             elif args.action == "search":
-                results = search_index(args.path, args.query, k=args.k, model=args.model)
+                results = search_index(args.path, args.query, k=args.k)
                 print(json.dumps(results, indent=2))
 
         elif args.command == "doctor":
@@ -1945,7 +1953,6 @@ Semantic Search:
                 args.path,
                 args.query,
                 k=args.k,
-                backend=args.backend,
             )
 
             if getattr(args, "machine", False):

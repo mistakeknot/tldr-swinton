@@ -2,10 +2,10 @@ import builtins
 
 import pytest
 
-import tldr_swinton.index as index_mod
+import tldr_swinton.modules.semantic.faiss_backend as fb_mod
 
 
-def test_require_semantic_deps_missing_numpy(monkeypatch) -> None:
+def test_require_numpy_missing(monkeypatch) -> None:
     orig_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
@@ -16,12 +16,12 @@ def test_require_semantic_deps_missing_numpy(monkeypatch) -> None:
     monkeypatch.setattr(builtins, "__import__", fake_import)
 
     with pytest.raises(RuntimeError) as exc:
-        index_mod._require_semantic_deps()
+        fb_mod._require_numpy()
 
     assert "semantic-ollama" in str(exc.value)
 
 
-def test_require_semantic_deps_missing_faiss(monkeypatch) -> None:
+def test_require_faiss_missing(monkeypatch) -> None:
     orig_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
@@ -32,6 +32,6 @@ def test_require_semantic_deps_missing_faiss(monkeypatch) -> None:
     monkeypatch.setattr(builtins, "__import__", fake_import)
 
     with pytest.raises(RuntimeError) as exc:
-        index_mod._require_semantic_deps()
+        fb_mod._require_faiss()
 
     assert "semantic-ollama" in str(exc.value)

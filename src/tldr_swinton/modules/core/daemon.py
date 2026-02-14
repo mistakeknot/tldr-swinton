@@ -586,15 +586,23 @@ class TLDRDaemon:
             return {"status": "error", "message": str(e)}
 
     def _handle_semantic(self, command: dict) -> dict:
-        """Handle semantic search/index command."""
+        """Handle semantic search/index command.
+
+        Caches the search backend instance for fast repeated queries.
+        ColBERT model stays resident (~900MB RSS) after first load.
+        """
         action = command.get("action", "search")
 
         try:
-            from .index import build_index, search_index
-
             if action == "index":
+                from ..semantic.index import build_index
                 language = command.get("language", "python")
-                stats = build_index(str(self.project), language=language)
+                backend = command.get("backend", "auto")
+                stats = build_index(
+                    str(self.project), language=language, backend=backend,
+                )
+                # Invalidate cached backend so next search reloads
+                self._semantic_backend = None
                 return {"status": "ok", "indexed": stats.total_units}
 
             elif action == "search":
@@ -602,8 +610,25 @@ class TLDRDaemon:
                 if not query:
                     return {"status": "error", "message": "Missing required parameter: query"}
                 k = command.get("k", 10)
-                results = search_index(str(self.project), query, k=k)
-                return {"status": "ok", "results": results}
+
+                # Use cached backend for fast repeated searches
+                if not hasattr(self, "_semantic_backend") or self._semantic_backend is None:
+                    from ..semantic.backend import get_backend
+                    self._semantic_backend = get_backend(str(self.project))
+                    self._semantic_backend.load()
+
+                results = self._semantic_backend.search(query, k=k)
+                formatted = [
+                    {
+                        "name": r.unit.name, "file": r.unit.file,
+                        "line": r.unit.line, "type": r.unit.unit_type,
+                        "signature": r.unit.signature, "summary": r.unit.summary,
+                        "score": round(r.score, 4), "rank": r.rank,
+                        "backend": self._semantic_backend.info().backend_name,
+                    }
+                    for r in results
+                ]
+                return {"status": "ok", "results": formatted}
 
             else:
                 return {"status": "error", "message": f"Unknown action: {action}"}

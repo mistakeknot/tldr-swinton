@@ -3,34 +3,33 @@ Index management for tldr-swinton semantic search.
 
 Orchestrates:
 - Code extraction (via existing TLDR APIs)
-- Embedding generation (via embeddings module)
-- Vector storage (via vector_store module)
+- Text preparation (shared across all backends)
+- Backend-agnostic build/search via SearchBackend protocol
 - Optional LLM summaries (via Ollama)
+- BM25 identifier fast-path
 """
 
 import json
 import logging
 import os
+import re
 import sys
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Optional
 from dataclasses import dataclass
 
-logger = logging.getLogger(__name__)
-
-from .embeddings import (
-    embed_batch,
-    embed_text,
-    check_backends,
-    BackendType,
-)
-from .vector_store import (
-    VectorStore,
+from .backend import (
     CodeUnit,
     SearchResult,
-    make_unit_id,
+    BackendInfo,
+    get_backend,
     get_file_hash,
+    make_unit_id,
+    _colbert_available,
+    _read_index_backend,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # Ollama configuration for summaries
@@ -50,23 +49,9 @@ class IndexStats:
     embed_backend: str = ""
 
 
-def _require_semantic_deps() -> None:
-    try:
-        import numpy  # noqa: F401
-    except ImportError as exc:
-        raise RuntimeError(
-            "Semantic indexing requires NumPy. "
-            "Install with: pip install 'tldr-swinton[semantic-ollama]' "
-            "or 'tldr-swinton[semantic]'."
-        ) from exc
-    try:
-        import faiss  # noqa: F401
-    except ImportError as exc:
-        raise RuntimeError(
-            "Semantic indexing requires FAISS. "
-            "Install with: pip install 'tldr-swinton[semantic-ollama]' "
-            "or 'tldr-swinton[semantic]'."
-        ) from exc
+# ---------------------------------------------------------------------------
+# Code extraction (shared across backends)
+# ---------------------------------------------------------------------------
 
 
 def _extract_code_units(
@@ -79,15 +64,6 @@ def _extract_code_units(
 
     Uses extract_file() to get full signatures, docstrings, and line numbers
     for high-quality semantic embeddings.
-
-    Args:
-        project_path: Path to project root
-        language: Language to scan for (auto-detect if None)
-        respect_ignore: Respect .tldrsignore patterns
-        respect_gitignore: If True, also respect .gitignore patterns
-
-    Returns:
-        List of CodeUnit objects with rich metadata
     """
     from tldr_swinton.modules.core.api import extract_file
     from tldr_swinton.modules.core.workspace import iter_workspace_files
@@ -95,7 +71,6 @@ def _extract_code_units(
     project = Path(project_path).resolve()
     units = []
 
-    # Supported extensions by language
     LANG_EXTENSIONS = {
         "python": {".py"},
         "typescript": {".ts", ".tsx"},
@@ -104,7 +79,6 @@ def _extract_code_units(
         "go": {".go"},
     }
 
-    # Determine which extensions to scan
     if language:
         extensions = LANG_EXTENSIONS.get(language, set())
     else:
@@ -120,8 +94,6 @@ def _extract_code_units(
     )
 
     for full_path in source_files:
-
-        # Extract rich metadata using extract_file
         try:
             info = extract_file(str(full_path))
         except Exception as e:
@@ -132,7 +104,6 @@ def _extract_code_units(
         file_hash = get_file_hash(full_path)
         lang = info.get("language", "unknown")
 
-        # Extract functions with full metadata
         for func in info.get("functions", []):
             name = func.get("name", "")
             signature = func.get("signature", f"def {name}(...)")
@@ -141,18 +112,11 @@ def _extract_code_units(
 
             unit_id = make_unit_id(rel_path, name, line)
             units.append(CodeUnit(
-                id=unit_id,
-                name=name,
-                file=rel_path,
-                line=line,
-                unit_type="function",
-                signature=signature,
-                language=lang,
-                summary=docstring,  # Use docstring as initial summary
-                file_hash=file_hash,
+                id=unit_id, name=name, file=rel_path, line=line,
+                unit_type="function", signature=signature,
+                language=lang, summary=docstring, file_hash=file_hash,
             ))
 
-        # Extract classes with methods
         for class_info in info.get("classes", []):
             class_name = class_info.get("name", "")
             class_sig = class_info.get("signature", f"class {class_name}")
@@ -160,24 +124,16 @@ def _extract_code_units(
             class_doc = class_info.get("docstring") or ""
             bases = class_info.get("bases", [])
 
-            # Include bases in signature for context
             if bases:
                 class_sig = f"class {class_name}({', '.join(bases)})"
 
             unit_id = make_unit_id(rel_path, class_name, class_line)
             units.append(CodeUnit(
-                id=unit_id,
-                name=class_name,
-                file=rel_path,
-                line=class_line,
-                unit_type="class",
-                signature=class_sig,
-                language=lang,
-                summary=class_doc,
-                file_hash=file_hash,
+                id=unit_id, name=class_name, file=rel_path, line=class_line,
+                unit_type="class", signature=class_sig,
+                language=lang, summary=class_doc, file_hash=file_hash,
             ))
 
-            # Extract methods with full metadata
             for method in class_info.get("methods", []):
                 method_name = method.get("name", "")
                 method_sig = method.get("signature", f"def {method_name}(self)")
@@ -187,35 +143,25 @@ def _extract_code_units(
                 full_name = f"{class_name}.{method_name}"
                 unit_id = make_unit_id(rel_path, full_name, method_line)
                 units.append(CodeUnit(
-                    id=unit_id,
-                    name=full_name,
-                    file=rel_path,
-                    line=method_line,
-                    unit_type="method",
-                    signature=method_sig,
-                    language=lang,
-                    summary=method_doc,
-                    file_hash=file_hash,
+                    id=unit_id, name=full_name, file=rel_path, line=method_line,
+                    unit_type="method", signature=method_sig,
+                    language=lang, summary=method_doc, file_hash=file_hash,
                 ))
 
     return units
 
 
-import re
+# ---------------------------------------------------------------------------
+# Text preparation (shared across backends)
+# ---------------------------------------------------------------------------
 
-# Embedding text limits
 _MAX_DOC_CHARS = 800
 _MAX_PATH_PARTS = 3
 
 
 def _clean_doc(doc: str) -> str:
-    """Truncate and clean docstring for embedding.
-
-    Long docstrings with parameter tables and examples can drown out
-    the "what it does" signal. Keep first ~800 chars.
-    """
+    """Truncate and clean docstring for embedding."""
     doc = (doc or "").strip()
-    # Collapse whitespace so we don't embed indentation noise
     doc = re.sub(r"\s+", " ", doc)
     if len(doc) > _MAX_DOC_CHARS:
         doc = doc[:_MAX_DOC_CHARS] + "…"
@@ -223,11 +169,7 @@ def _clean_doc(doc: str) -> str:
 
 
 def _short_path(p: str) -> str:
-    """Shorten path to last N segments to reduce noise.
-
-    Paths like 'utils/', 'helpers/', 'common/' can pollute embeddings.
-    Keep only the meaningful last segments.
-    """
+    """Shorten path to last N segments to reduce noise."""
     parts = Path(p).as_posix().split("/")
     return "/".join(parts[-_MAX_PATH_PARTS:]) if parts else p
 
@@ -239,19 +181,10 @@ def _build_embed_text(unit: CodeUnit) -> str:
     - Field labels help models separate metadata from meaning
     - Truncated docstrings prevent noise from examples/tables
     - Short paths reduce pollution from generic folder names
-
-    Format:
-        Language: python
-        Kind: function
-        Name: verify_token
-        Signature: def verify_token(token: str) -> Optional[str]
-        Doc: Verify JWT token and return the user_id if valid.
-        File: auth/tokens.py
     """
     doc = _clean_doc(unit.summary)
     path = _short_path(unit.file)
 
-    # Labels help embedding models distinguish field types
     parts = [
         f"Language: {unit.language}",
         f"Kind: {unit.unit_type}",
@@ -265,28 +198,23 @@ def _build_embed_text(unit: CodeUnit) -> str:
     return "\n".join(parts)
 
 
+# ---------------------------------------------------------------------------
+# Ollama summaries (optional pre-processing)
+# ---------------------------------------------------------------------------
+
+
 def _generate_summaries_ollama(
     units: list[CodeUnit],
     project_path: str,
-    show_progress: bool = True
+    show_progress: bool = True,
 ) -> dict[str, str]:
-    """Generate one-line summaries for units using Ollama.
-
-    Args:
-        units: Code units to summarize
-        project_path: Project root for reading source
-        show_progress: Show progress indicator
-
-    Returns:
-        Dict mapping unit ID to summary
-    """
+    """Generate one-line summaries for units using Ollama."""
     import urllib.request
     import urllib.error
 
     project = Path(project_path).resolve()
     summaries = {}
 
-    # Check Ollama availability
     try:
         url = f"{OLLAMA_HOST}/api/tags"
         req = urllib.request.Request(url, method="GET")
@@ -301,7 +229,6 @@ def _generate_summaries_ollama(
         logger.debug("Ollama unavailable for summaries: %s", e)
         return {}
 
-    # Progress handling
     console = None
     if show_progress and sys.stdout.isatty():
         try:
@@ -312,70 +239,48 @@ def _generate_summaries_ollama(
             pass
 
     def summarize_one(unit: CodeUnit) -> Optional[str]:
-        """Generate summary for a single unit."""
-        # Read source code
         full_path = project / unit.file
         if not full_path.exists():
             return None
-
         try:
             content = full_path.read_text()
             lines = content.split("\n")
-
-            # Extract ~20 lines around the unit
             start = max(0, unit.line - 1)
             end = min(len(lines), start + 20)
             snippet = "\n".join(lines[start:end])
 
-            # Build prompt
-            prompt = f"""Summarize this {unit.unit_type} in ONE sentence (max 15 words).
-Focus on what it does, not how.
-
-{unit.signature}
-
-Code:
-{snippet}
-
-Summary:"""
-
-            # Call Ollama
-            url = f"{OLLAMA_HOST}/api/generate"
-            payload = json.dumps({
-                "model": OLLAMA_SUMMARY_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "options": {"num_predict": 50, "temperature": 0.3}
-            }).encode()
-
-            req = urllib.request.Request(
-                url,
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST"
+            prompt = (
+                f"Summarize this {unit.unit_type} in ONE sentence (max 15 words).\n"
+                f"Focus on what it does, not how.\n\n"
+                f"{unit.signature}\n\nCode:\n{snippet}\n\nSummary:"
             )
 
+            url = f"{OLLAMA_HOST}/api/generate"
+            payload = json.dumps({
+                "model": OLLAMA_SUMMARY_MODEL, "prompt": prompt,
+                "stream": False, "options": {"num_predict": 50, "temperature": 0.3},
+            }).encode()
+            req = urllib.request.Request(
+                url, data=payload,
+                headers={"Content-Type": "application/json"}, method="POST",
+            )
             with urllib.request.urlopen(req, timeout=30) as response:
                 data = json.loads(response.read().decode())
                 summary = data.get("response", "").strip()
-                # Clean up - take first sentence only
                 summary = summary.split(".")[0].strip()
                 if summary and not summary.endswith("."):
                     summary += "."
                 return summary
-
         except Exception as e:
             logger.debug("Failed to generate summary for %s: %s", unit.name, e)
             return None
 
-    # Generate summaries
     if console:
+        from rich.progress import Progress, SpinnerColumn, TextColumn
         with Progress(
-            SpinnerColumn(),
-            TextColumn("[bold]{task.description}"),
-            console=console,
+            SpinnerColumn(), TextColumn("[bold]{task.description}"), console=console,
         ) as progress:
             task = progress.add_task(f"Generating summaries ({OLLAMA_SUMMARY_MODEL})...", total=len(units))
-
             for unit in units:
                 summary = summarize_one(unit)
                 if summary:
@@ -390,10 +295,15 @@ Summary:"""
     return summaries
 
 
+# ---------------------------------------------------------------------------
+# Build / Search / Info — delegate to backend
+# ---------------------------------------------------------------------------
+
+
 def build_index(
     project_path: str,
     language: Optional[str] = None,
-    backend: BackendType = "auto",
+    backend: str = "auto",
     embed_model: Optional[str] = None,
     generate_summaries: bool = False,
     rebuild: bool = False,
@@ -403,16 +313,11 @@ def build_index(
 ) -> IndexStats:
     """Build or update the semantic index for a project.
 
-    Creates/updates .tldrs/index/ with:
-    - vectors.faiss - Vector index
-    - units.json - Unit metadata
-    - meta.json - Index metadata
-
     Args:
         project_path: Path to project root
         language: Language to index (auto-detect if None)
-        backend: Embedding backend ("ollama", "sentence-transformers", "auto")
-        embed_model: Specific model to use
+        backend: Search backend: "auto" | "faiss" | "colbert"
+        embed_model: Specific model to use (FAISS backend only)
         generate_summaries: Generate one-line summaries with Ollama
         rebuild: Force full rebuild (ignore existing index)
         show_progress: Show progress indicators
@@ -422,31 +327,14 @@ def build_index(
     Returns:
         IndexStats with indexing statistics
     """
-    _require_semantic_deps()
     stats = IndexStats()
     project = Path(project_path).resolve()
-
-    # Load or create vector store
-    store = VectorStore(str(project))
-    existing_units = {}
-    existing_vectors = {}  # Map unit ID -> existing vector
-
-    if not rebuild and store.load():
-        # Index exists - build lookups for incremental update
-        old_units = store.get_all_units()
-        old_vectors = store.reconstruct_all_vectors()
-
-        for i, unit in enumerate(old_units):
-            existing_units[unit.id] = unit
-            if i < len(old_vectors):
-                existing_vectors[unit.id] = old_vectors[i]
 
     # Extract code units
     if show_progress:
         print("Scanning codebase...")
     units = _extract_code_units(
-        str(project),
-        language,
+        str(project), language,
         respect_ignore=respect_ignore,
         respect_gitignore=respect_gitignore,
     )
@@ -454,90 +342,68 @@ def build_index(
     stats.total_units = len(units)
 
     if not units:
-        print("No code units found to index.")
+        if show_progress:
+            print("No code units found to index.")
         return stats
 
-    # Determine which units need (re)embedding and which can reuse vectors
-    units_to_embed = []
-    texts_to_embed = []
-    all_units = []  # Final unit list in order
-    all_vectors = []  # Corresponding vectors (None for units needing embedding)
-    embed_indices = []  # Indices in all_vectors that need embedding
+    # Build embedding texts
+    texts = [_build_embed_text(u) for u in units]
 
-    for unit in units:
-        existing = existing_units.get(unit.id)
-        existing_vec = existing_vectors.get(unit.id)
-
-        if existing and existing.file_hash == unit.file_hash and existing_vec is not None:
-            # Unchanged - reuse existing vector
-            all_units.append(unit)
-            all_vectors.append(existing_vec)
-            stats.unchanged_units += 1
-        else:
-            # New or changed - needs embedding
-            all_units.append(unit)
-            all_vectors.append(None)  # Placeholder
-            embed_indices.append(len(all_vectors) - 1)
-            units_to_embed.append(unit)
-            texts_to_embed.append(_build_embed_text(unit))
-
-            if existing:
-                stats.updated_units += 1
-            else:
-                stats.new_units += 1
-
-    # Generate summaries if requested
-    if generate_summaries and units_to_embed:
+    # Generate summaries if requested (before embedding)
+    if generate_summaries:
         if show_progress:
-            print(f"Generating summaries for {len(units_to_embed)} units...")
-        summaries = _generate_summaries_ollama(units_to_embed, str(project), show_progress)
-        for unit in units_to_embed:
+            print(f"Generating summaries for {len(units)} units...")
+        summaries = _generate_summaries_ollama(units, str(project), show_progress)
+        for unit in units:
             if unit.id in summaries:
                 unit.summary = summaries[unit.id]
+        # Rebuild texts with updated summaries
+        texts = [_build_embed_text(u) for u in units]
 
-    # Embed only new/changed units
-    if units_to_embed:
-        if show_progress:
-            print(f"Embedding {len(units_to_embed)} code units ({stats.unchanged_units} unchanged, reusing vectors)...")
+    # Get backend and build
+    search_backend = get_backend(str(project), backend=backend)
 
-        results = embed_batch(texts_to_embed, backend=backend, model=embed_model, show_progress=show_progress)
-
-        # Record backend info
-        if results:
-            stats.embed_model = results[0].model
-            stats.embed_backend = results[0].backend
-
-        # Fill in the new embeddings at the right positions
-        for i, result in zip(embed_indices, results):
-            all_vectors[i] = result.vector
-
-        all_embeddings = all_vectors
-    else:
-        # No changes
-        if show_progress:
-            print("Index is up to date.")
-        return stats
-
-    # Build and save index
     if show_progress:
-        print("Building FAISS index...")
+        backend_info = search_backend.info()
+        print(f"Building index with {backend_info.backend_name} backend...")
 
-    store.build(
-        all_units,
-        all_vectors,
-        embed_model=stats.embed_model,
-        embed_backend=stats.embed_backend
-    )
+    backend_stats = search_backend.build(units, texts, rebuild=rebuild)
+    search_backend.save()
 
-    # Build BM25 index for hybrid search
+    # Update stats from backend
+    stats.new_units = backend_stats.new_units
+    stats.updated_units = backend_stats.updated_units
+    stats.unchanged_units = backend_stats.unchanged_units
+    stats.embed_model = backend_stats.embed_model
+    stats.embed_backend = backend_stats.backend_name
+
+    # Build BM25 index for identifier fast-path (all backends)
+    _build_bm25(search_backend, units, texts, show_progress)
+
+    if show_progress:
+        print(f"✓ Indexed {stats.total_units} code units")
+        print(f"  Backend: {stats.embed_backend} ({stats.embed_model})")
+        bi = search_backend.info()
+        print(f"  Location: {bi.index_path}")
+
+    return stats
+
+
+def _build_bm25(search_backend, units, texts, show_progress=False):
+    """Build BM25 index for identifier fast-path (used by all backends)."""
     try:
         from .bm25_store import BM25Store
 
-        bm25 = BM25Store(store.index_dir)
-        # Use the same texts that were used for embeddings
-        all_texts = [_build_embed_text(u) for u in all_units]
-        all_ids = [u.id for u in all_units]
-        bm25.build(all_ids, all_texts)
+        # BM25 is stored alongside the main index
+        bi = search_backend.info()
+        bm25_dir = Path(bi.index_path)
+        # For ColBERT, store BM25 in the parent index dir (not plaid subdir)
+        if bi.backend_name == "colbert":
+            bm25_dir = bm25_dir.parent
+
+        bm25 = BM25Store(bm25_dir)
+        all_ids = [u.id for u in units]
+        bm25.build(all_ids, texts)
         bm25.save()
         if show_progress:
             print("  BM25 lexical index: built")
@@ -547,194 +413,119 @@ def build_index(
     except Exception as e:
         logger.debug("Failed to build BM25 index: %s", e)
 
-    store.save()
-
-    if show_progress:
-        print(f"✓ Indexed {len(all_units)} code units")
-        print(f"  Backend: {stats.embed_backend} ({stats.embed_model})")
-        print(f"  Location: {store.index_dir}")
-
-    return stats
-
 
 # Pattern for identifier-like queries (function/method names)
 _IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_\.]*$")
-
-
-def _rrf_fuse(
-    semantic_results: list[SearchResult],
-    bm25_results: list[tuple[str, float]],
-    exclude_ids: set[str],
-    store: VectorStore,
-    k_param: int = 60,
-) -> list[tuple[CodeUnit, float]]:
-    """Reciprocal Rank Fusion of semantic and BM25 results.
-
-    RRF score = sum(1 / (k + rank)) across result lists.
-    k_param=60 is the standard default from the original RRF paper.
-
-    Returns:
-        List of (CodeUnit, fused_score) tuples, sorted by fused score descending.
-    """
-    scores: dict[str, float] = {}  # unit_id -> fused score
-    units: dict[str, CodeUnit] = {}  # unit_id -> CodeUnit
-
-    # Score semantic results
-    for rank, result in enumerate(semantic_results):
-        uid = result.unit.id
-        if uid in exclude_ids:
-            continue
-        scores[uid] = scores.get(uid, 0.0) + 1.0 / (k_param + rank + 1)
-        units[uid] = result.unit
-
-    # Score BM25 results
-    for rank, (uid, _bm25_score) in enumerate(bm25_results):
-        if uid in exclude_ids:
-            continue
-        scores[uid] = scores.get(uid, 0.0) + 1.0 / (k_param + rank + 1)
-        if uid not in units:
-            unit = store.get_unit(uid)
-            if unit:
-                units[uid] = unit
-
-    # Sort by fused score
-    ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-
-    return [(units[uid], score) for uid, score in ranked if uid in units]
 
 
 def search_index(
     project_path: str,
     query: str,
     k: int = 10,
-    backend: BackendType = "auto",
-    model: Optional[str] = None
+    **kwargs,
 ) -> list[dict]:
     """Search the semantic index.
 
     Uses a hybrid approach:
-    1. If query looks like an identifier, try exact name match first
-    2. Fall back to semantic search for natural language queries
+    1. If query looks like an identifier, try exact name match first (BM25)
+    2. Delegate semantic search to the active backend
 
     Args:
         project_path: Path to project root
         query: Natural language query or identifier name
         k: Number of results
-        backend: Embedding backend (should match index)
-        model: Embedding model (should match index)
 
     Returns:
         List of result dicts with unit info and score
     """
-    _require_semantic_deps()
     project = Path(project_path).resolve()
-    store = VectorStore(str(project))
 
-    if not store.load():
+    # Get the backend (auto-detects from meta.json)
+    search_backend = get_backend(str(project), backend="auto")
+
+    if not search_backend.load():
+        index_dir = project / ".tldrs" / "index"
         raise FileNotFoundError(
-            f"No index found at {store.index_dir}. Run `tldrs index` first."
+            f"No index found at {index_dir}. Run `tldrs index` first."
         )
 
-    # Use index's model/backend if not specified
-    if model is None:
-        model = store.metadata.embed_model
-    if backend == "auto" and store.metadata.embed_backend:
-        backend = store.metadata.embed_backend  # type: ignore
+    # Migration nudge: if FAISS index but pylate available
+    bi = search_backend.info()
+    if bi.backend_name == "faiss" and _colbert_available():
+        logger.info(
+            "ColBERT backend available. Rebuild for better search quality: "
+            "tldrs semantic index --backend=colbert"
+        )
 
     query_stripped = query.strip()
-    exact_matches = []
+    exact_results = []
 
-    # Lexical fast-path: if query looks like an identifier, try exact match first
+    # Identifier fast-path: exact name match via loaded backend
     if _IDENT_RE.match(query_stripped):
-        exact_matches = store.get_units_by_name(query_stripped)
+        exact_matches = _identifier_search(search_backend, query_stripped)
+        exact_results = [
+            {
+                "name": u.name, "file": u.file, "line": u.line,
+                "type": u.unit_type, "signature": u.signature,
+                "summary": u.summary, "score": 1.0, "rank": i + 1,
+                "backend": bi.backend_name,
+            }
+            for i, u in enumerate(exact_matches[:k])
+        ]
 
-        # Also try partial match for Class.method style queries
-        if not exact_matches and "." in query_stripped:
-            # Try matching just the method name
-            parts = query_stripped.split(".")
-            method_name = parts[-1]
-            full_name = query_stripped
-            exact_matches = [
-                u for u in store.get_all_units()
-                if u.name == full_name or u.name.endswith(f".{method_name}")
-            ]
-
-    # Format exact matches with synthetic high score (1.0)
-    exact_results = [
-        {
-            "name": u.name,
-            "file": u.file,
-            "line": u.line,
-            "type": u.unit_type,
-            "signature": u.signature,
-            "summary": u.summary,
-            "score": 1.0,  # Perfect match
-            "rank": i + 1,
-        }
-        for i, u in enumerate(exact_matches[:k])
-    ]
-
-    # If we got exact matches, fill remaining slots with semantic search
     remaining_k = k - len(exact_results)
     if remaining_k <= 0:
         return exact_results
 
-    # Embed query for semantic search
-    result = embed_text(query, backend=backend, model=model)
+    # Semantic search via backend
+    results = search_backend.search(query, k=remaining_k + len(exact_results))
 
-    # Semantic search
-    semantic_results = store.search(result.vector, k=remaining_k + len(exact_matches))
-
-    # Try BM25 for hybrid search
-    bm25_results: list[tuple[str, float]] = []
-    try:
-        from .bm25_store import BM25Store
-
-        bm25 = BM25Store(store.index_dir)
-        if bm25.load():
-            bm25_results = bm25.search(query, k=remaining_k + len(exact_matches))
-    except (ImportError, Exception) as e:
-        logger.debug("BM25 search unavailable: %s", e)
-
-    # Filter out exact matches from both result sets
-    exact_ids = {u.id for u in exact_matches}
-
-    if bm25_results:
-        # RRF fusion of semantic + BM25 results
-        fused = _rrf_fuse(semantic_results, bm25_results, exact_ids, store)
-
-        # Format fused results
-        semantic_formatted = [
-            {
-                "name": unit.name,
-                "file": unit.file,
-                "line": unit.line,
-                "type": unit.unit_type,
-                "signature": unit.signature,
-                "summary": unit.summary,
-                "score": round(score, 4),
-                "rank": len(exact_results) + i + 1,
-            }
-            for i, (unit, score) in enumerate(fused[:remaining_k])
-        ]
-    else:
-        # Fallback to pure semantic search
-        semantic_results = [r for r in semantic_results if r.unit.id not in exact_ids]
-        semantic_formatted = [
-            {
-                "name": r.unit.name,
-                "file": r.unit.file,
-                "line": r.unit.line,
-                "type": r.unit.unit_type,
-                "signature": r.unit.signature,
-                "summary": r.unit.summary,
-                "score": round(r.score, 4),
-                "rank": len(exact_results) + i + 1,
-            }
-            for i, r in enumerate(semantic_results[:remaining_k])
-        ]
+    # Filter out exact matches
+    exact_ids = {r["name"] for r in exact_results}
+    semantic_formatted = []
+    for i, r in enumerate(results):
+        if r.unit.name in exact_ids:
+            continue
+        semantic_formatted.append({
+            "name": r.unit.name, "file": r.unit.file, "line": r.unit.line,
+            "type": r.unit.unit_type, "signature": r.unit.signature,
+            "summary": r.unit.summary, "score": round(r.score, 4),
+            "rank": len(exact_results) + len(semantic_formatted) + 1,
+            "backend": bi.backend_name,
+        })
+        if len(semantic_formatted) >= remaining_k:
+            break
 
     return exact_results + semantic_formatted
+
+
+def _identifier_search(search_backend, query: str) -> list[CodeUnit]:
+    """Fast-path: exact name match for identifier-like queries."""
+    # FAISSBackend has get_units_by_name; ColBERTBackend uses dict lookup
+    if hasattr(search_backend, "get_units_by_name"):
+        matches = search_backend.get_units_by_name(query)
+    elif hasattr(search_backend, "_units"):
+        # ColBERTBackend stores units as dict
+        matches = [u for u in search_backend._units.values() if u.name == query]
+    else:
+        matches = []
+
+    # Also try Class.method partial match
+    if not matches and "." in query:
+        parts = query.split(".")
+        method_name = parts[-1]
+        if hasattr(search_backend, "get_all_units"):
+            all_units = search_backend.get_all_units()
+        elif hasattr(search_backend, "_units"):
+            all_units = list(search_backend._units.values())
+        else:
+            all_units = []
+        matches = [
+            u for u in all_units
+            if u.name == query or u.name.endswith(f".{method_name}")
+        ]
+
+    return matches
 
 
 def get_index_info(project_path: str) -> Optional[dict]:
@@ -743,16 +534,18 @@ def get_index_info(project_path: str) -> Optional[dict]:
     Returns:
         Dict with index metadata, or None if no index
     """
-    project = Path(project_path).resolve()
-    store = VectorStore(str(project))
-
-    if not store.load():
+    try:
+        search_backend = get_backend(project_path, backend="auto")
+        if not search_backend.load():
+            return None
+        bi = search_backend.info()
+        return {
+            "backend": bi.backend_name,
+            "count": bi.count,
+            "dimension": bi.dimension,
+            "embed_model": bi.model,
+            "index_path": bi.index_path,
+            "extra": bi.extra,
+        }
+    except RuntimeError:
         return None
-
-    return {
-        "count": store.count,
-        "dimension": store.metadata.dimension,
-        "embed_model": store.metadata.embed_model,
-        "embed_backend": store.metadata.embed_backend,
-        "index_path": str(store.index_dir),
-    }
