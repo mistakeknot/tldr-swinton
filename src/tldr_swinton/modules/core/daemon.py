@@ -20,6 +20,7 @@ import logging
 import os
 import socket
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -217,6 +218,10 @@ class TLDRDaemon:
         # P5 Features: Content-hash deduplication and query memoization
         self.dedup_index: Optional[ContentHashedIndex] = None
         self.salsa_db: SalsaDB = SalsaDB()
+
+        # Semantic backend cache and lock
+        self._semantic_backend = None
+        self._semantic_lock = threading.RLock()
 
         # P6 Features: Dirty-count triggered semantic re-indexing
         self._dirty_count: int = 0
@@ -599,12 +604,14 @@ class TLDRDaemon:
                 language = command.get("language", "python")
                 backend = command.get("backend", "auto")
                 rebuild = command.get("rebuild", False)
+                # Invalidate cached backend BEFORE build so concurrent
+                # searches don't use the stale index during the build.
+                with self._semantic_lock:
+                    self._semantic_backend = None
                 stats = build_index(
                     str(self.project), language=language, backend=backend,
                     rebuild=rebuild,
                 )
-                # Invalidate cached backend so next search reloads
-                self._semantic_backend = None
                 return {"status": "ok", "indexed": stats.total_units}
 
             elif action == "search":
@@ -614,10 +621,11 @@ class TLDRDaemon:
                 k = command.get("k", 10)
 
                 # Use cached backend for fast repeated searches
-                if not hasattr(self, "_semantic_backend") or self._semantic_backend is None:
-                    from ..semantic.backend import get_backend
-                    self._semantic_backend = get_backend(str(self.project))
-                    self._semantic_backend.load()
+                with self._semantic_lock:
+                    if self._semantic_backend is None:
+                        from ..semantic.backend import get_backend
+                        self._semantic_backend = get_backend(str(self.project))
+                        self._semantic_backend.load()
 
                 results = self._semantic_backend.search(query, k=k)
                 formatted = [

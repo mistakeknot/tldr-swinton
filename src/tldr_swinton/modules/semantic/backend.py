@@ -162,7 +162,7 @@ def _read_index_backend(project_path: str) -> Optional[str]:
     try:
         meta = json.loads(meta_path.read_text())
         return meta.get("backend")
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         return None
 
 

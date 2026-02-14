@@ -16,6 +16,7 @@ import logging
 import os
 import shutil
 import threading
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -126,7 +127,7 @@ class ColBERTBackend:
                     self._unit_hashes = meta.get("hashes", {})
                     self._incremental_updates = meta.get("incremental_updates", 0)
                     existing_ids = set(self._units.keys())
-                except Exception as e:
+                except (json.JSONDecodeError, KeyError, TypeError) as e:
                     logger.warning("Failed to load ColBERT metadata: %s", e)
                     needs_full_rebuild = True
 
@@ -266,11 +267,13 @@ class ColBERTBackend:
 
     def load(self) -> bool:
         """Load existing PLAID index and metadata."""
-        # Check for partial build
-        if self._sentinel_path.exists():
-            logger.warning("Partial ColBERT build detected, needs rebuild")
-            self._cleanup_partial()
-            return False
+        # Check for partial build under lock to avoid TOCTOU with
+        # a concurrent build that may be writing the sentinel.
+        with self._instance_lock:
+            if self._sentinel_path.exists():
+                logger.warning("Partial ColBERT build detected, needs rebuild")
+                self._cleanup_partial()
+                return False
 
         if not self._meta_path.exists():
             return False
@@ -297,7 +300,7 @@ class ColBERTBackend:
             self._retriever = retrieve.ColBERT(index=self._index)
 
             return True
-        except Exception as e:
+        except (json.JSONDecodeError, KeyError, TypeError, OSError) as e:
             logger.warning("Failed to load ColBERT index: %s", e)
             return False
 
@@ -356,6 +359,7 @@ class ColBERTBackend:
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
 
+        old_dir = self.index_dir.parent / "plaid-old"
         try:
             index = indexes_mod.PLAID(
                 index_name=str(temp_dir),
@@ -367,17 +371,12 @@ class ColBERTBackend:
             )
 
             # Atomic swap
-            old_dir = self.index_dir.parent / "plaid-old"
             if self.index_dir.exists():
                 if old_dir.exists():
                     shutil.rmtree(old_dir)
                 self.index_dir.rename(old_dir)
 
             temp_dir.rename(self.index_dir)
-
-            # Clean up old
-            if old_dir.exists():
-                shutil.rmtree(old_dir, ignore_errors=True)
 
             # Update in-memory state atomically for concurrent search()
             from pylate import retrieve
@@ -389,10 +388,15 @@ class ColBERTBackend:
                 self._retriever = new_retriever
 
         except Exception:
-            # Clean up temp on failure
+            raise
+        finally:
+            # Clean up old and temp dirs regardless of success/failure.
+            # On success: old_dir lingers if retrieve.ColBERT() fails after rename.
+            # On failure: temp_dir lingers if build fails partway through.
+            if old_dir.exists():
+                shutil.rmtree(old_dir, ignore_errors=True)
             if temp_dir.exists():
                 shutil.rmtree(temp_dir, ignore_errors=True)
-            raise
 
     def _incremental_add(
         self, indexes_mod, ids_to_encode, embeddings, incoming,
@@ -434,7 +438,7 @@ class ColBERTBackend:
 
     def _write_meta_atomic(self, path: Path, data: dict) -> None:
         """Write JSON atomically via temp file + rename."""
-        tmp = path.with_suffix(f".tmp.{os.getpid()}")
+        tmp = path.with_suffix(f".tmp.{uuid.uuid4().hex[:8]}")
         tmp.write_text(json.dumps(data, indent=2))
         tmp.replace(path)
 

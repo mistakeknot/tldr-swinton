@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -476,7 +477,7 @@ class FAISSBackend:
                     json.loads(self._meta_path.read_text())
                 )
             return True
-        except Exception as e:
+        except (json.JSONDecodeError, KeyError, TypeError, OSError) as e:
             logger.warning("Failed to load FAISS index from %s: %s", self.index_dir, e)
             return False
 
@@ -531,7 +532,8 @@ class FAISSBackend:
             return np.zeros((0, 0), dtype=np.float32)
         try:
             return self._faiss_index.reconstruct_n(0, len(self._units))
-        except Exception:
+        except RuntimeError as e:
+            logger.warning("Batch vector reconstruction failed, falling back to per-vector: %s", e)
             vectors = []
             for i in range(len(self._units)):
                 vectors.append(self._faiss_index.reconstruct(i))
@@ -569,7 +571,7 @@ class FAISSBackend:
 
     def _write_meta_atomic(self, data: dict) -> None:
         """Write meta.json atomically via temp file + rename."""
-        tmp = self._meta_path.with_suffix(f".tmp.{os.getpid()}")
+        tmp = self._meta_path.with_suffix(f".tmp.{uuid.uuid4().hex[:8]}")
         tmp.write_text(json.dumps(data, indent=2))
         tmp.replace(self._meta_path)
 
