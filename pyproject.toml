@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tldr-swinton"
-version = "0.7.2"
+version = "0.7.4"
 description = "Centralized platform for improving coding agent performance - token-efficient code analysis, session artifacts, and benchmarking"
 readme = "README.md"
 license = "MIT"
@@ -59,6 +59,12 @@ semantic = [
     "faiss-cpu>=1.7",
     "rank-bm25>=0.2.2",
     "rich>=13.0",  # Progress bars
+]
+# ColBERT late-interaction search (best quality, ~1.7GB PyTorch)
+semantic-colbert = [
+    "pylate>=1.3.4",
+    "rank-bm25>=0.2.2",
+    "rich>=13.0",
 ]
 # Full stack with Ollama integration
 full = [

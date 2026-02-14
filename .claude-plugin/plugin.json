@@ -1,6 +1,6 @@
 {
   "name": "tldr-swinton",
-  "version": "0.7.2",
+  "version": "0.7.4",
   "description": "Token-efficient code reconnaissance for LLMs. MCP tools + orchestration skills save 48-85% tokens via diff-context, semantic search, structural patterns, and symbol analysis.",
   "author": {
     "name": "MK",
@@ -9,7 +9,14 @@
   "repository": "https://github.com/mistakeknot/tldr-swinton",
   "homepage": "https://github.com/mistakeknot/tldr-swinton#readme",
   "license": "MIT",
-  "keywords": ["code-analysis", "token-efficiency", "semantic-search", "structural-search", "diff-context", "llm-tools"],
+  "keywords": [
+    "code-analysis",
+    "token-efficiency",
+    "semantic-search",
+    "structural-search",
+    "diff-context",
+    "llm-tools"
+  ],
   "skills": [
     "./.claude-plugin/skills/tldrs-session-start",
     "./.claude-plugin/skills/tldrs-map-codebase",
@@ -28,7 +35,10 @@
     "tldr-code": {
       "type": "stdio",
       "command": "tldr-mcp",
-      "args": ["--project", "."]
+      "args": [
+        "--project",
+        "."
+      ]
     }
   }
 }
