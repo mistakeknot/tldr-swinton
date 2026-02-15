@@ -1,7 +1,7 @@
 {
   "name": "tldr-swinton",
   "version": "0.7.6",
-  "description": "Token-efficient code reconnaissance for LLMs. MCP tools + orchestration skills save 48-85% tokens via diff-context, semantic search, structural patterns, and symbol analysis.",
+  "description": "Token-efficient code reconnaissance for LLMs. Autonomous skills save 48-85% tokens via diff-context, semantic search, structural patterns, and symbol analysis. Includes MCP server for direct tool integration.",
   "author": {
     "name": "MK",
     "email": "mistakeknot@vibeguider.org"
@@ -20,7 +20,8 @@
   "skills": [
     "./.claude-plugin/skills/tldrs-session-start",
     "./.claude-plugin/skills/tldrs-map-codebase",
-    "./.claude-plugin/skills/tldrs-ashpool-sync"
+    "./.claude-plugin/skills/tldrs-ashpool-sync",
+    "./.claude-plugin/skills/finding-duplicate-functions"
   ],
   "commands": [
     "./.claude-plugin/commands/find.md",
