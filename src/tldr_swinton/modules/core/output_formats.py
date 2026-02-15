@@ -673,7 +673,10 @@ def _format_cache_friendly(pack: dict) -> str:
     dynamic_token_est = _estimate_tokens("\n".join(dynamic_parts)) if dynamic_parts else 0
 
     # --- Single-pass assembly with placeholder for hints ---
+    head_sha = pack.get("head") or ""
     header = "# tldrs cache-friendly output v1"
+    if head_sha:
+        header += f" @ {head_sha[:8]}"
     breakpoint_line = f"<!-- CACHE_BREAKPOINT: ~{prefix_token_est} tokens -->"
     hints_placeholder = "__CACHE_HINTS_PLACEHOLDER__"
 
@@ -705,14 +708,15 @@ def _format_cache_friendly(pack: dict) -> str:
     breakpoint_offset = output.find("<!-- CACHE_BREAKPOINT")
     if breakpoint_offset < 0:
         breakpoint_offset = 0  # Defensive: degrade to 0 if marker missing
-    hints_data = {
-        "cache_hints": {
-            "prefix_tokens": prefix_token_est,
-            "prefix_hash": prefix_hash,
-            "breakpoint_char_offset": breakpoint_offset,
-            "format_version": 1,
-        }
+    hints_dict: dict = {
+        "prefix_tokens": prefix_token_est,
+        "prefix_hash": prefix_hash,
+        "breakpoint_char_offset": breakpoint_offset,
+        "format_version": 1,
     }
+    if head_sha:
+        hints_dict["commit_sha"] = head_sha
+    hints_data = {"cache_hints": hints_dict}
     hints_line = json.dumps(hints_data, separators=(",", ":"), ensure_ascii=False)
     output = output.replace(hints_placeholder, hints_line, 1)
 

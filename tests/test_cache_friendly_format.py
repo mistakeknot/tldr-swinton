@@ -201,6 +201,65 @@ class TestCacheFriendlyPrefixMaximization:
         assert _get_hash(out1) == _get_hash(out2)
 
 
+class TestCacheFriendlyCommitSha:
+    """Commit SHA fingerprint in header and cache hints."""
+
+    def _pack_with_head(self, head_sha: str) -> dict:
+        """Build a raw pack dict (not ContextPack) with base/head like difflens produces."""
+        from tldr_swinton.modules.core.output_formats import _contextpack_to_dict
+        pack = _make_pack(
+            slices=[_make_slice("a.py:f", "def f():", "code", (1, 5))],
+            unchanged=[],
+            cache_stats={"hit_rate": 0.0, "hits": 0, "misses": 1},
+        )
+        d = _contextpack_to_dict(pack)
+        d["head"] = head_sha
+        d["base"] = "0000000000000000000000000000000000000000"
+        return d
+
+    def test_header_includes_short_sha(self):
+        """Header line includes the first 8 chars of head SHA."""
+        d = self._pack_with_head("abc123def456789012345678901234567890abcd")
+        out = format_context_pack(d, fmt="cache-friendly")
+        assert "@ abc123de" in out, "Short SHA not in header"
+
+    def test_cache_hints_include_full_sha(self):
+        """cache_hints JSON includes the full commit SHA."""
+        full_sha = "abc123def456789012345678901234567890abcd"
+        d = self._pack_with_head(full_sha)
+        out = format_context_pack(d, fmt="cache-friendly")
+        for line in out.split("\n"):
+            if "cache_hints" in line:
+                hints = json.loads(line)["cache_hints"]
+                assert hints["commit_sha"] == full_sha
+                return
+        raise AssertionError("No cache_hints found")
+
+    def test_no_sha_without_head(self):
+        """Without head commit, no commit_sha in hints and no @ in header."""
+        pack = _make_pack(
+            slices=[_make_slice("a.py:f", "def f():", "code", (1, 5))],
+            unchanged=[],
+            cache_stats={"hit_rate": 0.0, "hits": 0, "misses": 1},
+        )
+        out = format_context_pack(pack, fmt="cache-friendly")
+        assert "@ " not in out.split("\n")[0], "Should not have @ in header without head"
+        for line in out.split("\n"):
+            if "cache_hints" in line:
+                hints = json.loads(line)["cache_hints"]
+                assert "commit_sha" not in hints
+                return
+        raise AssertionError("No cache_hints found")
+
+    def test_same_sha_produces_identical_output(self):
+        """Same head SHA produces byte-identical output."""
+        d1 = self._pack_with_head("abcdef1234567890abcdef1234567890abcdef12")
+        d2 = self._pack_with_head("abcdef1234567890abcdef1234567890abcdef12")
+        out1 = format_context_pack(d1, fmt="cache-friendly")
+        out2 = format_context_pack(d2, fmt="cache-friendly")
+        assert out1 == out2
+
+
 class TestCacheFriendlyNonDelta:
     """Non-delta path: all signatures in prefix, bodies in dynamic."""
 
