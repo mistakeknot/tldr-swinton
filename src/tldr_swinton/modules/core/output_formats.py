@@ -827,6 +827,7 @@ def _trim_to_symbol_boundary(lines: list[str]) -> list[str]:
     """Rewind to the last complete symbol boundary.
 
     Primary boundary is a blank line (ultracompact and most text formats).
+    Also detects orphaned markdown headers (### in cache-friendly dynamic section).
     Fallback boundary for text format is the start of the last `📍` block.
     """
     if not lines:
@@ -838,6 +839,18 @@ def _trim_to_symbol_boundary(lines: list[str]) -> list[str]:
     while trimmed and trimmed[-1].strip():
         trimmed.pop()
     if trimmed:
+        # Check for orphaned markdown headers: if the last non-blank line
+        # is a ### or ## header, it has no content after it — rewind further.
+        last_nonblank = len(trimmed) - 1
+        while last_nonblank >= 0 and not trimmed[last_nonblank].strip():
+            last_nonblank -= 1
+        if last_nonblank >= 0:
+            stripped = trimmed[last_nonblank].lstrip()
+            if stripped.startswith("### ") or stripped.startswith("## "):
+                # Discard the orphaned header and its preceding blank line
+                trimmed = trimmed[:last_nonblank]
+                while trimmed and not trimmed[-1].strip():
+                    trimmed.pop()
         return trimmed
 
     symbol_starts = [idx for idx, line in enumerate(lines) if line.lstrip().startswith("📍")]

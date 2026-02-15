@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from tldr_swinton.modules.core.output_formats import truncate_output, truncate_json_output
+from tldr_swinton.modules.core.output_formats import truncate_output, truncate_json_output, _trim_to_symbol_boundary
 
 
 def _content_before_marker(text: str) -> str:
@@ -86,6 +86,93 @@ def test_truncate_output_max_lines_symbol_boundary():
 def test_truncate_output_under_caps():
     text = "short"
     assert truncate_output(text, max_lines=100, max_bytes=1000) == text
+
+
+# --- Cache-friendly / markdown header boundary tests ---
+
+def test_truncate_cache_friendly_no_orphaned_header():
+    """Truncation in cache-friendly format must not leave orphaned ### headers."""
+    blocks = []
+    for i in range(5):
+        blocks.append(f"### symbol_{i}")
+        blocks.append("```python")
+        blocks.append(f"def func_{i}(): pass")
+        blocks.append("```")
+        blocks.append("")
+    text = "\n".join(blocks)
+
+    # Truncate mid-way through symbol_3: 14 lines cuts after symbol_2's blank line
+    # and into symbol_3's code block.  Without the fix, ### symbol_3 would survive.
+    result = truncate_output(text, max_lines=14)
+    assert "[TRUNCATED:" in result
+    content = _content_before_marker(result)
+    for line in content.splitlines():
+        if line.strip().startswith("### "):
+            # Every ### header must be followed by its code block
+            idx = content.splitlines().index(line)
+            remaining = content.splitlines()[idx + 1:]
+            assert any(l.strip().startswith("```") for l in remaining), (
+                f"Orphaned header found: {line!r}"
+            )
+
+
+def test_truncate_cache_friendly_section_header():
+    """Orphaned ## section headers (like '## DYNAMIC CONTENT') should be removed."""
+    lines_list = [
+        "# CACHE-FRIENDLY CONTEXT",
+        "",
+        "## STATIC SECTION",
+        "some static content",
+        "",
+        "## DYNAMIC CONTENT",
+    ]
+    # _trim_to_symbol_boundary should strip the orphaned ## header
+    trimmed = _trim_to_symbol_boundary(lines_list)
+    assert trimmed
+    last_nonblank = [l for l in trimmed if l.strip()][-1]
+    assert not last_nonblank.strip().startswith("## "), (
+        f"Orphaned section header survived: {last_nonblank!r}"
+    )
+
+
+def test_truncate_ultracompact_code_block():
+    """Ultracompact with code blocks: truncation inside ``` rewinds to previous symbol."""
+    blocks = []
+    for i in range(5):
+        blocks.append(f"P0:func_{i} def func_{i}(x: int) -> int @{i * 10}")
+        blocks.append("```")
+        blocks.append(f"  x = {i}")
+        blocks.append("```")
+        blocks.append("")
+    text = "\n".join(blocks)
+
+    # 12 lines: cuts inside func_2's code block.  Rewind should land at func_1's
+    # trailing blank line.
+    result = truncate_output(text, max_lines=12)
+    assert "[TRUNCATED:" in result
+    content = _content_before_marker(result)
+    # Should contain func_1 completely but not func_2's body
+    assert "func_1" in content
+    assert "func_2" not in content
+
+
+def test_truncate_preserves_complete_symbols():
+    """Truncation just after a complete symbol's blank line keeps it intact."""
+    blocks = []
+    for i in range(5):
+        blocks.append(f"### symbol_{i}")
+        blocks.append("```python")
+        blocks.append(f"def func_{i}(): pass")
+        blocks.append("```")
+        blocks.append("")
+    text = "\n".join(blocks)
+
+    # 10 lines = exactly 2 complete symbols (5 lines each).  No truncation needed
+    # because the last line is blank.
+    result = truncate_output(text, max_lines=10)
+    content = result.split("[TRUNCATED:")[0].rstrip("\n") if "[TRUNCATED:" in result else result
+    assert "symbol_0" in content
+    assert "symbol_1" in content
 
 
 # --- Unit tests for truncate_json_output ---
