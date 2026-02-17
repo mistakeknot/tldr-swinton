@@ -16,24 +16,24 @@ tldr-swinton is a token-efficient code analysis tool for LLMs. It's a fork of ll
 
 | Project | What | Path |
 |---------|------|------|
-| **Ashpool** | Agent workbench: run capture + artifact store + eval/regression for tldrs outputs | `../Ashpool` |
+| **interbench** | Agent workbench: run capture + artifact store + eval/regression for tldrs outputs | `/root/projects/Interverse/infra/interbench` |
 
-**Ashpool integration**: Ashpool captures tldrs runs as artifacts with metadata tagging, scores token efficiency, and A/B tests output formats. When adding new tldrs formats or flags, 4 files must be kept in sync:
-- `../Ashpool/scripts/regression_suite.json` — regression queries for each (command, format, flag) combination
-- `../Ashpool/scripts/ab_formats.py` — `DEFAULT_FORMATS` list for A/B testing
-- `../Ashpool/demo-tldrs.sh` — demo runs showcasing each format
-- `../Ashpool/scripts/score_tokens.py` — `parse_*` functions for scoring_hints formats
+**interbench integration**: interbench captures tldrs runs as artifacts with metadata tagging, scores token efficiency, and A/B tests output formats. When adding new tldrs formats or flags, 4 files must be kept in sync:
+- `/root/projects/Interverse/infra/interbench/scripts/regression_suite.json` — regression queries for each (command, format, flag) combination
+- `/root/projects/Interverse/infra/interbench/scripts/ab_formats.py` — `DEFAULT_FORMATS` list for A/B testing
+- `/root/projects/Interverse/infra/interbench/demo-tldrs.sh` — demo runs showcasing each format
+- `/root/projects/Interverse/infra/interbench/scripts/score_tokens.py` — `parse_*` functions for scoring_hints formats
 
 **Sync workflow** (automated):
 ```bash
-# Check for gaps between tldrs capabilities and Ashpool coverage
-tldrs manifest | python3 ../Ashpool/scripts/check_tldrs_sync.py
+# Check for gaps between tldrs capabilities and interbench coverage
+tldrs manifest | python3 /root/projects/Interverse/infra/interbench/scripts/check_tldrs_sync.py
 
 # Or use the Claude Code skill for guided remediation
-/tldrs-ashpool-sync
+/tldrs-interbench-sync
 ```
 
-The `tldrs manifest` command produces a machine-readable JSON of all eval-relevant commands, formats, flags, and scoring hints. The sync check script reads this and reports coverage gaps across all 4 Ashpool files. The `bump-version.sh` script runs the sync check automatically and warns if gaps exist.
+The `tldrs manifest` command produces a machine-readable JSON of all eval-relevant commands, formats, flags, and scoring hints. The sync check script reads this and reports coverage gaps across all 4 interbench files. The `bump-version.sh` script runs the sync check automatically and warns if gaps exist.
 
 ## Quick Reference
 
@@ -89,7 +89,7 @@ The repo includes a Claude Code plugin at `.claude-plugin/`. Available commands:
 |-------|---------|
 | `tldrs-session-start` | Before reading code for bugs, features, refactoring, tests, reviews, migrations |
 | `tldrs-map-codebase` | Understanding architecture, exploring unfamiliar projects, onboarding |
-| `tldrs-ashpool-sync` | Syncing Ashpool eval coverage after tldrs capability changes |
+| `tldrs-interbench-sync` | Syncing interbench eval coverage after tldrs capability changes |
 
 **Hooks:**
 - `PreToolUse` on **Serena replace_symbol_body** and **rename_symbol**: Runs `tldrs impact` to show callers before edits
@@ -582,6 +582,29 @@ The agent workflow eval tests real token savings for code modification tasks (no
 | `engines/delta.py` | Delta-mode orchestration (session tracking, etag comparison) |
 | `manifest.py` | Machine-readable capability manifest for eval sync |
 
+## Operational Notes
+
+### Embedding Model
+- Current: `nomic-embed-text-v2-moe` (475M, 768d, MoE)
+- **NOT** `nomic-embed-code` (7.1B, 3584d) — that's `manutic/nomic-embed-code`, not drop-in
+- Jina-code-0.5b evaluated (896d, SOTA): NOT adopting yet, not on Ollama
+
+### Plugin Structure
+- 3 skills: session-start, map-codebase, ashpool-sync
+- MCP server `tldr-code` for direct tool calls
+- PostToolUse:Read hook (`post-read-extract.sh`) — provides value for large files
+- PreToolUse hooks REMOVED (CC bug #17088 noise)
+
+### Gotchas
+- Ollama naming: community models use `user/model` format. Always `ollama pull` to verify
+- ThreadPoolExecutor + local GPU Ollama: no speedup (GPU serializes internally)
+- `--compress blocks`: AST-based segmentation + 0/1 knapsack DP, indent fallback
+
+### Do NOT Adopt
+- Stack Graphs: archived Sept 2025
+- LSP: conflicts with offline/static analysis approach
+- pylate-rs for LateOn-Code-edge: projection head missing, dimension mismatch
+
 ## Version History
 
 - **0.7.5** - ColBERT late-interaction search backend
@@ -594,14 +617,14 @@ The agent workflow eval tests real token savings for code modification tasks (no
   - New optional dep group: `[semantic-colbert]` for pylate
   - `embeddings.py` and `vector_store.py` are now backward-compat shims
 
-- **0.6.2** - Ashpool sync automation, plugin effectiveness improvements
+- **0.6.2** - interbench sync automation, plugin effectiveness improvements
   - Added `tldrs manifest` — machine-readable JSON of all eval-relevant capabilities
-  - Added `/tldrs-ashpool-sync` skill for guided Ashpool eval coverage sync
-  - Added `check_tldrs_sync.py` sync check script (reads manifest, reports gaps in 4 Ashpool files)
+  - Added `/tldrs-interbench-sync` skill for guided interbench eval coverage sync
+  - Added `check_tldrs_sync.py` sync check script (reads manifest, reports gaps in 4 interbench files)
   - Broadened skill triggers to match more task types (debug, refactor, tests, migrate)
   - Added Grep `PreToolUse` hook (same suggest-recon as Read hook) — later removed (v0.5+)
   - Setup hook now emits usage guidance for any repo
-  - `bump-version.sh` warns if Ashpool coverage has gaps
+  - `bump-version.sh` warns if interbench coverage has gaps
 
 - **0.6.1** - Delta engine extraction, parser caching
   - Extracted delta-mode orchestration from `cli.py` into `engines/delta.py`
