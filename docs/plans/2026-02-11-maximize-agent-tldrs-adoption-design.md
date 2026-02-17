@@ -216,7 +216,7 @@ After these changes, the plugin has **6 skills** (same count, all rewritten):
 | 3 | `tldrs-understand-symbol` | Understanding a function/class, before editing | Rewritten (+ before-edit branch) |
 | 4 | `tldrs-explore-file` | Analyzing a file | Rewritten |
 | 5 | `tldrs-map-codebase` | Understanding project architecture | Rewritten |
-| 6 | `tldrs-ashpool-sync` | Syncing eval coverage | Unchanged |
+| 6 | `tldrs-interbench-sync` | Syncing eval coverage | Unchanged |
 
 ## Hooks Summary
 

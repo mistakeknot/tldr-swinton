@@ -24,7 +24,7 @@ These skills were retired in a previous commit (ae23075: "refactor: retire 3 ski
 Remaining skills (3 orchestration-only):
 - `tldrs-session-start` — session initialization
 - `tldrs-map-codebase` — architecture exploration
-- `tldrs-ashpool-sync` — eval coverage sync
+- `tldrs-interbench-sync` — eval coverage sync
 
 ### 3. Updated AGENTS.md: Fixed Hooks Description
 

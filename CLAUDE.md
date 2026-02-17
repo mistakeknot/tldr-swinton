@@ -29,7 +29,7 @@ This project is available as a Claude Code plugin from the [interagency-marketpl
 **Autonomous skills** (Claude invokes these automatically):
 - `tldrs-session-start` - Runs diff-context before reading files (any coding task)
 - `tldrs-map-codebase` - Understand architecture, explore unfamiliar projects
-- `tldrs-ashpool-sync` - Sync Ashpool eval coverage with tldrs capabilities
+- `tldrs-interbench-sync` - Sync interbench eval coverage with tldrs capabilities
 
 **MCP tools** (direct tool calls, replace retired skills):
 - `tldr-code` MCP server provides `find`, `context`, `impact`, `cfg`, `dfg`, `extract`, `structural` etc. as native tools
@@ -69,7 +69,7 @@ Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../inte
 └── skills/              # 3 orchestration skills (Claude-invoked)
     ├── tldrs-session-start/
     ├── tldrs-map-codebase/
-    └── tldrs-ashpool-sync/
+    └── tldrs-interbench-sync/
 ```
 
 **Version sync:** All three locations must match: `pyproject.toml`, `.claude-plugin/plugin.json`, and `interagency-marketplace/.claude-plugin/marketplace.json`. Always bump all three together.
@@ -80,4 +80,4 @@ Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../inte
 
 ## Claude Code-Specific Notes
 
-**After adding formats/flags:** Run `tldrs manifest | python3 ../Ashpool/scripts/check_tldrs_sync.py` to detect gaps, then use `/tldrs-ashpool-sync` to fix them. Also update `../Ashpool` manually if needed. See AGENTS.md "Related Projects".
+**After adding formats/flags:** Run `tldrs manifest | python3 /root/projects/Interverse/infra/interbench/scripts/check_tldrs_sync.py` to detect gaps, then use `/tldrs-interbench-sync` to fix them. Also update `/root/projects/Interverse/infra/interbench` manually if needed. See AGENTS.md "Related Projects".

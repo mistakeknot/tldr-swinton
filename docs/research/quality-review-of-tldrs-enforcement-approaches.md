@@ -96,7 +96,7 @@ verify_coherence, diff_context, structural_search, distill, hotspots, status
 **What's Good:**
 - **Decision trees not rules:** Skills lay out "if-this-then-that" workflows, not "never do X" prohibitions
 - **Concrete examples:** Every branch shows the exact command to run
-- **Well-scoped triggers:** Session-start, map-codebase, ashpool-sync each have clear trigger conditions
+- **Well-scoped triggers:** Session-start, map-codebase, interbench-sync each have clear trigger conditions
 - **No duplication with hooks:** Skills correctly focus on strategy (which workflow?) not tactics (run extract before read)
 
 **What's Missing:**
@@ -159,7 +159,7 @@ verify_coherence, diff_context, structural_search, distill, hotspots, status
    - ❌ "You must run tldrs extract before Read" → triggers agent refusal ("I don't have permission to refuse user requests")
    - ✅ "For files >300 lines: `tldrs extract <file>` provides structure at 85% token savings vs raw Read. Use extract first unless user explicitly requests full file content."
 
-3. **Testing adherence:** No programmatic way to verify rule-following short of running evals with real agents. The project has Ashpool for eval infrastructure, but eval coverage is for tldrs OUTPUT quality, not agent adherence to usage rules.
+3. **Testing adherence:** No programmatic way to verify rule-following short of running evals with real agents. The project has interbench for eval infrastructure, but eval coverage is for tldrs OUTPUT quality, not agent adherence to usage rules.
 
 4. **Conflict with existing habits:** Agents have strong priors from training — "Read the file, then analyze it" is a deeply ingrained pattern. Rules that contradict trained behavior need STRONG justification in the rule text ("this saves 10,000 tokens" not "this is better").
 
@@ -186,7 +186,7 @@ verify_coherence, diff_context, structural_search, distill, hotspots, status
 
 3. **Debugging complexity:** When something doesn't work, is it because (a) the rule wasn't followed, (b) the hook didn't fire, (c) the dedup flag prevented the operation, or (d) the tldrs command itself errored? Multiple layers = multiple failure modes.
 
-4. **Maintenance burden:** Every new tldrs command or preset needs updates in BOTH CLAUDE.md rules AND hook logic. The project already has 4 files to sync for Ashpool (regression_suite.json, ab_formats.py, demo-tldrs.sh, score_tokens.py) — adding CLAUDE.md + hooks as a 5th and 6th sync target increases maintenance load.
+4. **Maintenance burden:** Every new tldrs command or preset needs updates in BOTH CLAUDE.md rules AND hook logic. The project already has 4 files to sync for interbench (regression_suite.json, ab_formats.py, demo-tldrs.sh, score_tokens.py) — adding CLAUDE.md + hooks as a 5th and 6th sync target increases maintenance load.
 
 **Quality Assessment:**
 - **Correctness:** Could work with careful coordination, but complex
@@ -247,7 +247,7 @@ verify_coherence, diff_context, structural_search, distill, hotspots, status
    - ❌ "Get context for a symbol" → tells agent WHAT but not WHEN or WHY
    - ✅ "Get call graph context around a symbol. Costs ~500 tokens vs ~15000 for reading the file. Use BEFORE editing to see callers." → tells WHAT, WHEN, WHY, and COST
 
-4. **Testing tool descriptions:** The MCP tool descriptions are visible to agents via `tools/list` but the project has no eval for "does agent pick the right tool?" Ashpool evals test OUTPUT quality, not SELECTION quality.
+4. **Testing tool descriptions:** The MCP tool descriptions are visible to agents via `tools/list` but the project has no eval for "does agent pick the right tool?" interbench evals test OUTPUT quality, not SELECTION quality.
 
 **Quality Assessment:**
 - **Correctness:** Consolidation reduces surface area, fewer edge cases
@@ -259,7 +259,7 @@ verify_coherence, diff_context, structural_search, distill, hotspots, status
 1. Consolidate 24 tools → 6-7 core tools with flags
 2. Rewrite descriptions to include cost estimates and usage guidance
 3. Add `buildInstructions()` hook (like qmd) to inject dynamic project state (index status, available presets, session-id recommendation)
-4. Run Ashpool evals with "selection quality" metrics — track which tools agents choose for different task types
+4. Run interbench evals with "selection quality" metrics — track which tools agents choose for different task types
 
 ## Quality Questions Answered
 
@@ -289,7 +289,7 @@ Could it be improved? Yes, by writing hooks in pure Python with `#!/usr/bin/env 
 
 **Answer:** Currently **no automated tests for hook/skill effectiveness**. The project has:
 - Unit tests for ContextPack JSON serialization (`tests/test_mcp_contextpack_json.py`)
-- Ashpool evals for output quality (token efficiency, correctness)
+- interbench evals for output quality (token efficiency, correctness)
 - Manual testing of hook firing via `/tmp/tldrs-*` flag files
 
 What's missing:
@@ -298,7 +298,7 @@ What's missing:
 - Evals for "does agent use presets vs bare flags?"
 
 How to add these:
-1. Extend Ashpool to capture tool selection traces (which tools did the agent call?)
+1. Extend interbench to capture tool selection traces (which tools did the agent call?)
 2. Define "correct" tool selection for benchmark tasks (e.g., "diff review should use diff-context not raw Read")
 3. Score agents on selection correctness, not just output correctness
 
@@ -345,7 +345,7 @@ Better naming:
 
 The project tests:
 1. MCP ContextPack JSON serialization (unit test)
-2. Output quality and token efficiency (Ashpool evals)
+2. Output quality and token efficiency (interbench evals)
 3. Hook firing via flag file inspection (manual)
 
 Missing:
@@ -357,7 +357,7 @@ Missing:
 
 **Tier 1: Selection Quality Evals (High Value)**
 
-Add to Ashpool:
+Add to interbench:
 ```json
 {
   "eval_type": "selection_correctness",
@@ -433,7 +433,7 @@ Only pursue if Tier 1 shows low selection quality. Would require:
    - Test phrasing for adherence ("this saves N tokens" framing)
    - Estimated effort: 2-3 hours
 
-3. **Ashpool Selection Quality Evals**
+3. **interbench Selection Quality Evals**
    - Add 5-10 benchmark tasks with correct tool selection as ground truth
    - Track tool usage patterns across eval runs
    - Estimated effort: 6-8 hours

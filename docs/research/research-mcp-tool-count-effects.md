@@ -447,7 +447,7 @@ Claude sees cost/benefit **every turn**, not once at session start.
 
 ### DO: Measure Tool Selection, Not Just Output Quality
 
-Add Ashpool evals for:
+Add interbench evals for:
 - "Did agent use extract before Read for large files?"
 - "Did agent use diff-context for diffs?"
 - "Did agent use context before editing?"

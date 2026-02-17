@@ -201,12 +201,12 @@ This means Claude Code receives `{"status": "ok", "result": { ... actual data ..
 
 **No significant waste found.** This is a model of how skill instructions should be written.
 
-### 3.3 tldrs-ashpool-sync (112 lines, 3,330 bytes, ~832 tokens)
+### 3.3 tldrs-interbench-sync (112 lines, 3,330 bytes, ~832 tokens)
 
 **Assessment**: This skill has the most detailed instructions because it orchestrates edits across 4 files in a separate repo. The detail is justified.
 
 **Waste found**:
-- **Lines 43-82**: The pattern examples for each Ashpool file (regression_suite.json, ab_formats.py, demo-tldrs.sh, score_tokens.py) consume ~40 lines (~350 tokens). These are essential for correctness -- the patterns must be followed exactly. However, this skill is invoked rarely (only after adding new tldrs capabilities), so the per-session cost is zero unless explicitly triggered.
+- **Lines 43-82**: The pattern examples for each interbench file (regression_suite.json, ab_formats.py, demo-tldrs.sh, score_tokens.py) consume ~40 lines (~350 tokens). These are essential for correctness -- the patterns must be followed exactly. However, this skill is invoked rarely (only after adding new tldrs capabilities), so the per-session cost is zero unless explicitly triggered.
 
 **Overall**: No changes needed. This skill is appropriately detailed for its complexity.
 
@@ -217,7 +217,7 @@ All 3 skills: **7,060 bytes (~1,765 tokens)** loaded into Claude Code's skill re
 Claude Code loads skill descriptions (the YAML front matter) into context at session start. The full SKILL.md body is only loaded when the skill is invoked. So the per-session overhead is:
 - session-start description: ~50 tokens (long description, line 3)
 - map-codebase description: ~40 tokens
-- ashpool-sync description: ~25 tokens
+- interbench-sync description: ~25 tokens
 - **Total per-session skill description overhead: ~115 tokens**
 
 This is acceptable.
@@ -348,6 +348,6 @@ This stale description costs ~40 tokens but, more importantly, gives Claude Code
 | Plugin Manifest | `.claude-plugin/plugin.json` | Plugin metadata, MCP server config |
 | Session-Start Skill | `.claude-plugin/skills/tldrs-session-start/SKILL.md` | Diff-first workflow instructions |
 | Map-Codebase Skill | `.claude-plugin/skills/tldrs-map-codebase/SKILL.md` | Architecture exploration instructions |
-| Ashpool-Sync Skill | `.claude-plugin/skills/tldrs-ashpool-sync/SKILL.md` | Eval coverage sync instructions |
+| interbench-Sync Skill | `.claude-plugin/skills/tldrs-interbench-sync/SKILL.md` | Eval coverage sync instructions |
 | Commands | `.claude-plugin/commands/*.md` | 6 slash command templates |
 | AGENTS.md | `AGENTS.md` | Shared agent documentation (has stale entries) |

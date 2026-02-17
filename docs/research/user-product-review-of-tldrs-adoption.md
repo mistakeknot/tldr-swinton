@@ -195,7 +195,7 @@ This is fundamentally a **product adoption problem** disguised as a technical co
 - Power users: No forced latency on non-coding tasks
 
 **Current Implementation Status:**
-- ✅ Skills exist: `tldrs-session-start`, `tldrs-map-codebase`, `tldrs-ashpool-sync`
+- ✅ Skills exist: `tldrs-session-start`, `tldrs-map-codebase`, `tldrs-interbench-sync`
 - ✅ Trigger patterns are broad: "fix bugs, debug, implement features, refactor, write tests..."
 - ❓ Unknown: Are skills actually triggering in real sessions?
 
@@ -233,7 +233,7 @@ This is fundamentally a **product adoption problem** disguised as a technical co
 **Current Tool Count:**
 - 24 MCP tools (listed above)
 - 6 slash commands (`/tldrs-find`, `/tldrs-diff`, `/tldrs-context`, `/tldrs-structural`, `/tldrs-quickstart`, `/tldrs-extract`)
-- 3 skills (session-start, map-codebase, ashpool-sync)
+- 3 skills (session-start, map-codebase, interbench-sync)
 
 **80/20 Analysis — Which Tools Deliver Most Value?**
 

@@ -49,7 +49,7 @@ Extract the paper's core insight (block segmentation + knapsack) but replace LM 
 
 - **Low risk**: Pure Python, no new deps, uses existing tree-sitter
 - **Medium confidence**: Block boundaries from AST are less precise than LM perplexity, but free
-- **Validation path**: Compare compressed output quality against L2 and L4 on Ashpool evals
+- **Validation path**: Compare compressed output quality against L2 and L4 on interbench evals
 
 ## Open Questions
 

@@ -1,7 +1,7 @@
 """
 Machine-readable manifest of tldrs capabilities.
 
-Used by Ashpool sync tooling to detect when eval coverage drifts
+Used by interbench sync tooling to detect when eval coverage drifts
 behind the CLI's actual formats, flags, and commands.
 
 Usage:
@@ -16,7 +16,7 @@ from typing import Any
 
 from . import __version__
 
-# Commands that matter for Ashpool evaluation.
+# Commands that matter for interbench evaluation.
 # Internal/utility commands (tree, warm, daemon, etc.) are excluded.
 _EVAL_COMMANDS = frozenset({
     "context",

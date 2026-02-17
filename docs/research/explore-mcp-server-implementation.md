@@ -378,7 +378,7 @@ SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null) || exit 0
 
 1. **tldrs-session-start** — Diff-focused reconnaissance before reading files
 2. **tldrs-map-codebase** — Architecture exploration for unfamiliar projects
-3. **tldrs-ashpool-sync** — Sync eval coverage with tldrs capabilities
+3. **tldrs-interbench-sync** — Sync eval coverage with tldrs capabilities
 
 ### 7.2 Session-Start Skill Pattern
 

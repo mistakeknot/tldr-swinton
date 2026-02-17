@@ -37,7 +37,7 @@ The solution: Accept that Claude Code won't reliably auto-invoke tools, and inst
 **Skills** (3 orchestration skills):
 - `tldrs-session-start`: "BEFORE reading any code files" (lines 10, 45, 65)
 - `tldrs-map-codebase`: Explore unfamiliar projects
-- `tldrs-ashpool-sync`: Internal tool sync
+- `tldrs-interbench-sync`: Internal tool sync
 
 **Hooks** (3 hooks):
 - Setup: Session start briefing + prebuild cache
@@ -302,7 +302,7 @@ Large MCP surfaces work when there's a **clear primary UX** (GitHub UI, file man
 
 3. **Retire `tldrs-session-start` and `tldrs-map-codebase` skills**:
    - Replace with Setup hook tip (above)
-   - Keep `tldrs-ashpool-sync` (internal tool, different purpose)
+   - Keep `tldrs-interbench-sync` (internal tool, different purpose)
 
 4. **Update CLAUDE.md** to remove imperatives:
    - Before: "BEFORE reading any code files, you MUST run tldrs"

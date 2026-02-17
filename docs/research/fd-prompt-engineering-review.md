@@ -14,7 +14,7 @@ The tldr-swinton plugin's total prompt injection footprint is **~6,040 tokens** 
 2. **Command markdown duplicates MCP tool descriptions** (~350 tokens of pure redundancy)
 3. **Setup hook outputs dynamic content** that overlaps with the `tldrs-session-start` skill (~200-400 tokens of per-session waste)
 4. **Legacy suggest-recon.sh** is unreferenced but still on disk (524 tokens of dead code)
-5. **Ashpool sync skill** is the largest single file at ~950 tokens and could be ~30% shorter
+5. **interbench sync skill** is the largest single file at ~950 tokens and could be ~30% shorter
 
 **Total estimated recoverable tokens: ~800-1,200 per session** from prompt injection, plus ~200-400 per session from setup hook output reduction.
 
@@ -68,7 +68,7 @@ The tldr-swinton plugin's total prompt injection footprint is **~6,040 tokens** 
 
 ---
 
-### File: `.claude-plugin/skills/tldrs-ashpool-sync/SKILL.md`
+### File: `.claude-plugin/skills/tldrs-interbench-sync/SKILL.md`
 - **Size:** 3,324 chars / ~950 tokens
 - **Assessment: Largest skill. Contains template patterns that may be overtrained.**
 
@@ -97,7 +97,7 @@ The tldr-swinton plugin's total prompt injection footprint is **~6,040 tokens** 
 |-------|--------------|----------------|---------|
 | session-start | ~610 | ~100 | 16% |
 | map-codebase | ~448 | ~55 | 12% |
-| ashpool-sync | ~950 | ~230 | 24% |
+| interbench-sync | ~950 | ~230 | 24% |
 | **Total** | **~2,008** | **~385** | **19%** |
 
 ---
@@ -259,7 +259,7 @@ This would reduce setup hook output from 500-2000 tokens to ~30-50 tokens, and e
 | "Fix this bug in auth.py" | session-start | No overlap |
 | "What does this codebase do?" | session-start + map-codebase | **YES — both fire** |
 | "Explore this repo structure" | map-codebase | No overlap |
-| "Sync Ashpool coverage" | ashpool-sync | No overlap |
+| "Sync interbench coverage" | interbench-sync | No overlap |
 
 **Overlap case: "understand/explore/onboard" tasks trigger both session-start and map-codebase.**
 
@@ -369,7 +369,7 @@ The skill mentions `tldrs impact`, `tldrs find`, `tldrs context`, `tldrs distill
 | `tldrs-understand-symbol` | Understanding how a function/class works, its callers, dependencies |
 | `tldrs-explore-file` | Debugging a function, tracing control/data flow, analyzing file structure |
 | `tldrs-map-codebase` | Understanding architecture, exploring unfamiliar projects, onboarding |
-| `tldrs-ashpool-sync` | Syncing Ashpool eval coverage after tldrs capability changes |
+| `tldrs-interbench-sync` | Syncing interbench eval coverage after tldrs capability changes |
 ```
 
 The skills `tldrs-find-code`, `tldrs-understand-symbol`, and `tldrs-explore-file` were retired (replaced by MCP tools, per MEMORY.md and commit ae23075). But AGENTS.md still lists them. This is not token waste in the plugin, but it is **misleading documentation** that could confuse agents reading AGENTS.md.
@@ -406,9 +406,9 @@ Remove the diff-context and structure execution (lines 51-63). Keep only:
 
 This is the single highest-impact change. It eliminates duplicate diff-context runs and reduces setup output from ~1000 tokens to ~50 tokens.
 
-### Priority 2: Trim Ashpool Sync Skill Templates (~230 token savings)
+### Priority 2: Trim interbench Sync Skill Templates (~230 token savings)
 
-**File:** `.claude-plugin/skills/tldrs-ashpool-sync/SKILL.md`
+**File:** `.claude-plugin/skills/tldrs-interbench-sync/SKILL.md`
 
 Replace full template blocks (Steps 4a-4d) with one-line descriptions. The skill already instructs Claude to read all 4 target files, so it will see the actual patterns.
 

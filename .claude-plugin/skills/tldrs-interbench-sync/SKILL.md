@@ -1,15 +1,15 @@
 ---
-name: tldrs-ashpool-sync
-description: "Sync Ashpool eval coverage with tldrs capabilities. Run when tldrs gains new formats, flags, or commands. Reads the tldrs manifest as ground truth and generates minimal targeted edits to 4 Ashpool files."
+name: tldrs-interbench-sync
+description: "Sync interbench eval coverage with tldrs capabilities. Run when tldrs gains new formats, flags, or commands. Reads the tldrs manifest as ground truth and generates minimal targeted edits to 4 interbench files."
 allowed-tools:
   - Bash
   - Read
   - Edit
 ---
 
-# Ashpool Sync Protocol
+# interbench Sync Protocol
 
-Sync Ashpool's eval coverage with the current tldrs capabilities.
+Sync interbench's eval coverage with the current tldrs capabilities.
 
 ## Step 1: Get ground truth
 
@@ -22,20 +22,20 @@ Save this output — it is the single source of truth for all tldrs capabilities
 ## Step 2: Run gap detection
 
 ```bash
-tldrs manifest | python3 /root/projects/Ashpool/scripts/check_tldrs_sync.py
+tldrs manifest | python3 /root/projects/Interverse/infra/interbench/scripts/check_tldrs_sync.py
 ```
 
-If exit 0: report "Ashpool is in sync" and stop.
+If exit 0: report "interbench is in sync" and stop.
 If exit 1: continue with the gaps listed.
 
 ## Step 3: Read target files
 
 Read ALL 4 files to understand existing patterns before editing:
 
-- `/root/projects/Ashpool/scripts/regression_suite.json`
-- `/root/projects/Ashpool/scripts/ab_formats.py`
-- `/root/projects/Ashpool/demo-tldrs.sh`
-- `/root/projects/Ashpool/scripts/score_tokens.py`
+- `/root/projects/Interverse/infra/interbench/scripts/regression_suite.json`
+- `/root/projects/Interverse/infra/interbench/scripts/ab_formats.py`
+- `/root/projects/Interverse/infra/interbench/demo-tldrs.sh`
+- `/root/projects/Interverse/infra/interbench/scripts/score_tokens.py`
 
 ## Step 4: Generate edits for each gap
 
@@ -99,7 +99,7 @@ Only add parsers for formats listed in `scoring_hints` that have non-empty `metr
 After all edits, re-run the sync check:
 
 ```bash
-tldrs manifest | python3 /root/projects/Ashpool/scripts/check_tldrs_sync.py
+tldrs manifest | python3 /root/projects/Interverse/infra/interbench/scripts/check_tldrs_sync.py
 ```
 
 Report the result. Exit 0 means all gaps are covered.

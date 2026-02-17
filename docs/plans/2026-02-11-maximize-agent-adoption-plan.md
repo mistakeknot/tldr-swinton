@@ -396,7 +396,7 @@ Part of: tldr-swinton-p9b"
 - Modify: `.claude-plugin/skills/tldrs-understand-symbol/SKILL.md`
 - Modify: `.claude-plugin/skills/tldrs-explore-file/SKILL.md`
 - Modify: `.claude-plugin/skills/tldrs-map-codebase/SKILL.md`
-- No change: `.claude-plugin/skills/tldrs-ashpool-sync/SKILL.md`
+- No change: `.claude-plugin/skills/tldrs-interbench-sync/SKILL.md`
 
 **Principle:** Skills handle session-level strategy only. No per-file rules (hooks handle those). All presets referenced as `compact`/`minimal`/`multi-turn`.
 

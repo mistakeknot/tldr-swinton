@@ -61,60 +61,30 @@ Recent work (2026-01 to 2026-02) focused on:
 ## P2.1 — Deep integration with Clavain (`iv-spad`)  
 **Status:** planning / active alignment
 
-This is the highest-impact next step and aligns with the Clavain P2.1 thread.
-
-What to ship:
-
-- Make tldr-swinton the default low-cost context source for Clavain stages that
-  touch code.
-- Add explicit "start here" integration in Clavain workflows:
-  diff review, symbol edits, and research tasks.
-- Track context handoff metadata so Clavain can reason about which retrieval mode was
-  used and why.
-
-### Deliverables
-
-- Dedicated integration map between Clavain work stages and tldr-swinton entrypoints.
-- End-to-end handoff contract for `diff-context` + `context` + `delegate`.
-- Validation against P2.1 success criteria in Clavain workflows.
+- [TSW-N1] **Default low-cost code context source** — wire tldr-swinton into code-reading-heavy Clavain stages.
+- [TSW-N2] **Clavain stage integration map** — add explicit entrypoint guidance for diff review and edits.
+- [TSW-N3] **Context handoff metadata** — capture and expose retrieval mode and rationale.
+- [TSW-N4] **Integration validation** — validate Clavain workflows against P2.1 success criteria.
 
 ## P2.2 — Closer parity with Clavain roadmap beads
 
-### `iv-ca5` — truncation should respect symbol boundaries
-
-Improve truncation defaults and preview behavior so symbol-centric contexts preserve
-boundary integrity.
-
-### `iv-dsk` — ultracompact needs `--depth=body` variant
-
-Add and validate deeper control over `ultracompact` body extraction depth to match
-editing context needs.
-
-### `iv-19m` — `slice` with source code option
-
-Extend slice payloads with optional source inclusion and better line-range summaries
-for agents needing exact edit surfaces.
-
-### `iv-72c` — cache-friendly format in demo and docs
-
-Add `cache-friendly` formatting and demo coverage so `tldr` runs can be reused across
-repetitive sessions with predictable cost curves.
+- [TSW-N5] **Symbol-boundary truncation safety** — make truncation defaults preserve symbol boundaries.
+- [TSW-N6] **`ultracompact` body depth control** — add `--depth=body` option for edit-focused summaries.
+- [TSW-N7] **Source-aware slice mode** — include optional source snippets and better range summaries.
+- [TSW-N8] **Cache-friendly run format** — add serialized outputs for repeated session reuse.
 
 ## P2.3 — Reliability and adoption polish
 
-- Simplify the largest agent adoption gaps:
-  clearer escalation ladder, stronger cost hints in tool descriptions,
-  fewer false starts for retrieval mode selection.
-- Expand `tldrs-interbench-sync` checks for new MCP-first usage signals.
-- Continue bug-class mitigation from solutions docs (`workflow-issues/` and
-  `performance-issues/`).
+- [TSW-N9] **Adoption friction reduction** — clarify escalation ladders and cost hints in tool text.
+- [TSW-N10] **MCP usage telemetry** — expand usage checks for first-party agent loops.
+- [TSW-N11] **Bug-class mitigation loop** — keep solutions docs feedback in sync with releases.
 
-## P3 — Scale and hardening
+## P2 — Scale and hardening
 
-- Expand long-context persistence and rehydration patterns.
-- Improve query planning for mixed modes (`semantic` vs `structural_search`).
-- Expand benchmark surfaces for multi-file refactor and architecture-risk tasks.
-- Reduce latency regressions under large workspaces and high-frequency agent loops.
+- [TSW-P1] **Long-context persistence** — persist + rehydrate context across iterative sessions.
+- [TSW-P2] **Mixed-mode planner** — improve query routing between semantic and structural paths.
+- [TSW-P3] **Architecture-risk benchmarks** — expand multi-file benchmarks beyond refactor workflows.
+- [TSW-P4] **Latency-control envelopes** — guard against regressions under high-frequency loops.
 
 ## Progress gates
 
@@ -124,5 +94,11 @@ repetitive sessions with predictable cost curves.
   validations.
 - **Gate 3 (P2.3):** selection-quality metrics show fewer raw-read fallbacks in
   real sessions.
-- **Gate 4 (P3):** no regression in token savings and no drop in semantic retrieval
+- **Gate 4 (P2):** no regression in token savings and no drop in semantic retrieval
   quality.
+
+## From Interverse Roadmap
+
+Items from the [Interverse roadmap](../../../docs/roadmap.json) that involve this module:
+
+No monorepo-level items currently reference this module.
