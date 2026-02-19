@@ -20,7 +20,7 @@
   "skills": [
     "./.claude-plugin/skills/tldrs-session-start",
     "./.claude-plugin/skills/tldrs-map-codebase",
-    "./.claude-plugin/skills/tldrs-ashpool-sync",
+    "./.claude-plugin/skills/tldrs-interbench-sync",
     "./.claude-plugin/skills/finding-duplicate-functions"
   ],
   "commands": [
