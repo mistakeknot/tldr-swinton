@@ -83,3 +83,7 @@ logs/
 .remote-source
 .serena/
 .workbench/
+
+# Runtime audit logs and flags
+.claude/*-audit.log
+.claude/*-toggle.flag
