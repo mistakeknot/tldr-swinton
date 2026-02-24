@@ -24,7 +24,7 @@ Example OpenHands LLM config:
 
 Use `claude:default` to route to the Claude Code CLI.
 
-## Module Guidance (Frontier Runs)
+## Module guidance (Frontier runs)
 
 When the agent needs context, prefer these tools in order:
 
@@ -49,7 +49,7 @@ tldrs cfg <file> <function>
 tldrs dfg <file> <function>
 ```
 
-## VHS Output (Optional)
+## VHS output (Optional)
 
 If `tldrs-vhs` is installed, you can store large outputs as `vhs://` refs:
 

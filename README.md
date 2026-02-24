@@ -12,9 +12,9 @@ Token-efficient code analysis platform for LLMs and AI agents.
 | Understand call chains and data flow | Token budgets to control cost | Diff-focused context for recent changes |
 | Find dead code and architectural layers | Session tracking for multi-turn work | 5-layer analysis: AST → Call Graph → CFG → DFG → PDG |
 
-tldrs isn't just extraction — it's full static analysis (control flow, data flow, program slicing), semantic search (embeddings + BM25 hybrid), and session-aware artifact storage, all designed to produce the smallest context an LLM needs to do its job.
+tldrs isn't just extraction: it's full static analysis (control flow, data flow, program slicing), semantic search (embeddings + BM25 hybrid), and session-aware artifact storage, all designed to produce the smallest context an LLM needs to do its job.
 
-## Quick Start
+## Quick start
 
 ### Install
 
@@ -30,7 +30,7 @@ git clone https://github.com/mistakeknot/tldr-swinton
 cd tldr-swinton && uv sync --extra semantic-ollama
 ```
 
-### Try It
+### Try it
 
 ```bash
 tldrs structure src/              # Code structure (functions, classes, imports)
@@ -63,19 +63,19 @@ Get oriented in a codebase or understand recent changes.
 | `search` | Regex pattern search across files |
 | `quickstart` | Quick reference guide for AI agents |
 
-### Structure & Extraction
+### Structure & extraction
 
 Understand file and project organization.
 
 | Command | Description |
 |---------|-------------|
-| `structure` | Code structure — functions, classes, imports (codemaps) |
+| `structure` | Code structure: functions, classes, imports (codemaps) |
 | `extract` | Full file analysis as JSON |
 | `tree` | File tree |
 | `imports` | Parse imports from a source file |
-| `importers` | Reverse import lookup — find all files importing a module |
+| `importers` | Reverse import lookup: find all files importing a module |
 
-### Deep Analysis
+### Deep analysis
 
 Static analysis beyond surface-level extraction.
 
@@ -83,9 +83,9 @@ Static analysis beyond surface-level extraction.
 |---------|-------------|
 | `cfg` | Control flow graph for a function |
 | `dfg` | Data flow graph for a function |
-| `slice` | Program slice — what affects a specific line |
+| `slice` | Program slice: what affects a specific line |
 | `calls` | Cross-file call graph |
-| `impact` | Reverse call graph — find all callers of a function |
+| `impact` | Reverse call graph: find all callers of a function |
 | `dead` | Find unreachable (dead) code |
 | `arch` | Detect architectural layers from call patterns |
 | `change-impact` | Find tests affected by changed files |
@@ -93,9 +93,9 @@ Static analysis beyond surface-level extraction.
 | `distill` | Compress context for sub-agent consumption |
 | `hotspots` | Most frequently used symbols across sessions |
 
-### Semantic Search
+### Semantic search
 
-Embedding-based search — find code by meaning, not keywords.
+Embedding-based search: find code by meaning, not keywords.
 
 | Command | Description |
 |---------|-------------|
@@ -116,19 +116,19 @@ Daemon, caching, and health checks.
 | `presets` | List flag presets and their expansions |
 | `manifest` | Machine-readable JSON of all tldrs capabilities |
 
-### Artifact Storage
+### Artifact storage
 
 Persistent storage for agent workflows.
 
 | Command | Description | Subcommands |
 |---------|-------------|-------------|
 | `vhs` | Content-addressed store for tool outputs | 9 (`put`, `get`, `cat`, `has`, `info`, `rm`, `ls`, `stats`, `gc`) |
-| `wb` | Agent workbench — capsules, decisions, hypotheses | 18 (`capture`, `show`, `decide`, `hypothesis`, `link`, ...) |
+| `wb` | Agent workbench: capsules, decisions, hypotheses | 18 (`capture`, `show`, `decide`, `hypothesis`, `link`, ...) |
 | `bench` | Benchmarking harness for agent improvements | 4 (`run`, `list`, `report`, `compare`) |
 
-## Agent Integration
+## Agent integration
 
-### Claude Code Plugin
+### Claude code plugin
 
 ```bash
 /plugin marketplace add mistakeknot/interagency-marketplace
@@ -137,14 +137,14 @@ Persistent storage for agent workflows.
 
 Adds 6 slash commands (`/tldrs-find`, `/tldrs-diff`, `/tldrs-context`, `/tldrs-structural`, `/tldrs-quickstart`, `/tldrs-extract`) and 6 autonomous skills that fire before Read/Grep to suggest better reconnaissance.
 
-### MCP Server
+### MCP server
 
 ```bash
 uv pip install mcp
 tldr-mcp --project /path/to/project
 ```
 
-Exposes tldrs commands as MCP tools — 1:1 mapping with the CLI. Add to your MCP config:
+Exposes tldrs commands as MCP tools: 1:1 mapping with the CLI. Add to your MCP config:
 
 ```json
 {
@@ -157,7 +157,7 @@ Exposes tldrs commands as MCP tools — 1:1 mapping with the CLI. Add to your MC
 }
 ```
 
-### Generic CLI (Any Agent)
+### Generic CLI (Any agent)
 
 Any agent with shell access can call `tldrs` directly:
 
@@ -191,7 +191,7 @@ uv run python evals/agent_workflow_eval.py --compress chunk-summary
 
 See [docs/token-savings-summary.md](docs/token-savings-summary.md) for full methodology and per-task breakdown.
 
-## Language Support
+## Language support
 
 | Tier | Languages | Install |
 |------|-----------|---------|
@@ -223,15 +223,15 @@ All languages use tree-sitter for parsing (Python also supports native AST). Lan
   AST → Call Graph → CFG → DFG → PDG
 ```
 
-- **Extraction** — Tree-sitter + Python AST parsing → signatures, types, classes, imports
-- **Search** — Semantic embeddings (Ollama/sentence-transformers) + BM25 hybrid with RRF fusion
-- **Static Analysis** — Control flow, data flow, program slicing, call graphs, dead code detection
-- **Engines** — SymbolKite (call-graph context) and DiffLens (diff-focused context) produce `ContextPack` objects
-- **Artifacts** — VHS (content-addressed output store), Workbench (agent reasoning), Bench (evals)
+- **Extraction**: Tree-sitter + Python AST parsing → signatures, types, classes, imports
+- **Search**: Semantic embeddings (Ollama/sentence-transformers) + BM25 hybrid with RRF fusion
+- **Static Analysis**: Control flow, data flow, program slicing, call graphs, dead code detection
+- **Engines**: SymbolKite (call-graph context) and DiffLens (diff-focused context) produce `ContextPack` objects
+- **Artifacts**: VHS (content-addressed output store), Workbench (agent reasoning), Bench (evals)
 
-## Installation Details
+## Installation details
 
-### Optional Dependencies
+### Optional dependencies
 
 | Group | What It Adds | Install |
 |-------|-------------|---------|
@@ -241,7 +241,7 @@ All languages use tree-sitter for parsing (Python also supports native AST). Lan
 | `all` | Additional tree-sitter grammars (6 languages) | `uv pip install tldr-swinton[all]` |
 | `test` | pytest | `uv pip install tldr-swinton[test]` |
 
-### Ollama Setup (Recommended for Semantic Search)
+### Ollama setup (Recommended for semantic search)
 
 ```bash
 # Install Ollama: https://ollama.ai
@@ -265,7 +265,7 @@ curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldr-swinton/main/scrip
 
 Removes installation directory, shell alias, and pip packages. Project indexes (`.tldrs/` directories) are preserved.
 
-## Output Formats & Presets
+## Output formats & presets
 
 **Presets** expand to multiple flags for common workflows:
 
@@ -281,10 +281,10 @@ Usage: `tldrs context main --project . --preset compact`
 
 ## Links
 
-- [Quick Reference](docs/QUICKSTART.md) — One-page agent guide
-- [Agent Workflow](docs/agent-workflow.md) — Full integration guide
-- [Token Savings](docs/token-savings-summary.md) — Detailed benchmark methodology
-- [AGENTS.md](AGENTS.md) — Architecture, commands, and development guide
+- [Quick Reference](docs/QUICKSTART.md): One-page agent guide
+- [Agent Workflow](docs/agent-workflow.md): Full integration guide
+- [Token Savings](docs/token-savings-summary.md): Detailed benchmark methodology
+- [AGENTS.md](AGENTS.md): Architecture, commands, and development guide
 
 ## Credits
 

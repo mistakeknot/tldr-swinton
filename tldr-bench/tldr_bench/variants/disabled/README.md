@@ -2,7 +2,7 @@
 
 These variants are disabled because they cannot demonstrate value in static token-counting benchmarks.
 
-## Why Disabled
+## Why disabled
 
 | Variant | Issue | Required Benchmark Type |
 |---------|-------|------------------------|
@@ -19,7 +19,7 @@ To re-enable a variant:
 3. Add to `variants/__init__.py` VARIANTS dict
 4. Add benchmark tasks to appropriate YAML
 
-## Required Benchmark Types
+## Required benchmark types
 
 ### attention_pruning
 Needs a benchmark that:
