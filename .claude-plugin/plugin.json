@@ -35,7 +35,7 @@
   "mcpServers": {
     "tldr-code": {
       "type": "stdio",
-      "command": "tldr-mcp",
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/launch-mcp.sh",
       "args": [
         "--project",
         "."

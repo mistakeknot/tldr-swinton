@@ -1,9 +1,8 @@
 # tldr-swinton Roadmap
 
-> Auto-generated from beads on 2026-02-23. Strategic context: [Demarch Roadmap](../../../docs/demarch-roadmap.md)
+> Auto-generated from beads on 2026-02-25. Strategic context: [Demarch Roadmap](../../../docs/demarch-roadmap.md)
 
 ## Open Items
 
-- ○ iv-mif9 [● P2] [feature] - F3: Remove moved tools from tldr-swinton
-- ○ iv-vwj3 [● P2] [feature] - F2: Extract Python modules from tldr-swinton
+- ○ iv-ff7k6.1 [● P1] [task] [governance supply-chain tldr-swinton] - [tldr-swinton] Submodule update and provenance policy for datasets/vendor sources (blocked by: iv-ff7k6)
 
