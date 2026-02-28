@@ -31,7 +31,6 @@
     "./.claude-plugin/commands/quickstart.md",
     "./.claude-plugin/commands/extract.md"
   ],
-  "hooks": "./.claude-plugin/hooks/hooks.json",
   "mcpServers": {
     "tldr-code": {
       "type": "stdio",
