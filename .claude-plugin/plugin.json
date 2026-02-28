@@ -1,6 +1,6 @@
 {
   "name": "tldr-swinton",
-  "version": "0.7.14",
+  "version": "0.7.15",
   "description": "Token-efficient code reconnaissance for LLMs. Autonomous skills save 48-85% tokens via diff-context, semantic search, structural patterns, and symbol analysis. Includes MCP server for direct tool integration.",
   "author": {
     "name": "MK",
