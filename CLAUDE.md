@@ -78,6 +78,10 @@ Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../inte
 
 **IMPORTANT: Always update and push the marketplace.** Any change to `.claude-plugin/` (version bumps, renames, new commands, etc.) must be followed by updating `interagency-marketplace` and pushing both repos. The plugin is not published until the marketplace is updated.
 
+## Tool Overlap with intermap
+
+4 tools overlap functionally with intermap (`structure`/`code_structure`, `impact`/`impact_analysis`, `arch`/`detect_patterns`, `change_impact`/`change_impact`). Intermap provides project-level scope; tldr-swinton provides file-level detail. Both coexist. See intermap CLAUDE.md for the full matrix.
+
 ## Claude Code-Specific Notes
 
 **After adding formats/flags:** Run `tldrs manifest | python3 /root/projects/Interverse/infra/interbench/scripts/check_tldrs_sync.py` to detect gaps, then use `/tldrs-interbench-sync` to fix them. Also update `/root/projects/Interverse/infra/interbench` manually if needed. See AGENTS.md "Related Projects".
