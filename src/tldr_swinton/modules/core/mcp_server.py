@@ -18,16 +18,19 @@ import time
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import Field
-
 logger = logging.getLogger(__name__)
 
 try:
+    from pydantic import Field
     from mcp.server.fastmcp import FastMCP
     _MCP_AVAILABLE = True
 except ImportError:  # pragma: no cover - optional dependency
     FastMCP = None
     _MCP_AVAILABLE = False
+
+    def Field(**kwargs):  # noqa: N802 — stub matching pydantic.Field signature
+        """No-op stand-in so Annotated[..., Field(...)] parses when pydantic is absent."""
+        return kwargs
 
 
 _INSTRUCTIONS = """\

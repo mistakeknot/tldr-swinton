@@ -62,9 +62,8 @@ Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../inte
 │   ├── quickstart.md
 │   └── extract.md
 ├── hooks/
-│   ├── hooks.json       # Hook definitions (Setup, PreToolUse:Serena, PostToolUse:Read)
+│   ├── hooks.json       # Hook definitions (Setup, PostToolUse:Read)
 │   ├── setup.sh         # Setup hook script (+ prebuild cache warming)
-│   ├── pre-serena-edit.sh # Caller analysis before Serena edits/renames
 │   └── suggest-recon.sh # (legacy, not registered)
 └── skills/              # 3 orchestration skills (Claude-invoked)
     ├── tldrs-session-start/
