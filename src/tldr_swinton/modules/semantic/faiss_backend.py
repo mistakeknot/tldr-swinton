@@ -13,7 +13,6 @@ Supports:
 
 from __future__ import annotations
 
-import fcntl
 import json
 import logging
 import os
@@ -577,10 +576,12 @@ class FAISSBackend:
 
     def _acquire_build_lock(self):
         """Acquire non-blocking exclusive lock for build serialization."""
+        from ._filelock import lock_exclusive
+
         self.index_dir.mkdir(parents=True, exist_ok=True)
         fd = open(self._lock_path, "w")
         try:
-            fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_exclusive(fd)
         except BlockingIOError:
             fd.close()
             raise RuntimeError(
@@ -592,7 +593,8 @@ class FAISSBackend:
     def _release_build_lock(self, fd) -> None:
         if fd:
             try:
-                fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+                from ._filelock import unlock
+                unlock(fd)
                 fd.close()
             except Exception:
                 pass
