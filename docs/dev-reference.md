@@ -15,14 +15,14 @@ Detailed development procedures extracted from AGENTS.md. For the quick referenc
 ### Verify Correct Module Loaded
 
 ```bash
-python -c "import tldr_swinton; print(tldr_swinton.__file__)"
-python -c "from tldr_swinton.modules.core.hybrid_extractor import HybridExtractor; import inspect; print(inspect.getfile(HybridExtractor))"
+python3 -c "import tldr_swinton; print(tldr_swinton.__file__)"
+python3 -c "from tldr_swinton.modules.core.hybrid_extractor import HybridExtractor; import inspect; print(inspect.getfile(HybridExtractor))"
 ```
 
 ### Test Extraction Directly
 
 ```bash
-python -c "
+python3 -c "
 from tldr_swinton.modules.core.hybrid_extractor import HybridExtractor
 e = HybridExtractor()
 r = e.extract('path/to/file.ts')

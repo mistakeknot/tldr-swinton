@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Run benchmarks for token efficiency features.
 
 This script measures token savings for compression features:
@@ -12,7 +12,7 @@ Disabled features (require different benchmark types):
   - coherence_verify: Needs error detection rate benchmark
 
 Usage:
-    python scripts/run_new_features_bench.py [--filter PATTERN] [--json]
+    python3 scripts/run_new_features_bench.py [--filter PATTERN] [--json]
 """
 
 from __future__ import annotations
