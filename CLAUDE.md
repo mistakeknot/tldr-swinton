@@ -34,48 +34,9 @@ This project is available as a Claude Code plugin from the [interagency-marketpl
 **MCP tools** (direct tool calls, replace retired skills):
 - `tldr-code` MCP server provides `find`, `context`, `impact`, `cfg`, `dfg`, `extract`, `structural` etc. as native tools
 
-## Plugin Publishing Runbook
+## Publishing
 
-**Interactive (preferred):** Use `/interpub:release <version>` for a guided 4-phase workflow with validation and push confirmation.
-
-**Scripted:** Use the local bump script:
-
-```bash
-# One command — updates all 3 version locations, commits, pushes, reinstalls CLI
-scripts/bump-version.sh 0.7.0
-
-# Dry-run to preview changes
-scripts/bump-version.sh 0.7.0 --dry-run
-```
-
-Both methods update `pyproject.toml`, `.claude-plugin/plugin.json`, and `../interagency-marketplace/.claude-plugin/marketplace.json` atomically. The pre-commit hook (`scripts/check-versions.sh`) validates all three are in sync.
-
-**Plugin structure:**
-```
-.claude-plugin/
-├── plugin.json          # Manifest (version, metadata, MCP server, references)
-├── commands/            # Slash commands (/tldrs-find, etc.)
-│   ├── find.md
-│   ├── diff-context.md
-│   ├── context.md
-│   ├── structural.md
-│   ├── quickstart.md
-│   └── extract.md
-├── hooks/
-│   ├── hooks.json       # Hook definitions (Setup, PostToolUse:Read)
-│   ├── setup.sh         # Setup hook script (+ prebuild cache warming)
-│   └── suggest-recon.sh # (legacy, not registered)
-└── skills/              # 3 orchestration skills (Claude-invoked)
-    ├── tldrs-session-start/
-    ├── tldrs-map-codebase/
-    └── tldrs-interbench-sync/
-```
-
-**Version sync:** All three locations must match: `pyproject.toml`, `.claude-plugin/plugin.json`, and `interagency-marketplace/.claude-plugin/marketplace.json`. Always bump all three together.
-
-**Pre-commit hook:** The hook runs `scripts/check-versions.sh` to verify `pyproject.toml` and `plugin.json` match before allowing commits. To install the hook on a fresh clone, copy `.git/hooks/pre-commit` from an existing setup or run `scripts/check-versions.sh` manually.
-
-**IMPORTANT: Always update and push the marketplace.** Any change to `.claude-plugin/` (version bumps, renames, new commands, etc.) must be followed by updating `interagency-marketplace` and pushing both repos. The plugin is not published until the marketplace is updated.
+Use `/interpub:release <version>` or `scripts/bump-version.sh <version>`. See root [agents/plugin-publishing.md](../../agents/plugin-publishing.md) for full runbook. Pre-commit hook validates version sync across `pyproject.toml`, `plugin.json`, and marketplace.
 
 ## Tool Overlap with intermap
 
