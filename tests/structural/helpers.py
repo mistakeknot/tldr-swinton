@@ -1,19 +1,13 @@
-"""Shared helpers for structural tests."""
+"""Shared helpers for structural tests -- delegates to _shared."""
 
-import yaml
+import sys
+from pathlib import Path
 
+# Add interverse/ to path so _shared package is importable
+_interverse = Path(__file__).resolve().parents[3]
+if str(_interverse) not in sys.path:
+    sys.path.insert(0, str(_interverse))
 
-def parse_frontmatter(path):
-    """Parse YAML frontmatter from a markdown file.
+from _shared.tests.structural.helpers import parse_frontmatter
 
-    Returns (frontmatter_dict, body_text) or (None, full_text) if no frontmatter.
-    """
-    text = path.read_text(encoding="utf-8")
-    if not text.startswith("---"):
-        return None, text
-    parts = text.split("---", 2)
-    if len(parts) < 3:
-        return None, text
-    fm = yaml.safe_load(parts[1])
-    body = parts[2]
-    return fm, body
+__all__ = ["parse_frontmatter"]
