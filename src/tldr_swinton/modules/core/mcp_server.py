@@ -33,21 +33,12 @@ except ImportError:  # pragma: no cover - optional dependency
         return kwargs
 
 
-_INSTRUCTIONS = """\
-tldr-code provides token-efficient code reconnaissance. Use these tools INSTEAD OF \
-Read/Grep/Glob when you need to understand code structure without reading full files.
-
-COST LADDER (cheapest first):
-1. extract(file, compact=True) ~200 tok — file map. Use INSTEAD OF Read for overview.
-2. structure(project) ~500 tok — directory symbols. Use INSTEAD OF Glob + multiple Reads.
-3. context(entry) ~400 tok — call graph around symbol. Use INSTEAD OF reading caller files.
-4. diff_context(project) ~800 tok — changed-code context. Use INSTEAD OF git diff + Read.
-5. impact(function) ~300 tok — reverse call graph. Use BEFORE refactoring any function.
-6. semantic(query) ~300 tok — meaning-based search. Use INSTEAD OF Grep for concepts.
-
-SEMANTIC INDEX: Run semantic_index() once before semantic(). Check semantic_info() for status. \
-Backends: faiss (lighter, Ollama embeddings) or colbert (better retrieval, heavier).\
-"""
+_INSTRUCTIONS = (
+    "tldr-code: token-efficient code reconnaissance. Tools: extract (file map), "
+    "structure (directory symbols), context (call graph), diff_context (changed code), "
+    "impact (reverse call graph), semantic (meaning search). "
+    "Run semantic_index() once before semantic queries; semantic_info() reports backend status."
+)
 
 
 class _NoMCP:
