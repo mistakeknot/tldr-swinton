@@ -1,0 +1,9 @@
+{
+  "name": "tldr-swinton",
+  "companions": {
+    "recommended": [
+      "intercheck"
+    ],
+    "optional": []
+  }
+}

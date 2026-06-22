@@ -40,8 +40,5 @@
         "."
       ]
     }
-  },
-  "peerDependencies": [
-    "intercheck"
-  ]
+  }
 }
