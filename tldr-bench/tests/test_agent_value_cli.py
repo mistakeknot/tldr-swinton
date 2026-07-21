@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from tldr_bench.agent_eval.cli import _resolve_executable
+from tldr_bench.agent_eval.cli import _resolve_executable, build_parser
 
 
 REPO_ROOT = Path(__file__).parents[2]
@@ -63,6 +63,12 @@ def test_resolve_executable_before_condition_path_is_sanitized(
     monkeypatch.setenv("PATH", str(tmp_path))
 
     assert _resolve_executable(Path("codex")) == executable.resolve()
+
+
+def test_default_model_uses_codex_supported_concrete_id(monkeypatch) -> None:
+    monkeypatch.delenv("TLDRS_EVAL_MODEL", raising=False)
+
+    assert build_parser().parse_args([]).model == "gpt-5.6-sol"
 
 
 def test_list_tasks_and_dry_run_render_stable_cells(tmp_path: Path) -> None:

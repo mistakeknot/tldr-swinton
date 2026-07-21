@@ -51,14 +51,15 @@ baseline/adaptive cell starts from a fresh history-free repository with a hidden
 mutation; hidden graders run only after the agent exits. The 12-task pilot has
 three negative controls and three tasks in each exploratory category.
 
-GPT-5.6 is the default current Codex model. The pilot fixes reasoning effort at
-`medium`; use the same model and effort for both conditions. Run a four-cell
-smoke test first:
+GPT-5.6 Sol is the default current Codex model. The Codex ChatGPT transport uses
+the concrete `gpt-5.6-sol` ID (the API's `gpt-5.6` alias may be rejected). The
+pilot fixes reasoning effort at `medium`; use the same model and effort for both
+conditions. Run a four-cell smoke test first:
 
 ```bash
 PYTHONPATH=tldr-bench python3 tldr-bench/scripts/run_agent_value_eval.py \
   --smoke \
-  --model gpt-5.6 \
+  --model gpt-5.6-sol \
   --reasoning-effort medium \
   --results-dir tldr-bench/results/agent-value/smoke
 ```
@@ -67,7 +68,7 @@ Run the full 72-cell pilot (12 tasks × 2 conditions × 3 repeats):
 
 ```bash
 PYTHONPATH=tldr-bench python3 tldr-bench/scripts/run_agent_value_eval.py \
-  --model gpt-5.6 \
+  --model gpt-5.6-sol \
   --reasoning-effort medium \
   --repeats 3 \
   --results-dir tldr-bench/results/agent-value/pilot-2026-07
@@ -77,7 +78,7 @@ Resume the exact same run without duplicating completed cells:
 
 ```bash
 PYTHONPATH=tldr-bench python3 tldr-bench/scripts/run_agent_value_eval.py \
-  --model gpt-5.6 \
+  --model gpt-5.6-sol \
   --reasoning-effort medium \
   --repeats 3 \
   --results-dir tldr-bench/results/agent-value/pilot-2026-07 \

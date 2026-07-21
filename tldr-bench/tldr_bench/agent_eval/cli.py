@@ -50,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument(
-        "--model", default=os.environ.get("TLDRS_EVAL_MODEL", "gpt-5.6")
+        "--model", default=os.environ.get("TLDRS_EVAL_MODEL", "gpt-5.6-sol")
     )
     parser.add_argument(
         "--reasoning-effort",
