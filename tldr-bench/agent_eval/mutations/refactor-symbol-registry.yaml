@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/modules/core/symbol_registry.py
+    old: '            if func.name == name:'
+    new: '            if func.signature() == name:'

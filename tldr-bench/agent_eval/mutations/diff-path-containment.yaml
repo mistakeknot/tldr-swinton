@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/modules/core/path_utils.py
+    old: "            try:\n                if not resolved.is_relative_to(base):\n                    raise PathTraversalError(\n                        f\"Path '{file_path}' escapes base directory '{base_path}' via traversal\"\n                    )"
+    new: "            try:\n                if resolved.is_relative_to(base):\n                    raise PathTraversalError(\n                        f\"Path '{file_path}' escapes base directory '{base_path}' via traversal\"\n                    )"

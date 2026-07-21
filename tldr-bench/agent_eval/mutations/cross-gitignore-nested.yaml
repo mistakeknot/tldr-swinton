@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/modules/core/tldrsignore.py
+    old: '        combined = f"{prefix}/**/{body}"'
+    new: '        combined = f"{prefix}/{body.lstrip(''*'')}"'

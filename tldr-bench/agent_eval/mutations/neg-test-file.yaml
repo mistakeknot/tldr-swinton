@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/modules/core/change_impact.py
+    old: '    if "tests" in parts or "test" in parts or "__tests__" in parts:'
+    new: '    if "tests" in parts or "test" in parts:'

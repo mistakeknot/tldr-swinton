@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/modules/core/ast_extractor.py
+    old: "        elif self.language == \"go\":\n            return f\"func {self.name}({params_str}){' ' + self.return_type if self.return_type else ''}\""
+    new: "        elif self.language == \"go\":\n            return f\"def {self.name}({params_str})\""

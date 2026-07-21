@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/modules/core/token_utils.py
+    old: '    return max(1, len(text) // 4)'
+    new: '    return max(1, len(text) // 8)'

@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/manifest.py
+    old: '        if isinstance(action, (argparse._StoreTrueAction, argparse._StoreFalseAction)):'
+    new: '        if isinstance(action, argparse._StoreTrueAction):'

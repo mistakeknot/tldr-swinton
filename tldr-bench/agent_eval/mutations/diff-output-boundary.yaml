@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/modules/core/output_formats.py
+    old: "    if len(symbol_starts) == 1 and symbol_starts[0] > 0:\n        return lines[:symbol_starts[0]]\n    return []"
+    new: "    if len(symbol_starts) == 1 and symbol_starts[0] > 0:\n        return lines[:symbol_starts[0]]\n    return lines"

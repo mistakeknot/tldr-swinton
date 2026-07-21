@@ -1,0 +1,129 @@
+- id: neg-token-fallback
+  title: Preserve the fallback token estimate
+  category: negative_control
+  eligible_for_tldrs: false
+  prompt: >-
+    In src/tldr_swinton/modules/core/token_utils.py, fix the fallback token
+    estimate so it uses four characters per token and still reports at least
+    one token for empty input. Do not change the tiktoken-backed path.
+  mutation: ../../agent_eval/mutations/neg-token-fallback.yaml
+  grader: ../../agent_eval/graders/test_neg_token_fallback.py
+
+- id: neg-import-statement
+  title: Restore import statement formatting
+  category: negative_control
+  eligible_for_tldrs: false
+  prompt: >-
+    In src/tldr_swinton/modules/core/ast_extractor.py, restore valid formatting
+    for from-import statements containing more than one imported name.
+  mutation: ../../agent_eval/mutations/neg-import-statement.yaml
+  grader: ../../agent_eval/graders/test_neg_import_statement.py
+
+- id: neg-test-file
+  title: Recognize JavaScript test directories
+  category: negative_control
+  eligible_for_tldrs: false
+  prompt: >-
+    In src/tldr_swinton/modules/core/change_impact.py, restore test-file
+    detection for files placed beneath the conventional __tests__ directory.
+  mutation: ../../agent_eval/mutations/neg-test-file.yaml
+  grader: ../../agent_eval/graders/test_neg_test_file.py
+
+- id: cross-gitignore-nested
+  title: Preserve nested ignore semantics
+  category: cross_file_bug
+  eligible_for_tldrs: true
+  prompt: >-
+    Nested ignore files no longer apply a basename-only pattern recursively
+    beneath their directory. Restore Git-compatible nested matching while
+    preserving anchored and negated patterns.
+  mutation: ../../agent_eval/mutations/cross-gitignore-nested.yaml
+  grader: ../../agent_eval/graders/test_cross_gitignore_nested.py
+
+- id: cross-module-init
+  title: Normalize package initializer modules
+  category: cross_file_bug
+  eligible_for_tldrs: true
+  prompt: >-
+    Change-impact analysis now reports a package initializer as a module named
+    after the initializer itself. Restore package-level module normalization
+    without changing ordinary module names.
+  mutation: ../../agent_eval/mutations/cross-module-init.yaml
+  grader: ../../agent_eval/graders/test_cross_module_init.py
+
+- id: cross-manifest-flags
+  title: Classify disabling flags as booleans
+  category: cross_file_bug
+  eligible_for_tldrs: true
+  prompt: >-
+    The machine-readable command manifest misclassifies flags that turn a
+    feature off as valued strings. Make boolean classification symmetric for
+    enabling and disabling flags while preserving typed valued options.
+  mutation: ../../agent_eval/mutations/cross-manifest-flags.yaml
+  grader: ../../agent_eval/graders/test_cross_manifest_flags.py
+
+- id: diff-output-boundary
+  title: Avoid partial symbol output after truncation
+  category: diff_regression
+  eligible_for_tldrs: true
+  prompt: >-
+    A recent truncation regression can emit an incomplete first symbol when no
+    safe boundary occurs inside the output budget. Restore boundary-safe output
+    and retain the truncation marker.
+  mutation: ../../agent_eval/mutations/diff-output-boundary.yaml
+  grader: ../../agent_eval/graders/test_diff_output_boundary.py
+
+- id: diff-preset-explicit
+  title: Honor explicit preset overrides
+  category: diff_regression
+  eligible_for_tldrs: true
+  prompt: >-
+    Preset expansion overwrites values the caller explicitly supplied, including
+    equals-form command options. Restore explicit-option precedence while still
+    applying the remaining preset defaults.
+  mutation: ../../agent_eval/mutations/diff-preset-explicit.yaml
+  grader: ../../agent_eval/graders/test_diff_preset_explicit.py
+
+- id: diff-path-containment
+  title: Reject traversal outside the base path
+  category: diff_regression
+  eligible_for_tldrs: true
+  prompt: >-
+    Path validation regressed: a traversal that resolves outside an explicitly
+    supplied base is accepted, while a safe normalized path can be rejected.
+    Restore containment semantics without weakening normal validation.
+  mutation: ../../agent_eval/mutations/diff-path-containment.yaml
+  grader: ../../agent_eval/graders/test_diff_path_containment.py
+
+- id: refactor-callgraph-dedupe
+  title: Preserve call graph edges during deduplication
+  category: dependency_refactor
+  eligible_for_tldrs: true
+  prompt: >-
+    A call-graph deduplication refactor dropped forward edges on first insertion.
+    Restore exactly-once forward and reverse edges when the same call is observed
+    repeatedly.
+  mutation: ../../agent_eval/mutations/refactor-callgraph-dedupe.yaml
+  grader: ../../agent_eval/graders/test_refactor_callgraph_dedupe.py
+
+- id: refactor-go-signature
+  title: Preserve Go signature rendering
+  category: dependency_refactor
+  eligible_for_tldrs: true
+  prompt: >-
+    A language-rendering refactor made Go function metadata render with Python
+    syntax. Restore idiomatic Go signatures without changing other language
+    renderers.
+  mutation: ../../agent_eval/mutations/refactor-go-signature.yaml
+  grader: ../../agent_eval/graders/test_refactor_go_signature.py
+
+- id: refactor-symbol-registry
+  title: Preserve symbol registry identity lookups
+  category: dependency_refactor
+  eligible_for_tldrs: true
+  prompt: >-
+    A registry refactor compares a lookup name against a rendered signature,
+    breaking file-and-symbol identity resolution. Restore named lookups and keep
+    missing-symbol behavior unchanged.
+  mutation: ../../agent_eval/mutations/refactor-symbol-registry.yaml
+  grader: ../../agent_eval/graders/test_refactor_symbol_registry.py

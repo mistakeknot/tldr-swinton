@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/modules/core/ast_extractor.py
+    old: '        if callee not in self.calls[caller]:'
+    new: '        if callee in self.calls[caller]:'

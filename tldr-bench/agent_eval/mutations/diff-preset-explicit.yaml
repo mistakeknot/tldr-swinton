@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/presets.py
+    old: '        return any(a == flag or a.startswith(f"{flag}=") for a in argv)'
+    new: '        return False'

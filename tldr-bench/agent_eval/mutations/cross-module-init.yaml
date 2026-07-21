@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/modules/core/change_impact.py
+    old: '        if parts and parts[-1] == "__init__":'
+    new: '        if parts and parts[-1] == "__package__":'

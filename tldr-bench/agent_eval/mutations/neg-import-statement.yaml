@@ -1,0 +1,4 @@
+replacements:
+  - path: src/tldr_swinton/modules/core/ast_extractor.py
+    old: '            names_str = ", ".join(self.names)'
+    new: '            names_str = " ".join(self.names)'

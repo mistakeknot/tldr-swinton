@@ -189,6 +189,10 @@ def run_external_grader(
 ) -> GradeResult:
     environment = dict(os.environ)
     environment["AGENT_EVAL_WORKSPACE"] = str(workspace.resolve())
+    # A mutation and its repair can have the same byte length and filesystem
+    # timestamp. Do not let a grader run reuse bytecode compiled for the prior
+    # source state and produce a false failure.
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
     try:
         result = subprocess.run(
             [str(python_executable), str(task.grader_path), str(workspace.resolve())],
