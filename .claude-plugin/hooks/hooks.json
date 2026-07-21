@@ -1,5 +1,5 @@
 {
-  "description": "tldrs plugin hooks — token-efficient reconnaissance",
+  "description": "tldrs plugin hook — runtime health and quiet cache preparation",
   "hooks": {
     "Setup": [
       {
@@ -8,18 +8,6 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/setup.sh",
             "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/.claude-plugin/hooks/post-read-extract.sh\"",
-            "timeout": 8
           }
         ]
       }

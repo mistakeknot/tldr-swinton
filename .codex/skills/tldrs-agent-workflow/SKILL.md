@@ -1,17 +1,19 @@
 ---
 name: tldrs-agent-workflow
-description: Token-efficient code reconnaissance. Use BEFORE Read tool. Saves 48-85% tokens depending on command (diff-context 48-73%, semantic search 85%, structural search 60%, multi-turn 60%+).
+description: Adaptive code reconnaissance for large, unfamiliar, multi-file, diff-heavy, or delegation-heavy tasks. Use compact tldrs output when it will narrow the next read; skip known small edits and already-scoped context.
 ---
 
 # tldrs Agent Workflow
 
-**Rule**: Run tldrs BEFORE using Read tool on code files.
+Use tldrs when it materially narrows the code the agent must inspect: unfamiliar areas, large diffs, cross-file relationships, semantic discovery, or delegation packets.
+
+Skip it when the exact target is already known, the file is small, the task is docs/config only, or the harness already narrowed the context enough to read or edit directly.
 
 ## Quick Decision
 
 | Task | Command | Then |
 |------|---------|------|
-| Start any coding task | `tldrs diff-context --project . --budget 2000` | Review changed symbols |
+| Review a non-trivial diff | `tldrs diff-context --project . --preset compact` | Review changed symbols |
 | Find code by concept | `tldrs find "auth logic"` | Read top results |
 | Find code by structure | `tldrs structural 'pattern' --lang python` | Read matches |
 | Understand a function | `tldrs context func --project . --depth 2 --budget 2000` | Read if editing |
@@ -21,6 +23,7 @@ description: Token-efficient code reconnaissance. Use BEFORE Read tool. Saves 48
 
 - You are editing a single file under 200 lines AND you already know which file it is
 - Simple config files: Read directly
+- The harness or an explorer agent already narrowed the task to the required lines
 
 ## Core Commands
 
@@ -133,12 +136,12 @@ Supported: python, typescript, javascript, rust, go, java, c, cpp, ruby, php, ko
 
 ## Common Mistakes
 
-1. **Reading files before tldrs**: Run diff-context first
-2. **No budget on large codebases**: Always use `--budget`
-3. **Double-quoting structural patterns**: Use single quotes for `$VAR` patterns — `$$$` expands to PID in double quotes
-4. **Searching without index**: Run `tldrs index .` once for semantic search
-5. **Ambiguous symbol names**: Use `file.py:symbol` format
-6. **No output cap on large repos**: Add `--max-lines 50` or `--max-bytes 4096`
+1. **Running reconnaissance by ritual**: Use it only when the output changes the next read, edit, or delegation.
+2. **No budget on large codebases**: Use `--preset compact` or an explicit `--budget`.
+3. **Double-quoting structural patterns**: Use single quotes for `$VAR` patterns — `$$$` expands to PID in double quotes.
+4. **Searching without index**: Run `tldrs index .` once for semantic search.
+5. **Ambiguous symbol names**: Use `file.py:symbol` format.
+6. **No output cap on large repos**: Add `--max-lines 50` or `--max-bytes 4096`.
 
 ## Common Errors
 
