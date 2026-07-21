@@ -19,6 +19,13 @@ class TaskCategory(str, Enum):
 
 
 @dataclass(frozen=True)
+class Replacement:
+    path: Path
+    old: str
+    new: str
+
+
+@dataclass(frozen=True)
 class TaskSpec:
     id: str
     title: str
