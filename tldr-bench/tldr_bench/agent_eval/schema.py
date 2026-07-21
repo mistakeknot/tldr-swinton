@@ -46,11 +46,18 @@ class TraceMetrics:
     reasoning_output_tokens: int | None = None
     total_tokens: int | None = None
     tool_calls: int = 0
+    tool_output_bytes: int = 0
     tldrs_calls: int = 0
     raw_read_calls: int = 0
     compactions: int = 0
     commands: tuple[str, ...] = ()
     errors: tuple[str, ...] = ()
+
+    @property
+    def uncached_total_tokens(self) -> int | None:
+        if self.total_tokens is None:
+            return None
+        return max(0, self.total_tokens - (self.cached_input_tokens or 0))
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TraceMetrics":

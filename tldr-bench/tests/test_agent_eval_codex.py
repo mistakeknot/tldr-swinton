@@ -31,6 +31,7 @@ def test_parse_current_codex_jsonl_trace() -> None:
     assert parsed.metrics.reasoning_output_tokens == 20
     assert parsed.metrics.total_tokens == 1500
     assert parsed.metrics.tool_calls == 2
+    assert parsed.metrics.tool_output_bytes == 31
     assert parsed.metrics.tldrs_calls == 1
     assert parsed.metrics.raw_read_calls == 1
     assert parsed.metrics.compactions == 1

@@ -95,6 +95,7 @@ def parse_codex_trace(text: str, *, requested_model: str) -> ParsedCodexTrace:
     commands: list[str] = []
     errors: list[str] = []
     tool_calls = 0
+    tool_output_bytes = 0
     tldrs_calls = 0
     raw_read_calls = 0
     compactions = 0
@@ -134,6 +135,9 @@ def parse_codex_trace(text: str, *, requested_model: str) -> ParsedCodexTrace:
                 final_message = str(item.get("text", ""))
             if item_type in _TOOL_ITEM_TYPES:
                 tool_calls += 1
+                tool_output_bytes += len(
+                    str(item.get("aggregated_output", "")).encode("utf-8")
+                )
             if item_type == "command_execution":
                 command = str(item.get("command", ""))
                 commands.append(command)
@@ -168,6 +172,7 @@ def parse_codex_trace(text: str, *, requested_model: str) -> ParsedCodexTrace:
             ),
             total_tokens=(input_tokens + output_tokens) if saw_usage else None,
             tool_calls=tool_calls,
+            tool_output_bytes=tool_output_bytes,
             tldrs_calls=tldrs_calls,
             raw_read_calls=raw_read_calls,
             compactions=compactions,
