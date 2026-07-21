@@ -63,6 +63,14 @@ def test_parse_trace_does_not_count_tldrs_availability_probes() -> None:
         "/bin/zsh -lc 'command -v tldrs || true'",
         "/bin/zsh -lc 'which -a tldrs || true'",
         "/bin/zsh -lc 'type tldrs || true'",
+        (
+            "/bin/zsh -lc \"python3 - <<'PY'\n"
+            "import sys\n"
+            "sys.argv = ['tldrs', 'context', 'target']\n"
+            "PY\""
+        ),
+        "/bin/zsh -lc \"python3 -c 'print(\\\"tldrs\\\")'\"",
+        "/bin/zsh -lc 'FOO=1 tldrs context target --project .'",
     ]
     trace = "\n".join(
         json.dumps(
@@ -81,7 +89,7 @@ def test_parse_trace_does_not_count_tldrs_availability_probes() -> None:
 
     parsed = parse_codex_trace(trace, requested_model="gpt-eval")
 
-    assert parsed.metrics.tldrs_calls == 0
+    assert parsed.metrics.tldrs_calls == 1
 
 
 def test_build_codex_command_fixes_harness_controls(tmp_path: Path) -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import subprocess
 import time
 from dataclasses import dataclass
@@ -10,11 +11,6 @@ from pathlib import Path
 from .schema import TraceMetrics
 
 
-_TLDRS_COMMAND = re.compile(r"(?:^|[\s'\"/])tldrs(?:[\s'\"]|$)")
-_TLDRS_PROBE = re.compile(
-    r"\b(?:command\s+-[vV]|which(?:\s+-[A-Za-z]+)*|type(?:\s+-[A-Za-z]+)*)"
-    r"\s+tldrs\b"
-)
 _RAW_READ_COMMAND = re.compile(
     r"(?:^|[;&|]\s*|['\"])(?:cat|sed|head|tail)(?:\s|$)"
 )
@@ -24,11 +20,91 @@ _TOOL_ITEM_TYPES = {
     "function_call",
     "web_search",
 }
+_SHELL_NAMES = {"bash", "dash", "ksh", "sh", "zsh"}
+_SHELL_BOUNDARIES = {";", "&&", "||", "|", "&", "(", ")"}
+_SHELL_KEYWORDS = {"if", "then", "elif", "else", "while", "until", "do"}
+_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_HEREDOC = re.compile(
+    r"<<-?\s*(?P<quote>['\"]?)(?P<delimiter>[A-Za-z_][A-Za-z0-9_]*)"
+    r"(?P=quote)"
+)
+
+
+def _unwrap_shell_script(command: str) -> str:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return command
+    if not tokens or Path(tokens[0]).name not in _SHELL_NAMES:
+        return command
+    for index, token in enumerate(tokens[1:], 1):
+        if token.startswith("-") and "c" in token[1:] and index + 1 < len(tokens):
+            return tokens[index + 1]
+    return command
+
+
+def _strip_heredoc_bodies(script: str) -> str:
+    kept: list[str] = []
+    delimiter: str | None = None
+    for line in script.splitlines():
+        if delimiter is not None:
+            if line.strip() == delimiter:
+                delimiter = None
+            continue
+        match = _HEREDOC.search(line)
+        if match:
+            kept.append(line[: match.start()])
+            delimiter = match.group("delimiter")
+        else:
+            kept.append(line)
+    return "\n".join(kept)
 
 
 def _invokes_tldrs(command: str) -> bool:
-    without_probes = _TLDRS_PROBE.sub("", command)
-    return _TLDRS_COMMAND.search(without_probes) is not None
+    script = _strip_heredoc_bodies(_unwrap_shell_script(command))
+    lexer = shlex.shlex(
+        script.replace("\n", " ; "),
+        posix=True,
+        punctuation_chars=";&|()",
+    )
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    try:
+        tokens = list(lexer)
+    except ValueError:
+        return False
+
+    expect_command = True
+    command_wrapper = False
+    environment_wrapper = False
+    for token in tokens:
+        if token in _SHELL_BOUNDARIES:
+            expect_command = True
+            command_wrapper = False
+            environment_wrapper = False
+            continue
+        if not expect_command:
+            continue
+        if token in _SHELL_KEYWORDS or token == "!" or _ASSIGNMENT.match(token):
+            continue
+        executable = Path(token).name
+        if executable == "env":
+            environment_wrapper = True
+            continue
+        if environment_wrapper and token.startswith("-"):
+            continue
+        if executable == "command":
+            command_wrapper = True
+            continue
+        if command_wrapper and token in {"-v", "-V"}:
+            expect_command = False
+            continue
+        if command_wrapper and token.startswith("-"):
+            continue
+        if executable == "tldrs":
+            return True
+        expect_command = False
+    return False
 
 
 @dataclass(frozen=True)
