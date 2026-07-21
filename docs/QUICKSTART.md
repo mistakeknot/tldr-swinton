@@ -1,200 +1,123 @@
 # tldrs Quick Reference
 
-**Rule**: Run tldrs BEFORE using Read tool on code files. Saves 48-85% tokens (semantic search ~85%, diff-context ~48%, multi-turn 60%+).
+Use tldrs when it will narrow the next read, edit, test, or delegation: large or unfamiliar codebases, non-trivial diffs, cross-file relationships, semantic discovery, and noisy exploration.
 
-## Quick Decision
+Skip it when the exact target is already known, the file is small, the task is docs/config only, or the agent harness already supplied a sufficient context packet.
 
-| Task | Command | Then |
+Historical repository benchmarks show substantial token reductions for selected workflows; they are not a promise that every extra tool call saves time or tokens. See [Harness and Model Capabilities](harness-capabilities.md) for the current routing rationale.
+
+## Quick decision
+
+| Need | Command | Next |
 |------|---------|------|
-| Start any coding task | `tldrs diff-context --project . --budget 2000` | Review changed symbols |
-| Find code by concept | `tldrs find "auth logic"` | Read top results |
-| Find code by structure | `tldrs structural 'pattern' --lang python` | Read matches |
-| Understand a function | `tldrs context func --project . --depth 2` | Read if editing |
-| Explore structure | `tldrs structure src/` | Navigate to relevant files |
+| Review a non-trivial diff | `tldrs diff-context --project . --preset compact` | Inspect changed symbols |
+| Find code by concept | `tldrs find "auth logic"` | Read the best matches |
+| Find code by structure | `tldrs structural 'pattern' --lang python` | Inspect exact matches |
+| Understand a symbol | `tldrs context func --project . --preset compact` | Read only the edit target |
+| Map an unfamiliar area | `tldrs structure src/` | Drill into one directory |
+| Prepare agent handoff | `tldrs distill --task "task" --budget 1500` | Send the compact packet |
 
-## When to Skip tldrs
+## Core commands
 
-- File < 200 lines → just Read it
-- You know exactly what to edit → Read and Edit directly
-- Simple config files → Read directly
-
-## Core Commands
-
-### 1. Diff-Context (Start Here)
+### Diff context
 
 ```bash
-tldrs diff-context --project . --budget 2000
+tldrs diff-context --project . --preset compact
 ```
 
-**Output:**
-```
-P0=src/auth.py P1=src/users.py
+Use `--preset minimal` for a large diff or a small worker context. Add `--session-id <task-id>` when repeated calls should omit unchanged symbols.
 
-P0:login def login(user, password)  [contains_diff]
-P0:verify def verify(token)  [caller_of_diff]
-P1:create_user def create_user(data)  [contains_diff]
-```
-
-### 2. Semantic Search
+### Semantic search
 
 ```bash
-# First time only
 tldrs index .
-
-# Search by concept
 tldrs find "authentication logic"
 ```
 
-**Output:**
-```
- 1. [0.82] verify_token (function)
-      def verify_token(token: str) -> User
-      src/auth/tokens.py:42
-```
+Build the index once, then update it when the codebase changes materially.
 
-### 3. Symbol Context
+### Symbol context
 
 ```bash
-tldrs context handle_request --project . --depth 2 --format ultracompact
+tldrs context src/app.py:handle_request --project . --depth 2 --preset compact
 ```
 
-**Output:**
-```
-handle_request(request) -> Response
-  calls: validate_input, process_data, format_response
-  called_by: main, api_handler
-```
+If the entry is ambiguous, tldrs returns candidates. Re-run with `file.py:symbol`.
 
-### 4. Structural Search
+### Structural search
 
 ```bash
 tldrs structural 'def $FUNC($$$ARGS): return None' --lang python
 ```
 
-**Output:**
-```
-Found 3 match(es):
+Always single-quote structural patterns. `$VAR` and `$$$ARGS` are ast-grep meta-variables that a shell would otherwise expand.
 
-  src/api.py:42
-    def get_user(id): return None
-    $FUNC = get_user
+### Impact and test selection
 
-  src/utils.py:15
-    def noop(): return None
-    $FUNC = noop
-```
-
-**What it tells you:** Code matches by AST structure, with meta-variable bindings.
-
-**Important:** Always single-quote patterns. `$VAR` and `$$$ARGS` are ast-grep meta-variables, not shell variables.
-
-Included in base install (ast-grep-py).
-
-## Workflow Examples
-
-### Bug Fix
 ```bash
-tldrs diff-context --project . --budget 2000    # See changes
-tldrs find "error handling"                      # Find relevant code
-tldrs context buggy_func --project . --depth 2   # Get context
-# NOW read the file to fix it
+tldrs impact authenticate --depth 3 --lang python
+tldrs change-impact --git
 ```
 
-### Feature Implementation
+Use these when callers or affected tests could change the implementation plan.
+
+### Delegation packets
+
 ```bash
-tldrs find "user registration"                   # Find similar features
-tldrs context register_user --project . --depth 2 # Understand pattern
-tldrs structure src/features/                    # See where to add
-# Read and implement
+tldrs distill --task "review authorization changes" --budget 1500 --session-id auth-review
 ```
 
-## Error Handling
+Modern harnesses can isolate explorers in their own context windows. Use `distill` when a worker still needs a stable, bounded handoff instead of raw search output.
 
-| Error | Fix |
-|-------|-----|
-| `No index found` | Run `tldrs index .` |
-| `Ambiguous entry` | Use `file.py:func` syntax |
-| `No changes detected` | Specify `--base` and `--head` |
+## Budgets and output caps
 
-## Token Budgets
-
-| Codebase | Budget |
-|----------|--------|
+| Scope | Starting budget |
+|-------|-----------------|
 | Small (<50 files) | 1500 |
-| Medium (50-200) | 2000 |
-| Large (200+) | 3000 |
+| Medium (50-200 files) | 2000 |
+| Large (200+ files) | 3000 |
 
-## Multi-Turn Optimization
+Hard caps:
 
 ```bash
-# First turn - full output
-tldrs diff-context --project . --session-id task-123
-
-# Later turns - unchanged symbols omitted (~60% savings)
-tldrs diff-context --project . --session-id task-123
+tldrs context main --project . --max-lines 50
+tldrs diff-context --project . --max-bytes 4096
 ```
 
-## Cache-Friendly Format (Prompt Caching)
+## Prompt caching
 
-Use `--format cache-friendly` to optimize for LLM provider prompt caching:
+`--format cache-friendly` separates a stable signature prefix from changing content:
 
 ```bash
 tldrs diff-context --project . --delta --format cache-friendly
 ```
 
-**Output structure:**
-```
-# tldrs cache-friendly output
+Use it only when the consuming API or harness actually reuses that prefix. Provider caching semantics and prices change; measure cache reads, cache writes, total tokens, latency, and task quality on the target harness instead of assuming a fixed percentage.
 
-## CACHE PREFIX (stable - cache this section)
-## 3 symbols
-
-api.py:get_user def get_user(id: int) @45 [caller]
-api.py:list_users def list_users() @62 [caller]
-models.py:User class User @10 [callee]
-
-<!-- CACHE_BREAKPOINT: ~150 tokens -->
-
-## DYNAMIC CONTENT (changes per request)
-## 1 symbols, 1 with code
-
-api.py:update_user def update_user(id, data) @82-95 [contains_diff]
-```python
-def update_user(id: int, data: dict) -> User:
-    user = get_user(id)
-    ...
-```
-
-## STATS: Prefix ~150 tokens | Dynamic ~300 tokens | Total ~450 tokens
-```
-
-**Cost savings:**
-- Anthropic: ~90% on cached prefix tokens
-- OpenAI: ~50% on cached prefix tokens
-
-**How it works:**
-1. Unchanged symbols go to CACHE PREFIX (sorted by ID for stability)
-2. Changed symbols go to DYNAMIC CONTENT (with full code)
-3. LLM providers cache the stable prefix across requests
-
-## Language Support
+## Language support
 
 ```bash
 tldrs structure src/ --lang typescript
 tldrs context main --project . --lang rust
 ```
 
-Supported: `python`, `typescript`, `javascript`, `rust`, `go`, `java`, `c`, `cpp`
+Base install: Python, TypeScript, JavaScript, Rust, Go, Java, C, C++, and Ruby.
 
-## Common Mistakes
+Optional grammars: Kotlin, Swift, C#, Scala, Lua, and Elixir.
 
-1. **Reading files before tldrs** → Run diff-context first
-2. **No budget on large codebases** → Always use `--budget`
-3. **Searching without index** → Run `tldrs index .` once
-4. **Ambiguous symbol names** → Use `file.py:symbol` format
+## Common errors
 
-## Full Documentation
+| Error | Fix |
+|-------|-----|
+| `ModuleNotFoundError: tldr_swinton` | Re-run `scripts/install.sh`; it replaces stale editable launchers |
+| `No git repository` | Use `tldrs structure <dir>` instead of diff-context |
+| `No semantic index found` | Run `tldrs index .` |
+| `Ambiguous entry` | Use `file.py:symbol` syntax |
+| Garbled structural pattern | Single-quote the ast-grep pattern |
 
-- `tldrs quickstart` - This guide
-- `tldrs --help` - All commands
-- See `docs/agent-workflow.md` for advanced usage
+## Full documentation
+
+- `tldrs --help` — command reference
+- [Agent Workflow](agent-workflow.md) — harness integration and advanced flow
+- [Harness and Model Capabilities](harness-capabilities.md) — current capability baseline
+- [Token Savings](token-savings-summary.md) — benchmark methodology

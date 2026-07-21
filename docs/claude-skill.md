@@ -1,11 +1,11 @@
 ---
 name: tldrs-agent-workflow
-description: Token-efficient code analysis workflow using tldr-swinton. Use when exploring codebases, understanding changes, or finding relevant code before making edits.
+description: Adaptive code reconnaissance using tldr-swinton. Use for unfamiliar, multi-file, diff-heavy, or delegation-heavy work when compact analysis will narrow the next read.
 ---
 
 # tldr-swinton Workflow
 
-Use `tldrs` for **reconnaissance** before reading full files. Token savings vary by command: semantic search ~85%, diff-context ~48%, multi-turn sessions 60%+.
+Use `tldrs` when reconnaissance will reduce uncertainty or isolate noisy exploration. Read directly when the target is already known and small.
 
 ## Quick Decision
 
@@ -19,7 +19,7 @@ Use `tldrs` for **reconnaissance** before reading full files. Token savings vary
 
 ## Workflow
 
-1. **Start with diff-context** for most tasks:
+1. **Start with diff-context** for non-trivial recent changes:
    ```bash
    tldrs diff-context --project . --budget 2000
    ```
@@ -60,7 +60,7 @@ tldrs diff-context --project . --session-id my-session
 
 ## Common Mistakes
 
-- Opening full files before running diff/context/structure commands
+- Running tldrs by ritual when the next file or symbol is already known
 - Skipping `--budget` and getting oversized outputs
 - Forgetting `--lang` for non-Python repos
 

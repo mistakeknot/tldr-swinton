@@ -1,6 +1,6 @@
 # Product Requirements Document — tldr-swinton
 
-**Version:** 0.7.14
+**Version:** 0.7.19
 **Last updated:** 2026-02-15  
 **Vision:** [`docs/vision.md`](vision.md)
 

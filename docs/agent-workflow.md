@@ -1,136 +1,125 @@
-# Agent Workflow (tldr-swinton)
+# Agent Workflow
 
-This guide helps coding agents use tldr-swinton to minimize tokens while keeping accuracy.
+tldr-swinton is a context-selection tool, not a mandatory pre-read gate. Use it when compact static or semantic analysis will reduce uncertainty, isolate noisy exploration, or produce a better handoff than raw file reads.
 
-## Purpose
-
-- Use tldrs for reconnaissance (context selection) before reading full files.
-- Prefer compact outputs with explicit budgets.
-- Codex users: repo-scoped skill at `./.codex/skills/tldrs-agent-workflow/`.
-- Claude users: skill available at `.claude-plugin/skills/tldrs-agent-workflow/`.
-
-## Install
+## Install and verify
 
 ```bash
-# tldrs
 curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldr-swinton/main/scripts/install.sh | bash
-
-# VHS refs are built-in (repo-local). Large outputs are stored under `.tldrs/`.
+tldrs --version
 ```
 
-Verify install:
-```bash
-tldrs --help
-tldrs context main --project . --depth 1 --budget 200 --format ultracompact
-```
+The installer creates launchers in `~/.local/bin` that preserve the caller's working directory. If `command -v tldrs` succeeds but `tldrs --version` fails, the executable is stale or import-broken; re-run the installer.
 
-## Decision Tree
+## Harness integration
 
-1) Working on recent changes? Use diff-first context:
-   - `tldrs diff-context --project . --budget 2000`
+### Claude Code
 
-2) Need call-graph context around a symbol?
-   - `tldrs context <entry> --project . --depth 2 --budget 2000 --format ultracompact`
+- The plugin exposes six slash commands, four skills, and the `tldr-code` MCP server.
+- Large/unfamiliar reconnaissance and codebase mapping run with `context: fork` on the built-in Explore agent, keeping search output out of the main conversation.
+- The Setup hook checks executable health and quietly prebuilds cache state. It does not inject a project map into every session.
+- There is no PostToolUse Read hook: adding a second structural dump after a raw read duplicates context.
 
-3) Need file or folder structure?
-   - `tldrs structure src/ --lang typescript`
-   - `tldrs extract path/to/file.ts`
+### Codex
 
-4) Need semantic search?
-   - `tldrs index .`
-   - `tldrs find "authentication logic"`
+- The repo-scoped skill is `./.codex/skills/tldrs-agent-workflow/SKILL.md`.
+- The skill recommends tldrs for unfamiliar, multi-file, diff-heavy, and delegation-heavy work, with an explicit bypass for already-scoped edits.
+- Use `tldrs distill` when a Codex subagent needs a bounded packet; otherwise let the explorer keep raw reconnaissance in its own thread.
 
-5) Need to find code by structural pattern?
-   - `tldrs structural 'if $COND: $$$BODY' --lang python`
-   - Single-quote patterns to prevent shell expansion of `$`
+### Other harnesses
 
-6) Need deep analysis?
-   - `tldrs slice <file> <func> <line>`
-   - `tldrs cfg <file> <function>`
-   - `tldrs dfg <file> <function>`
+- Use the CLI from any shell-capable agent.
+- Use `tldr-mcp --project /path/to/project` when the harness supports MCP.
+- Treat the Agent Skills files as portable core guidance; harness-specific frontmatter such as Claude's `context: fork` is an extension.
 
-## Entry Syntax and Discovery
+See [Harness and Model Capabilities](harness-capabilities.md) for the dated primary-source baseline.
 
-- Entry formats: `file.py:func`, `Class.method`, `module:func`
-- Example: `tldrs context src/app.py:handle_request --project .`
-- If unsure, discover names first: `tldrs structure src/`
-- If ambiguous, the context command returns candidates; re-run with `file.py:func`.
+## Decision boundary
 
-## Language Flags
+Use tldrs when at least one is true:
 
-- Use `--lang` for non-Python repos.
-- Example: `tldrs structure src/ --lang typescript`
-- Example: `tldrs context src/main.rs:run --lang rust`
+- The target area is unfamiliar or too large to inspect directly.
+- Recent changes span multiple files or require caller/callee context.
+- Semantic or structural discovery will narrow the file set.
+- Search results, logs, or file contents would pollute the main conversation.
+- Another agent needs a stable handoff with an explicit token budget.
 
-## Budget and Depth Tuning
+Read or edit directly when all are true:
 
-- If context is thin, increase depth: `--depth 3`
-- If output is large, reduce budget or use ultracompact:
-  - `tldrs context <entry> --depth 3 --budget 1500 --format ultracompact`
+- The exact target is known.
+- The file or region is small enough to inspect safely.
+- No cross-file relationship needs analysis.
+- The harness has already provided sufficient context.
 
-## DiffLens Compression
+## Command ladder
 
-- Two-stage compression:
-  - `tldrs diff-context --project . --budget 1500 --compress two-stage`
-- Chunk-summary compression:
-  - `tldrs diff-context --project . --budget 1500 --compress chunk-summary`
+1. Recent changes:
+   `tldrs diff-context --project . --preset compact`
+2. Unknown concept:
+   `tldrs find "authentication logic"`
+3. Known symbol:
+   `tldrs context <entry> --project . --depth 2 --preset compact`
+4. Architecture or directory shape:
+   `tldrs arch --lang <lang> .` or `tldrs structure <dir>`
+5. Exact syntax pattern:
+   `tldrs structural 'if $COND: $$$BODY' --lang python`
+6. Deep dependency question:
+   `tldrs impact`, `cfg`, `dfg`, or `slice`
+7. Delegation:
+   `tldrs distill --task "..." --budget 1500`
 
-## Structural Search (ast-grep)
+## Output discipline
 
-Included in base install (ast-grep-py).
+- Start with `--preset compact`; use `minimal` for large diffs or smaller worker contexts.
+- Set `--max-lines` or `--max-bytes` when a hard transport cap matters.
+- Use JSON only for programmatic consumers; models usually need `ultracompact`.
+- Reuse `--session-id` during multi-turn work so unchanged symbols can be omitted.
+- Use `cache-friendly` only when the consuming API or harness reuses the stable prefix, and measure actual cache usage.
 
-```bash
-# Find all function definitions
-tldrs structural 'def $FUNC($$$ARGS): $$$BODY' --lang python
+## Entry syntax
 
-# Find all method calls
-tldrs structural '$OBJ.$METHOD($$$ARGS)' --lang python
-```
+- `file.py:func`
+- `Class.method`
+- `module:func`
 
-**Shell escaping**: Always single-quote patterns. `$VAR` and `$$$ARGS` are ast-grep meta-variables that the shell would otherwise expand.
+If unsure, use `tldrs structure <dir>` first. If tldrs reports ambiguity, select one of its qualified candidates.
 
-## Impact / Test Selection
+## Typical flows
 
-- Git diff to affected tests:
-  - `tldrs change-impact --git --git-base HEAD~1`
-- Session-modified files (run tests):
-  - `tldrs change-impact --session --run`
-
-## Call Graph and Import Helpers
-
-- Call graph:
-  - `tldrs calls . --lang python`
-- Reverse call graph (callers):
-  - `tldrs impact authenticate --depth 3 --lang python`
-- Importers:
-  - `tldrs importers tldr_swinton.api --lang python`
-
-## Output Handling
-
-- Use budgets to cap output size: `--budget 2000`.
-- Prefer compact output: `--format ultracompact` where supported.
-- For tooling, use JSON: `tldrs context <entry> --format json`.
-- Store large outputs as refs:
+### Non-trivial bug fix
 
 ```bash
-tldrs context main --project . --output vhs
-# Later:
-tldrs context main --project . --include vhs://<hash>
+tldrs diff-context --project . --preset compact
+tldrs find "error handling"
+tldrs context src/api.py:handle_request --project . --preset compact
+tldrs change-impact --git
 ```
 
-- `--output vhs` prints a ref plus a short summary/preview; the ref is what saves tokens.
-- Repo-local VHS storage lives under `.tldrs/` by default.
-- Programmatic note: ContextPack JSON includes `etag` per slice for conditional fetch in the API.
-  - For API usage: `get_symbol_context_pack(..., etag=...)` returns `"UNCHANGED"` when the symbol is unchanged.
+Then read the exact implementation and tests needed for the change.
+
+### Large codebase exploration
+
+```bash
+tldrs arch --lang typescript .
+tldrs structure packages/auth/
+tldrs context packages/auth/src/index.ts:initialize --project . --preset compact
+```
+
+In Claude Code, the plugin runs this class of work in a forked Explore context. In Codex or another multi-agent harness, keep the raw exploration in an explorer thread and return a short file/symbol summary.
+
+### Agent handoff
+
+```bash
+tldrs distill --task "review authorization changes for regressions" --budget 1500 --session-id auth-review
+```
+
+The receiving agent should still verify source and tests before editing.
 
 ## Troubleshooting
 
-- Override VHS storage location: `export TLDRS_VHS_HOME=/path/to/store`
-- Suppress entry warnings (optional): `export TLDRS_NO_WARNINGS=1`
-
-## Typical Agent Flow
-
-1) `tldrs diff-context --project . --budget 2000`
-2) `tldrs context <entry> --project . --depth 2 --budget 2000 --format ultracompact`
-3) `tldrs extract path/to/file.py` for precise edits
-4) Read the full file only when you must modify it
+- `command -v tldrs` succeeds but `tldrs --version` fails: stale launcher or deleted editable target; re-run `scripts/install.sh`.
+- `No semantic index found`: run `tldrs index .`.
+- `No git repository`: use `structure`, `tree`, or `extract` instead of diff-context.
+- Structural search is garbled: single-quote `$` patterns.
+- Entry is ambiguous: qualify it as `file.py:symbol`.
+- Repo-local artifact storage needs relocation: set `TLDRS_VHS_HOME`.

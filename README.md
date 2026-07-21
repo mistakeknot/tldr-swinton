@@ -2,7 +2,7 @@
 
 Token-efficient code analysis platform for LLMs and AI agents.
 
-33 commands. 5 analysis layers. 13+ languages. 48–93% token savings.
+33 commands. 5 analysis layers. 13+ languages. Adaptive context selection for modern coding agents.
 
 ## Why tldrs?
 
@@ -22,8 +22,8 @@ tldrs isn't just extraction: it's full static analysis (control flow, data flow,
 # One-liner (recommended)
 curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldr-swinton/main/scripts/install.sh | bash
 
-# Or via uv
-uv pip install tldr-swinton
+# Or as an isolated uv tool
+uv tool install tldr-swinton
 
 # Or manual
 git clone https://github.com/mistakeknot/tldr-swinton
@@ -42,7 +42,7 @@ tldrs context main --project .    # Call-graph context around a symbol
 ### Verify
 
 ```bash
-tldrs --version   # 0.7.0
+tldrs --version
 tldrs doctor      # Check optional tools (type checkers, linters)
 ```
 
@@ -135,7 +135,11 @@ Persistent storage for agent workflows.
 /plugin install tldr-swinton
 ```
 
-Adds 6 slash commands (`/tldrs-find`, `/tldrs-diff`, `/tldrs-context`, `/tldrs-structural`, `/tldrs-quickstart`, `/tldrs-extract`) and 6 autonomous skills that fire before Read/Grep to suggest better reconnaissance.
+Adds 6 slash commands (`/tldrs-find`, `/tldrs-diff`, `/tldrs-context`, `/tldrs-structural`, `/tldrs-quickstart`, `/tldrs-extract`) and 4 skills. Large/unfamiliar reconnaissance and codebase mapping run in a forked Explore context; known small edits bypass tldrs.
+
+### Codex skill
+
+The repo-scoped Agent Skill at `.codex/skills/tldrs-agent-workflow/SKILL.md` uses the same adaptive boundary. It recommends tldrs for unfamiliar, multi-file, diff-heavy, or delegation-heavy work and permits direct reads for already-scoped edits.
 
 ### MCP server
 
@@ -162,7 +166,7 @@ Exposes tldrs commands as MCP tools: 1:1 mapping with the CLI. Add to your MCP c
 Any agent with shell access can call `tldrs` directly:
 
 ```bash
-# Decision tree: which command?
+# Use tldrs when it will narrow the next read, edit, test, or handoff.
 # Working on recent changes?     → tldrs diff-context --project .
 # Need context around a symbol?  → tldrs context <name> --project . --budget 2000
 # Searching for code by meaning? → tldrs find "query"
@@ -263,7 +267,7 @@ uv sync --extra full
 curl -fsSL https://raw.githubusercontent.com/mistakeknot/tldr-swinton/main/scripts/uninstall.sh | bash
 ```
 
-Removes installation directory, shell alias, and pip packages. Project indexes (`.tldrs/` directories) are preserved.
+Removes the installation directory, managed launchers, legacy shell alias, and pip packages. Project indexes (`.tldrs/` directories) are preserved.
 
 ## Output formats & presets
 
@@ -283,6 +287,7 @@ Usage: `tldrs context main --project . --preset compact`
 
 - [Quick Reference](docs/QUICKSTART.md): One-page agent guide
 - [Agent Workflow](docs/agent-workflow.md): Full integration guide
+- [Harness Capabilities](docs/harness-capabilities.md): Dated model/harness baseline and routing rationale
 - [Token Savings](docs/token-savings-summary.md): Detailed benchmark methodology
 - [AGENTS.md](AGENTS.md): Architecture, commands, and development guide
 

@@ -11,6 +11,13 @@ def test_claude_reconnaissance_uses_an_explore_fork_for_noisy_work() -> None:
     assert "starting any coding task" not in skill.lower()
 
 
+def test_claude_codebase_mapping_uses_an_explore_fork() -> None:
+    skill = Path(".claude-plugin/skills/tldrs-map-codebase/SKILL.md").read_text()
+
+    assert "context: fork" in skill
+    assert "agent: Explore" in skill
+
+
 def test_codex_guidance_is_adaptive_instead_of_a_pre_read_gate() -> None:
     skill = Path(".codex/skills/tldrs-agent-workflow/SKILL.md").read_text()
 

@@ -6,7 +6,7 @@
 
 Token-efficient code analysis tool for LLMs. Fork of llm-tldr with fixes for TypeScript, Rust, and multi-language support.
 
-**Version**: 0.7.14
+**Version**: 0.7.19
 **Quick start**: Run `tldrs quickstart` for a concise reference guide.
 
 ## Quick Reference
