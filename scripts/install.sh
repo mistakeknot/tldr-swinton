@@ -10,7 +10,7 @@
 #   --dir PATH      Installation directory (default: ~/tldr-swinton)
 #
 
-set -e
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -142,11 +142,13 @@ fi
 echo -e "  ${YELLOW}→${NC} Installing dependencies (this may take a minute)..."
 if [ -f "uv.lock" ]; then
     # uv sync respects requires-python = ">=3.10" from lockfile
-    uv sync --extra "$SEMANTIC_EXTRA" 2>&1 | grep -v "^  " || true
+    uv sync --extra "$SEMANTIC_EXTRA"
 else
     # Fallback if no lockfile - explicitly use 3.11
-    uv venv -p 3.11 2>/dev/null || true
-    uv pip install -e ".[${SEMANTIC_EXTRA}]" 2>&1 | tail -5
+    if [ ! -d ".venv" ]; then
+        uv venv -p 3.11
+    fi
+    uv pip install -e ".[${SEMANTIC_EXTRA}]"
 fi
 echo -e "  ${GREEN}✓${NC} Python environment ready"
 
@@ -178,41 +180,48 @@ else
     fi
 fi
 
-# Step 5: Verify installation
+# Step 5: Install stable launchers and verify from outside the checkout
 echo ""
 echo -e "${BLUE}[5/5]${NC} Verifying installation..."
 
-# Test the CLI
-if uv run tldrs --help > /dev/null 2>&1; then
-    echo -e "  ${GREEN}✓${NC} CLI is working"
+scripts/install-launchers.sh "$INSTALL_DIR" "$HOME/.local/bin"
+export PATH="$HOME/.local/bin:$PATH"
+
+# Login shells used by coding-agent harnesses need the user bin directory too.
+case "${SHELL:-}" in
+    */zsh) PATH_RC="$HOME/.zprofile" ;;
+    */bash) PATH_RC="$HOME/.profile" ;;
+    *) PATH_RC="$HOME/.profile" ;;
+esac
+
+touch "$PATH_RC"
+if ! grep -Fq 'export PATH="$HOME/.local/bin:$PATH"' "$PATH_RC"; then
+    {
+        echo ""
+        echo "# tldr-swinton launchers"
+        echo 'export PATH="$HOME/.local/bin:$PATH"'
+    } >> "$PATH_RC"
+    echo -e "  ${GREEN}✓${NC} Added user launchers to PATH in ${PATH_RC}"
+fi
+
+# Remove the legacy interactive alias, which changed the caller's working directory.
+for shell_rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+    if [ -f "$shell_rc" ] && grep -q "alias tldrs=" "$shell_rc"; then
+        sed -i.bak '/# tldr-swinton$/d; /alias tldrs=/d' "$shell_rc"
+        rm -f "$shell_rc.bak"
+        echo -e "  ${GREEN}✓${NC} Removed legacy tldrs alias from ${shell_rc}"
+    fi
+done
+
+VERIFY_DIR=$(mktemp -d)
+if (cd "$VERIFY_DIR" && "$HOME/.local/bin/tldrs" --version > /dev/null 2>&1); then
+    echo -e "  ${GREEN}✓${NC} CLI launcher works outside the install directory"
 else
-    # Try with activated venv
-    source .venv/bin/activate 2>/dev/null || true
-    if tldrs --help > /dev/null 2>&1; then
-        echo -e "  ${GREEN}✓${NC} CLI is working"
-    else
-        echo -e "  ${RED}✗${NC} CLI verification failed"
-        exit 1
-    fi
+    echo -e "  ${RED}✗${NC} CLI launcher verification failed"
+    rm -rf "$VERIFY_DIR"
+    exit 1
 fi
-
-# Add shell alias
-SHELL_RC=""
-if [ -f "$HOME/.zshrc" ]; then
-    SHELL_RC="$HOME/.zshrc"
-elif [ -f "$HOME/.bashrc" ]; then
-    SHELL_RC="$HOME/.bashrc"
-fi
-
-if [ -n "$SHELL_RC" ]; then
-    # Add alias if not already present
-    if ! grep -q "alias tldrs=" "$SHELL_RC" 2>/dev/null; then
-        echo "" >> "$SHELL_RC"
-        echo "# tldr-swinton" >> "$SHELL_RC"
-        echo "alias tldrs='cd ${INSTALL_DIR} && uv run tldrs'" >> "$SHELL_RC"
-        echo -e "  ${GREEN}✓${NC} Added 'tldrs' alias to ${SHELL_RC}"
-    fi
-fi
+rm -rf "$VERIFY_DIR"
 
 # Success message
 echo ""
@@ -229,8 +238,7 @@ echo -e "  ${BLUE}tldrs diff-context --project . --budget 2000${NC}  # Context f
 echo -e "  ${BLUE}tldrs index .${NC}                           # Build semantic index (once)"
 echo -e "  ${BLUE}tldrs find \"auth logic\"${NC}                 # Search by concept"
 echo ""
-echo -e "Or after restarting your shell:"
-echo -e "  ${BLUE}tldrs quickstart${NC}"
+echo -e "The launchers are installed in: ${BLUE}$HOME/.local/bin${NC}"
 echo ""
 echo -e "Documentation: ${BLUE}https://github.com/mistakeknot/tldr-swinton${NC}"
 echo -e "Quick Reference: ${BLUE}https://github.com/mistakeknot/tldr-swinton/blob/main/docs/QUICKSTART.md${NC}"

@@ -9,7 +9,7 @@
 #   --dir PATH      Installation directory (default: ~/tldr-swinton)
 #
 
-set -e
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -74,9 +74,19 @@ if [ "$SKIP_CONFIRM" = false ]; then
     fi
 fi
 
-# Step 1: Remove shell alias
+# Step 1: Remove managed launchers and legacy shell alias
 echo ""
-echo -e "${BLUE}[1/3]${NC} Removing shell alias..."
+echo -e "${BLUE}[1/3]${NC} Removing launchers and shell alias..."
+
+for command in tldrs tldr-swinton tldr-mcp; do
+    launcher="$HOME/.local/bin/$command"
+    if [ -f "$launcher" ] && grep -Fq "$INSTALL_DIR/.venv/bin/$command" "$launcher"; then
+        rm -f "$launcher"
+        echo -e "  ${GREEN}✓${NC} Removed ${launcher}"
+    elif [ -e "$launcher" ]; then
+        echo -e "  ${YELLOW}!${NC} Kept unmanaged launcher ${launcher}"
+    fi
+done
 
 SHELL_RC=""
 if [ -f "$HOME/.zshrc" ]; then
