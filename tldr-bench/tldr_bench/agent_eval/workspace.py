@@ -20,6 +20,7 @@ _EVALUATOR_EXCLUSIONS = (
     Path(".claude-plugin"),
     Path("AGENTS.md"),
     Path("CLAUDE.md"),
+    Path("tldr-bench"),
     Path("tldr-bench/agent_eval"),
     Path("tldr-bench/tldr_bench/agent_eval"),
     Path("tldr-bench/tldr_bench/tasks/agent_value.yaml"),

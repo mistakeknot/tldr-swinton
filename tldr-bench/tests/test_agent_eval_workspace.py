@@ -109,10 +109,7 @@ def test_materialized_conditions_share_source_but_isolate_guidance(
     assert not (baseline / "CLAUDE.md").exists()
     assert not (baseline / ".codex").exists()
     assert not (baseline / ".claude-plugin").exists()
-    assert not (baseline / "tldr-bench" / "agent_eval").exists()
-    assert not (
-        baseline / "tldr-bench" / "tldr_bench" / "tasks" / "agent_value.yaml"
-    ).exists()
+    assert not (baseline / "tldr-bench").exists()
     assert (
         subprocess.run(
             ["git", "rev-list", "--count", "HEAD"],
