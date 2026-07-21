@@ -1,3 +1,8 @@
+---
+name: tldrs-semantic-search
+description: Reference semantic-search backends when changing indexing, retrieval, persistence, or concurrency behavior.
+---
+
 # Semantic Search Backends
 
 | Backend | Model | Dimensions | Install | Quality |

@@ -1,3 +1,8 @@
+---
+name: tldrs-mcp-server
+description: Reference the tldr-swinton MCP surface when changing tools, schemas, costs, or server behavior.
+---
+
 # MCP Server (`tldr-code`)
 
 The MCP server is the primary agent interface. 24 tools organized by category.

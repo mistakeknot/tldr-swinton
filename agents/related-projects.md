@@ -1,3 +1,8 @@
+---
+name: tldrs-related-projects
+description: Check downstream projects and synchronization requirements before changing public tldr-swinton formats or capabilities.
+---
+
 # Related Projects
 
 | Project | What | Path |

@@ -97,7 +97,7 @@
 1. Sync the project environment with test dependencies.
 2. Remove only the confirmed stale Homebrew Python 3.11 editable installation whose target no longer exists.
 3. Install the new launchers from this checkout.
-4. Run the full test suite, manifest/version checks, and live commands from `/Users/sma/projects`.
+4. Run the repository's exact CI command, focused installation/harness tests, manifest/version checks, and live commands from `/Users/sma/projects`. (The checkout contains separately configured root, structural, evaluation, and `tldr-bench` suites, so bare recursive pytest collection is not a valid aggregate command.)
 5. Review the diff, update and close Beads issue `mk-4e4q`, pull/rebase, push Beads and Git, and confirm `main` is up to date.
 
 <verify>
@@ -105,6 +105,8 @@
   expect: contains "0.7.19"
 - run: `tldrs structure /Users/sma/projects/tldr-swinton/src/tldr_swinton`
   expect: exit 0
-- run: `uv run pytest -q`
+- run: `PYTHONPATH=tldr-bench uv run python -m pytest tldr-bench/tests/test_compare_results_cli.py tldr-bench/tests/test_cassette_variant.py -q`
+  expect: exit 0
+- run: `uv run python -m pytest tests/test_install_script.py tests/test_harness_guidance.py tests/test_capability_guidance.py -q`
   expect: exit 0
 </verify>

@@ -1,3 +1,8 @@
+---
+name: tldrs-architecture
+description: Reference tldr-swinton architecture when changing extraction, analysis, CLI, or MCP internals.
+---
+
 # Architecture
 
 ## Source Layout

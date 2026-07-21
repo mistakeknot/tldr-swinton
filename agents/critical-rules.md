@@ -1,3 +1,8 @@
+---
+name: tldrs-critical-rules
+description: Check tldr-swinton invariants before changing imports, outputs, compatibility surfaces, or tests.
+---
+
 # Critical Rules
 
 ## Import Convention

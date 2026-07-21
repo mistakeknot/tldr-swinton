@@ -1,3 +1,8 @@
+---
+name: tldrs-data-structures
+description: Reference the core tldr-swinton data structures when changing extractors, serialization, or consumers.
+---
+
 # Key Data Structures
 
 **FunctionInfo** (`modules/core/ast_extractor.py`):

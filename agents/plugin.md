@@ -1,3 +1,8 @@
+---
+name: tldrs-plugin
+description: Reference the Claude Code plugin surface when changing commands, skills, hooks, or packaging.
+---
+
 # Claude Code Plugin
 
 ## Commands

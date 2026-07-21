@@ -1,4 +1,5 @@
 import json
+import stat
 from pathlib import Path
 
 
@@ -39,3 +40,21 @@ def test_setup_hook_checks_executable_health_without_injecting_structure() -> No
     assert "tldrs --version" in hook
     assert "tldrs structure" not in hook
     assert "will run diff-context" not in hook
+
+
+def test_setup_hook_is_executable_for_direct_plugin_invocation() -> None:
+    mode = Path(".claude-plugin/hooks/setup.sh").stat().st_mode
+
+    assert mode & stat.S_IXUSR
+
+
+def test_plugin_agents_have_current_claude_frontmatter() -> None:
+    agent_files = sorted(Path("agents").glob("*.md"))
+
+    assert agent_files
+    for agent_file in agent_files:
+        text = agent_file.read_text()
+        assert text.startswith("---\n"), agent_file
+        frontmatter = text.split("---", 2)[1]
+        assert "\nname:" in frontmatter, agent_file
+        assert "\ndescription:" in frontmatter, agent_file
