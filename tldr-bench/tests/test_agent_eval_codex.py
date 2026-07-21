@@ -58,6 +58,32 @@ def test_parse_trace_preserves_errors_and_malformed_lines() -> None:
     )
 
 
+def test_parse_trace_does_not_count_tldrs_availability_probes() -> None:
+    commands = [
+        "/bin/zsh -lc 'command -v tldrs || true'",
+        "/bin/zsh -lc 'which -a tldrs || true'",
+        "/bin/zsh -lc 'type tldrs || true'",
+    ]
+    trace = "\n".join(
+        json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": command,
+                    "aggregated_output": "",
+                    "exit_code": 0,
+                },
+            }
+        )
+        for command in commands
+    )
+
+    parsed = parse_codex_trace(trace, requested_model="gpt-eval")
+
+    assert parsed.metrics.tldrs_calls == 0
+
+
 def test_build_codex_command_fixes_harness_controls(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()

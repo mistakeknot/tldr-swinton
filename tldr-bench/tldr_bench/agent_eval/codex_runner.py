@@ -11,6 +11,10 @@ from .schema import TraceMetrics
 
 
 _TLDRS_COMMAND = re.compile(r"(?:^|[\s'\"/])tldrs(?:[\s'\"]|$)")
+_TLDRS_PROBE = re.compile(
+    r"\b(?:command\s+-[vV]|which(?:\s+-[A-Za-z]+)*|type(?:\s+-[A-Za-z]+)*)"
+    r"\s+tldrs\b"
+)
 _RAW_READ_COMMAND = re.compile(
     r"(?:^|[;&|]\s*|['\"])(?:cat|sed|head|tail)(?:\s|$)"
 )
@@ -20,6 +24,11 @@ _TOOL_ITEM_TYPES = {
     "function_call",
     "web_search",
 }
+
+
+def _invokes_tldrs(command: str) -> bool:
+    without_probes = _TLDRS_PROBE.sub("", command)
+    return _TLDRS_COMMAND.search(without_probes) is not None
 
 
 @dataclass(frozen=True)
@@ -141,7 +150,7 @@ def parse_codex_trace(text: str, *, requested_model: str) -> ParsedCodexTrace:
             if item_type == "command_execution":
                 command = str(item.get("command", ""))
                 commands.append(command)
-                if _TLDRS_COMMAND.search(command):
+                if _invokes_tldrs(command):
                     tldrs_calls += 1
                 if _RAW_READ_COMMAND.search(command):
                     raw_read_calls += 1
