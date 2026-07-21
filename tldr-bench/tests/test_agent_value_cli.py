@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tldr_bench.agent_eval.cli import _resolve_executable
+
 
 REPO_ROOT = Path(__file__).parents[2]
 SCRIPT = REPO_ROOT / "tldr-bench/scripts/run_agent_value_eval.py"
@@ -50,6 +52,17 @@ def _fake_codex(tmp_path: Path) -> Path:
     )
     executable.chmod(0o755)
     return executable
+
+
+def test_resolve_executable_before_condition_path_is_sanitized(
+    tmp_path: Path, monkeypatch
+) -> None:
+    executable = tmp_path / "codex"
+    executable.write_text("#!/bin/sh\n")
+    executable.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    assert _resolve_executable(Path("codex")) == executable.resolve()
 
 
 def test_list_tasks_and_dry_run_render_stable_cells(tmp_path: Path) -> None:

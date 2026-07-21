@@ -80,6 +80,13 @@ def _default_results_dir() -> Path:
     return REPO_ROOT / "tldr-bench/results/agent-value" / stamp
 
 
+def _resolve_executable(executable: Path) -> Path:
+    if executable.is_absolute() or executable.parent != Path("."):
+        return executable.resolve()
+    resolved = shutil.which(str(executable))
+    return Path(resolved).resolve() if resolved else executable
+
+
 def _select_tasks(args: argparse.Namespace, tasks: list[TaskSpec]) -> list[TaskSpec]:
     if args.smoke and args.task:
         raise ValueError("--smoke and --task cannot be combined")
@@ -183,7 +190,9 @@ def _metadata(
         "reasoning_effort": args.reasoning_effort,
         "timeout_seconds": args.timeout_seconds,
         "seed": args.seed,
-        "codex_version": _command_version([str(args.codex_executable), "--version"]),
+        "codex_version": _command_version(
+            [str(_resolve_executable(args.codex_executable)), "--version"]
+        ),
         "tldrs_version": _command_version([str(tldrs_executable), "--version"]),
         "python_version": platform.python_version(),
         "host_os": platform.system(),
@@ -284,7 +293,7 @@ def _render_dry_run(
         model=args.model,
         reasoning_effort=args.reasoning_effort,
         timeout_s=args.timeout_seconds,
-        codex_executable=args.codex_executable,
+        codex_executable=_resolve_executable(args.codex_executable),
     )
     for task, condition, repeat in cells:
         cell = _cell_id(task, condition, repeat)
@@ -309,7 +318,7 @@ def _run_cell(
         model=args.model,
         reasoning_effort=args.reasoning_effort,
         timeout_s=args.timeout_seconds,
-        codex_executable=args.codex_executable,
+        codex_executable=_resolve_executable(args.codex_executable),
     )
     environment = build_condition_environment(
         condition, tldrs_bin_dir=args.tldrs_bin_dir
