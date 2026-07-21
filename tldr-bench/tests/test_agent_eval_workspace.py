@@ -11,6 +11,7 @@ import pytest
 from tldr_bench.agent_eval.schema import Condition, TaskCategory, TaskSpec
 from tldr_bench.agent_eval.workspace import (
     build_condition_environment,
+    capture_patch,
     load_replacements,
     materialize_workspace,
     patch_hash,
@@ -192,3 +193,18 @@ def test_external_grader_owns_success_and_patch_hash(tmp_path: Path) -> None:
     assert (passed.tests_passed, passed.tests_total) == (2, 2)
     assert patch_hash(workspace) != patch_hash(clean)
     assert not task.grader_path.is_relative_to(workspace)
+
+
+def test_capture_patch_includes_tracked_and_untracked_files(tmp_path: Path) -> None:
+    source = _make_source_repo(tmp_path)
+    task = _make_task_assets(tmp_path)
+    workspace = tmp_path / "work"
+    materialize_workspace(source, task, Condition.BASELINE, workspace)
+    (workspace / "app.py").write_text("def answer() -> int:\n    return 42\n")
+    (workspace / "proof.txt").write_text("external proof\n")
+
+    patch = capture_patch(workspace).decode()
+
+    assert "return 42" in patch
+    assert "proof.txt" in patch
+    assert "external proof" in patch

@@ -23,6 +23,7 @@ _EVALUATOR_EXCLUSIONS = (
     Path("tldr-bench/agent_eval"),
     Path("tldr-bench/tldr_bench/agent_eval"),
     Path("tldr-bench/tldr_bench/tasks/agent_value.yaml"),
+    Path("tldr-bench/scripts/run_agent_value_eval.py"),
     Path("tldr-bench/tests/test_agent_value_tasks.py"),
     Path("tldr-bench/tests/test_agent_value_cli.py"),
 )
@@ -245,3 +246,27 @@ def patch_hash(workspace: Path) -> str:
         payload.extend(b"\0")
         payload.extend((workspace / relative).read_bytes())
     return hashlib.sha256(payload).hexdigest()
+
+
+def capture_patch(workspace: Path) -> bytes:
+    """Return a binary-capable patch that includes new untracked files."""
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+    ).stdout
+    paths = [part.decode() for part in untracked.split(b"\0") if part]
+    if paths:
+        subprocess.run(
+            ["git", "add", "--intent-to-add", "--", *paths],
+            cwd=workspace,
+            check=True,
+            capture_output=True,
+        )
+    return subprocess.run(
+        ["git", "diff", "--binary", "HEAD"],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+    ).stdout

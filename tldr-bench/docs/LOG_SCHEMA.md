@@ -56,3 +56,37 @@ System metadata (auto):
 Notes:
 
 - `instance_ids` is populated from `--instance-ids` (comma-separated). IDs must not contain commas.
+
+## Paired agent value run schema
+
+`scripts/run_agent_value_eval.py` creates one run directory with:
+
+- `metadata.json`: format version, source SHA, full hidden-corpus SHA-256,
+  selected task IDs/conditions/repeats, requested model, reasoning effort,
+  timeout, bootstrap seed, Codex/tldrs versions, Python version, and host data.
+- `outcomes.jsonl`: append-only completed `RunOutcome` records. The stable cell
+  ID is `<task>__<condition>__rNN`; resume refuses duplicate IDs.
+- `traces/<cell>.jsonl`: raw Codex event stream.
+- `messages/<cell>.md`: final agent message captured by Codex.
+- `stderr/<cell>.log`: Codex process stderr.
+- `patches/<cell>.diff`: binary-capable git patch, including newly created files.
+- `graders/<cell>.stdout` and `.stderr`: hidden external-grader evidence.
+- `report.json` and `report.md`: paired metrics, raw cells, fixed gates, and
+  PASS/FAIL/INCONCLUSIVE verdict.
+
+Each outcome records task, condition, repeat, agent exit/timeout, elapsed time,
+patch hash, grader exit and test counts, contamination reasons, and native trace
+metrics: model, input/cached/output/reasoning tokens, tool count/output bytes,
+tldrs calls, raw-read calls, compactions, commands, and errors. Task success is
+the external grader result, never the agent process exit code.
+
+The fixed pilot gates are:
+
+- no more than one additional adaptive failure;
+- at least 20% median uncached-token savings on eligible tasks;
+- no more than 5% median token overhead on negative controls;
+- no more than 10% median latency regression;
+- at least 80% routing precision.
+
+Missing cells, baseline treatment leakage, unavailable adaptive tldrs, or other
+contamination force an `INCONCLUSIVE` overall verdict.
