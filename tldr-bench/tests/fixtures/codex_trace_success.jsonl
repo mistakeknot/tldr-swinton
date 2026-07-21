@@ -1,0 +1,8 @@
+{"type":"thread.started","thread_id":"thread-123"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc 'tldrs context target --project . --budget 2000'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc 'tldrs context target --project . --budget 2000'","aggregated_output":"target context","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/bin/zsh -lc \"sed -n '1,120p' src/target.py\"","aggregated_output":"def target(): ...","exit_code":0,"status":"completed"}}
+{"type":"context.compacted"}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"Implemented and verified."}}
+{"type":"turn.completed","usage":{"input_tokens":1200,"cached_input_tokens":400,"output_tokens":300,"reasoning_output_tokens":20}}

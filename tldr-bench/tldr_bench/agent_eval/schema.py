@@ -43,6 +43,7 @@ class TraceMetrics:
     input_tokens: int | None = None
     cached_input_tokens: int | None = None
     output_tokens: int | None = None
+    reasoning_output_tokens: int | None = None
     total_tokens: int | None = None
     tool_calls: int = 0
     tldrs_calls: int = 0
