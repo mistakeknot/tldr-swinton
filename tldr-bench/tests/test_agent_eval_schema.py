@@ -175,6 +175,9 @@ def test_run_outcome_round_trips_as_json_primitives() -> None:
             tool_calls=5,
             tldrs_calls=1,
             raw_read_calls=2,
+            raw_read_paths=("src/owner.py", "src/owner.py"),
+            unique_raw_read_paths=("src/owner.py",),
+            duplicate_raw_read_paths=1,
             compactions=0,
             commands=("tldrs context target --project .", "sed -n 1,80p file.py"),
             errors=(),
@@ -189,6 +192,12 @@ def test_run_outcome_round_trips_as_json_primitives() -> None:
         ),
         contaminated=False,
         contamination_reasons=(),
+        owner_paths=("src/owner.py",),
+        changed_paths=("src/owner.py", "src/helper.py"),
+        owner_read_precision=1.0,
+        owner_read_recall=1.0,
+        owner_change_precision=0.5,
+        owner_change_recall=1.0,
     )
 
     encoded = json.dumps(outcome.to_dict())

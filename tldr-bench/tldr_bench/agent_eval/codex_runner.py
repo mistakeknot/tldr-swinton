@@ -28,6 +28,9 @@ _HEREDOC = re.compile(
     r"<<-?\s*(?P<quote>['\"]?)(?P<delimiter>[A-Za-z_][A-Za-z0-9_]*)"
     r"(?P=quote)"
 )
+_RAW_READ_EXECUTABLES = {"cat", "head", "sed", "tail"}
+_HEAD_TAIL_VALUE_OPTIONS = {"-c", "-n", "--bytes", "--lines"}
+_SED_VALUE_OPTIONS = {"-e", "-f", "--expression", "--file"}
 
 
 def _unwrap_shell_script(command: str) -> str:
@@ -60,7 +63,7 @@ def _strip_heredoc_bodies(script: str) -> str:
     return "\n".join(kept)
 
 
-def _invokes_tldrs(command: str) -> bool:
+def _shell_tokens(command: str) -> list[str] | None:
     script = _strip_heredoc_bodies(_unwrap_shell_script(command))
     lexer = shlex.shlex(
         script.replace("\n", " ; "),
@@ -70,8 +73,14 @@ def _invokes_tldrs(command: str) -> bool:
     lexer.whitespace_split = True
     lexer.commenters = ""
     try:
-        tokens = list(lexer)
+        return list(lexer)
     except ValueError:
+        return None
+
+
+def _invokes_tldrs(command: str) -> bool:
+    tokens = _shell_tokens(command)
+    if tokens is None:
         return False
 
     expect_command = True
@@ -105,6 +114,84 @@ def _invokes_tldrs(command: str) -> bool:
             return True
         expect_command = False
     return False
+
+
+def _read_path(token: str) -> str | None:
+    if (
+        not token
+        or token == "-"
+        or token.startswith("-")
+        or token.startswith("/dev/")
+        or any(marker in token for marker in ("$", "*", "?", "[", "]"))
+    ):
+        return None
+    path = Path(token)
+    normalized = path.as_posix()
+    if normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def _read_targets(executable: str, arguments: list[str]) -> tuple[str, ...]:
+    targets: list[str] = []
+    skip_next = False
+    sed_has_expression = False
+    sed_script_consumed = False
+    for token in arguments:
+        if skip_next:
+            skip_next = False
+            continue
+        if executable in {"head", "tail"}:
+            if token in _HEAD_TAIL_VALUE_OPTIONS:
+                skip_next = True
+                continue
+            if token.startswith("-"):
+                continue
+        elif executable == "sed":
+            if token in _SED_VALUE_OPTIONS:
+                skip_next = True
+                if token in {"-e", "--expression"}:
+                    sed_has_expression = True
+                continue
+            if token.startswith("-"):
+                continue
+            if not sed_has_expression and not sed_script_consumed:
+                sed_script_consumed = True
+                continue
+        elif token.startswith("-"):
+            continue
+        target = _read_path(token)
+        if target is not None:
+            targets.append(target)
+    return tuple(targets)
+
+
+def _raw_read_paths(command: str) -> tuple[str, ...]:
+    tokens = _shell_tokens(command)
+    if tokens is None:
+        return ()
+    paths: list[str] = []
+    segment: list[str] = []
+    for token in [*tokens, ";"]:
+        if token not in _SHELL_BOUNDARIES:
+            segment.append(token)
+            continue
+        executable_index: int | None = None
+        for index, candidate in enumerate(segment):
+            if candidate in _SHELL_KEYWORDS or candidate == "!":
+                continue
+            if _ASSIGNMENT.match(candidate):
+                continue
+            executable_index = index
+            break
+        if executable_index is not None:
+            executable = Path(segment[executable_index]).name
+            if executable in _RAW_READ_EXECUTABLES:
+                paths.extend(
+                    _read_targets(executable, segment[executable_index + 1 :])
+                )
+        segment = []
+    return tuple(paths)
 
 
 @dataclass(frozen=True)
@@ -183,6 +270,7 @@ def parse_codex_trace(text: str, *, requested_model: str) -> ParsedCodexTrace:
     tool_output_bytes = 0
     tldrs_calls = 0
     raw_read_calls = 0
+    raw_read_paths: list[str] = []
     compactions = 0
     input_tokens = 0
     cached_input_tokens = 0
@@ -230,6 +318,7 @@ def parse_codex_trace(text: str, *, requested_model: str) -> ParsedCodexTrace:
                     tldrs_calls += 1
                 if _RAW_READ_COMMAND.search(command):
                     raw_read_calls += 1
+                    raw_read_paths.extend(_raw_read_paths(command))
                 exit_code = item.get("exit_code")
                 if isinstance(exit_code, int) and exit_code != 0:
                     errors.append(f"command failed ({exit_code}): {command}")
@@ -244,6 +333,7 @@ def parse_codex_trace(text: str, *, requested_model: str) -> ParsedCodexTrace:
                 usage.get("reasoning_output_tokens") or 0
             )
 
+    unique_raw_read_paths = tuple(dict.fromkeys(raw_read_paths))
     return ParsedCodexTrace(
         thread_id=thread_id,
         final_message=final_message,
@@ -260,6 +350,11 @@ def parse_codex_trace(text: str, *, requested_model: str) -> ParsedCodexTrace:
             tool_output_bytes=tool_output_bytes,
             tldrs_calls=tldrs_calls,
             raw_read_calls=raw_read_calls,
+            raw_read_paths=tuple(raw_read_paths),
+            unique_raw_read_paths=unique_raw_read_paths,
+            duplicate_raw_read_paths=(
+                len(raw_read_paths) - len(unique_raw_read_paths)
+            ),
             compactions=compactions,
             commands=tuple(commands),
             errors=tuple(errors),

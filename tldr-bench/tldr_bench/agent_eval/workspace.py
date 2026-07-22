@@ -300,3 +300,26 @@ def capture_patch(workspace: Path) -> bytes:
         check=True,
         capture_output=True,
     ).stdout
+
+
+def changed_paths(workspace: Path) -> tuple[str, ...]:
+    """Return tracked and untracked paths changed from the evaluation base."""
+    tracked = subprocess.run(
+        ["git", "diff", "--name-only", "-z", "HEAD"],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+    ).stdout
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+    ).stdout
+    paths = {
+        part.decode()
+        for payload in (tracked, untracked)
+        for part in payload.split(b"\0")
+        if part
+    }
+    return tuple(sorted(paths))

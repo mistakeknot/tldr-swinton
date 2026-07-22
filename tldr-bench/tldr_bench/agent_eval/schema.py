@@ -49,6 +49,9 @@ class TraceMetrics:
     tool_output_bytes: int = 0
     tldrs_calls: int = 0
     raw_read_calls: int = 0
+    raw_read_paths: tuple[str, ...] = ()
+    unique_raw_read_paths: tuple[str, ...] = ()
+    duplicate_raw_read_paths: int = 0
     compactions: int = 0
     commands: tuple[str, ...] = ()
     errors: tuple[str, ...] = ()
@@ -59,11 +62,21 @@ class TraceMetrics:
             return None
         return max(0, self.total_tokens - (self.cached_input_tokens or 0))
 
+    @property
+    def duplicate_raw_read_ratio(self) -> float:
+        if not self.raw_read_paths:
+            return 0.0
+        return self.duplicate_raw_read_paths / len(self.raw_read_paths)
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TraceMetrics":
         values = dict(data)
         values["commands"] = tuple(values.get("commands", ()))
         values["errors"] = tuple(values.get("errors", ()))
+        values["raw_read_paths"] = tuple(values.get("raw_read_paths", ()))
+        values["unique_raw_read_paths"] = tuple(
+            values.get("unique_raw_read_paths", ())
+        )
         return cls(**values)
 
 
@@ -94,6 +107,12 @@ class RunOutcome:
     grade: GradeResult
     contaminated: bool = False
     contamination_reasons: tuple[str, ...] = ()
+    owner_paths: tuple[str, ...] = ()
+    changed_paths: tuple[str, ...] = ()
+    owner_read_precision: float | None = None
+    owner_read_recall: float | None = None
+    owner_change_precision: float | None = None
+    owner_change_recall: float | None = None
 
     @property
     def cell_id(self) -> str:
@@ -121,6 +140,8 @@ class RunOutcome:
         values["contamination_reasons"] = tuple(
             values.get("contamination_reasons", ())
         )
+        values["owner_paths"] = tuple(values.get("owner_paths", ()))
+        values["changed_paths"] = tuple(values.get("changed_paths", ()))
         return cls(**values)
 
 

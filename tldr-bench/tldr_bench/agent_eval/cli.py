@@ -24,6 +24,8 @@ from .tasks import load_agent_tasks
 from .workspace import (
     build_condition_environment,
     capture_patch,
+    changed_paths,
+    load_replacements,
     materialize_workspace,
     patch_hash,
     run_external_grader,
@@ -368,6 +370,18 @@ def _run_cell(
         (results_dir / "patches").mkdir(parents=True, exist_ok=True)
         (results_dir / "patches" / f"{cell}.diff").write_bytes(patch)
         digest = patch_hash(workspace)
+        owners = tuple(
+            sorted(
+                str(replacement.path)
+                for replacement in load_replacements(task.mutation_path)
+            )
+        )
+        changes = changed_paths(workspace)
+        owner_set = set(owners)
+        read_set = set(process.trace.metrics.unique_raw_read_paths)
+        change_set = set(changes)
+        owner_read_hits = len(owner_set & read_set)
+        owner_change_hits = len(owner_set & change_set)
         grade = run_external_grader(
             task, workspace, python_executable=args.grader_python
         )
@@ -386,6 +400,20 @@ def _run_cell(
             grade=grade,
             contaminated=bool(contamination),
             contamination_reasons=tuple(contamination),
+            owner_paths=owners,
+            changed_paths=changes,
+            owner_read_precision=(
+                owner_read_hits / len(read_set) if read_set else None
+            ),
+            owner_read_recall=(
+                owner_read_hits / len(owner_set) if owner_set else None
+            ),
+            owner_change_precision=(
+                owner_change_hits / len(change_set) if change_set else None
+            ),
+            owner_change_recall=(
+                owner_change_hits / len(owner_set) if owner_set else None
+            ),
         )
     finally:
         if temporary is not None:

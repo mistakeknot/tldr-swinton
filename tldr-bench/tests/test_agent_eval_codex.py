@@ -92,6 +92,42 @@ def test_parse_trace_does_not_count_tldrs_availability_probes() -> None:
     assert parsed.metrics.tldrs_calls == 1
 
 
+def test_parse_trace_records_duplicate_raw_source_reads() -> None:
+    commands = [
+        "/bin/zsh -lc 'cat src/owner.py'",
+        "/bin/zsh -lc \"sed -n '1,80p' src/owner.py\"",
+        "/bin/zsh -lc 'head -n 20 src/helper.py'",
+    ]
+    trace = "\n".join(
+        json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": command,
+                    "aggregated_output": "",
+                    "exit_code": 0,
+                },
+            }
+        )
+        for command in commands
+    )
+
+    parsed = parse_codex_trace(trace, requested_model="gpt-eval")
+
+    assert parsed.metrics.raw_read_paths == (
+        "src/owner.py",
+        "src/owner.py",
+        "src/helper.py",
+    )
+    assert parsed.metrics.unique_raw_read_paths == (
+        "src/owner.py",
+        "src/helper.py",
+    )
+    assert parsed.metrics.duplicate_raw_read_paths == 1
+    assert parsed.metrics.duplicate_raw_read_ratio == 1 / 3
+
+
 def test_build_codex_command_fixes_harness_controls(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()

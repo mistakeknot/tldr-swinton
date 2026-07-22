@@ -12,6 +12,7 @@ from tldr_bench.agent_eval.schema import Condition, TaskCategory, TaskSpec
 from tldr_bench.agent_eval.workspace import (
     build_condition_environment,
     capture_patch,
+    changed_paths,
     load_replacements,
     materialize_workspace,
     patch_hash,
@@ -156,8 +157,9 @@ def test_adaptive_policy_guidance_is_causally_isolated(tmp_path: Path) -> None:
     tool_only_guidance = (tool_only / "AGENTS.md").read_text()
     one_shot_guidance = (one_shot / "AGENTS.md").read_text()
     assert "tldrs" not in tool_only_guidance.lower()
-    assert "at most one tldrs reconnaissance command" in one_shot_guidance.lower()
-    assert "do not chain tldrs commands" in one_shot_guidance.lower()
+    normalized_one_shot = " ".join(one_shot_guidance.lower().split())
+    assert "at most one tldrs reconnaissance command" in normalized_one_shot
+    assert "do not chain tldrs commands" in normalized_one_shot
     assert _tracked_content(tool_only) == _tracked_content(one_shot)
 
 
@@ -234,3 +236,4 @@ def test_capture_patch_includes_tracked_and_untracked_files(tmp_path: Path) -> N
     assert "return 42" in patch
     assert "proof.txt" in patch
     assert "external proof" in patch
+    assert changed_paths(workspace) == ("app.py", "proof.txt")

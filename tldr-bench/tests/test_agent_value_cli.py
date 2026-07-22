@@ -137,6 +137,13 @@ def test_execute_resume_and_report_only(tmp_path: Path) -> None:
     assert len(outcomes) == 2
     assert all(outcome["success"] for outcome in outcomes)
     assert {outcome["condition"] for outcome in outcomes} == {"baseline", "adaptive"}
+    assert all(
+        outcome["owner_paths"]
+        == ["src/tldr_swinton/modules/core/token_utils.py"]
+        for outcome in outcomes
+    )
+    assert all(outcome["owner_change_precision"] == 1.0 for outcome in outcomes)
+    assert all(outcome["owner_change_recall"] == 1.0 for outcome in outcomes)
     for outcome in outcomes:
         cell = outcome["cell_id"]
         assert (results / "traces" / f"{cell}.jsonl").is_file()
