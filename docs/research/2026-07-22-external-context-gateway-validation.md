@@ -17,9 +17,11 @@ every arm.
 
 A follow-up, same-SHA Codex/Python confirmation used the public test-file path
 as a deterministic source-owner hint and capped source excerpts at 750
-characters. It passed 8/8 cells, saved 22.5% at the median paired cell and 26.9%
-in aggregate, reduced median latency by 46.4%, and retained 100% owner recall.
-This is the promoted model-aware profile. Generic and Claude use 1500.
+characters. The released-0.8.2 four-repeat confirmation passed 16/16 cells,
+saved 41.8% at the median paired cell (95% bootstrap interval +35.3% to
++51.3%) and 38.7% in aggregate, reduced median latency by 40.1%, and retained
+100% owner recall. This is the promoted model-aware profile. Generic and Claude
+use 1500.
 
 ## Frozen inputs
 
@@ -58,15 +60,16 @@ characters only when that explicit owner signal exists.
 | Metric | Confirmed result |
 |---|---:|
 | Hidden-grader correctness | 8/8 baseline, 8/8 adaptive |
-| Median paired uncached-token savings | 22.5% |
-| Aggregate uncached-token savings | 26.9% |
-| Median latency change | -46.4% |
+| Median paired uncached-token savings | 41.8% |
+| Savings 95% bootstrap interval | +35.3% to +51.3% |
+| Aggregate uncached-token savings | 38.7% (249,689 to 153,068) |
+| Median latency change | -40.1% |
 | Context-owner recall | 100% |
 | Agent-side tldrs calls | 0 |
 
-The four paired savings were +54.7%, +39.8%, -16.9%, and +5.2%. The variance is
-material; the aggregate and median pass are therefore reported alongside the
-individual cells rather than hidden behind one average.
+Seven of eight pairs saved tokens; the one negative cell was -16.0%. The
+positive bootstrap lower bound, aggregate, and individual-cell variance are
+reported together rather than hidden behind one average.
 
 ## Harness defects found and fixed
 

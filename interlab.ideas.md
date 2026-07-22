@@ -39,8 +39,9 @@
 - [x] External 1500-character balanced matrix — retain as general default:
   32/32 correct, 14.0% aggregate cross-model savings, lower median latency in
   every repository/harness arm.
-- [x] Codex/Python 750-character owner-hint profile — retain: 8/8 correct,
-  22.5% median paired savings, 26.9% aggregate savings, 46.4% lower latency.
+- [x] Codex/Python 750-character owner-hint profile — retain: 16/16 correct,
+  41.8% median paired savings (95% interval +35.3% to +51.3%), 38.7%
+  aggregate savings, 40.1% lower latency.
 
 ## Rejected
 

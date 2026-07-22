@@ -72,9 +72,10 @@ claim.
 
 The public Python test paths exposed a stronger deterministic owner signal.
 Mapping `test_encoding.py` and `test_signer.py` to matching non-test source
-stems enabled a 750-character Codex profile. Its same-SHA, counterbalanced
-confirmation passed 8/8 cells with 22.5% median paired savings, 26.9% aggregate
-savings, 46.4% lower median latency, and 100% owner recall. The 750 budget
+stems enabled a 750-character Codex profile. Its released-0.8.2,
+counterbalanced four-repeat confirmation passed 16/16 cells with 41.8% median
+paired savings (95% bootstrap interval +35.3% to +51.3%), 38.7% aggregate
+savings, 40.1% lower median latency, and 100% owner recall. The 750 budget
 regressed Claude/Python aggregate tokens by 3.7%, so it is promoted only for
 Codex with an explicit test-file owner hint.
 

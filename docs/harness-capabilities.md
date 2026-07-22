@@ -41,9 +41,10 @@ bootstrap interval 25.2% to 41.1%) and 34.7% lower median latency.
 The July 22 external confirmation added pinned Python and Go repositories plus
 Claude Code. At the balanced 1500-character budget, all 32 cells passed and the
 four repository/harness arms saved 6.8% to 19.8% in aggregate. A model-aware
-Codex/Python profile with an explicit test-file owner hint then passed 8/8 cells
-with 22.5% median paired savings, 26.9% aggregate savings, and 46.4% lower
-median latency. The product therefore defaults to 1500 characters and exposes
+Codex/Python profile with an explicit test-file owner hint then passed 16/16
+cells with 41.8% median paired savings (95% bootstrap interval +35.3% to
++51.3%), 38.7% aggregate savings, and 40.1% lower median latency. The product
+therefore defaults to 1500 characters and exposes
 `--harness-profile codex` for the validated 750-character owner-routed case;
 it does not claim one budget is optimal for every model and language.
 
