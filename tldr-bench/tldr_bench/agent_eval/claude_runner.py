@@ -100,17 +100,32 @@ def _content_bytes(content: Any) -> int:
     return 0
 
 
-def _read_tool_path(tool_input: Any) -> str | None:
+def _read_tool_path(
+    tool_input: Any,
+    *,
+    workspace: Path | None = None,
+) -> str | None:
     if not isinstance(tool_input, dict):
         return None
     value = tool_input.get("file_path") or tool_input.get("path")
     if not isinstance(value, str) or not value:
         return None
-    path = Path(value).as_posix()
+    raw_path = Path(value)
+    if workspace is not None and raw_path.is_absolute():
+        try:
+            raw_path = raw_path.resolve().relative_to(workspace.resolve())
+        except ValueError:
+            pass
+    path = raw_path.as_posix()
     return path[2:] if path.startswith("./") else path
 
 
-def parse_claude_trace(text: str, *, requested_model: str) -> ParsedClaudeTrace:
+def parse_claude_trace(
+    text: str,
+    *,
+    requested_model: str,
+    workspace: Path | None = None,
+) -> ParsedClaudeTrace:
     session_id: str | None = None
     model = requested_model
     final_message = ""
@@ -166,7 +181,7 @@ def parse_claude_trace(text: str, *, requested_model: str) -> ParsedClaudeTrace:
                             raw_read_calls += 1
                             raw_read_paths.extend(paths)
                 elif name == "Read":
-                    path = _read_tool_path(tool_input)
+                    path = _read_tool_path(tool_input, workspace=workspace)
                     if path is not None:
                         raw_read_calls += 1
                         raw_read_paths.append(path)
@@ -269,7 +284,11 @@ def run_claude(
         stderr += f"claude timed out after {config.timeout_s}s"
     elapsed_ms = int((time.perf_counter() - started) * 1000)
     trace_path.write_text(stdout)
-    parsed = parse_claude_trace(stdout, requested_model=config.model)
+    parsed = parse_claude_trace(
+        stdout,
+        requested_model=config.model,
+        workspace=workspace,
+    )
     output_last_message.write_text(parsed.final_message)
     return ClaudeProcessResult(
         exit_code=exit_code,

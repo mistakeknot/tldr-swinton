@@ -35,6 +35,30 @@ attempt is excluded from correctness and token comparisons. A fake-harness
 regression now proves the grader executable is absolutized before materializing
 any workspace. Reruns use fresh result directories and the new evaluator SHA.
 
+### Smoke attempt 2 — methodological reject
+
+The first complete external matrix passed all eight hidden-grader cells, but it
+is excluded from savings claims. The one-pair screens ranged from 17.5% savings
+to 18.6% overhead under Codex and from 2.7% savings to 18.0% overhead under
+Claude. Three harness defects made those token values non-comparable:
+
+- retained workspaces lived below `/Users/sma/projects`, so Codex inherited the
+  parent `AGENTS.md` and loaded unrelated workflow skills;
+- the Python public verification command resolved `python` from an environment
+  where it was unavailable, causing avoidable runtime probing even though the
+  hidden grader passed the eventual repair; and
+- Claude reported absolute `Read` paths, so owner-read accounting failed to
+  match repository-relative owner paths.
+
+The baseline contamination audit also found a second `tldrs` installation in
+the evaluator virtualenv after the configured install directory was removed.
+The corrected harness now strips every `PATH` entry exposing `tldrs` for
+baseline and injected policies, expands a quoted `{python}` placeholder to the
+pinned evaluator interpreter, normalizes Claude reads relative to the isolated
+workspace, and uses operating-system temporary workspaces. Each correction has
+a focused regression test. Attempt 3 starts from a new evaluator SHA and fresh
+result directories.
+
 ## Objective
 
 Hill-climb tldr-swinton context policy until it reduces eligible-task median

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import os
 import shutil
 import subprocess
@@ -235,6 +236,32 @@ def test_injected_runtime_adds_a_validated_test_execution_contract(
     assert "Do not probe alternative interpreters" in guidance
 
 
+def test_injected_runtime_expands_verification_python_placeholder(
+    tmp_path: Path,
+) -> None:
+    source = _make_source_repo(tmp_path)
+    task = replace(
+        _make_task_assets(tmp_path),
+        verification_command="{python} -m pytest tests/test_app.py -q",
+    )
+    workspace = tmp_path / "language-runtime"
+
+    materialize_workspace(
+        source,
+        task,
+        Condition.ADAPTIVE,
+        workspace,
+        adaptive_policy="injected_runtime",
+        verification_python=Path("/opt/agent harness/python"),
+    )
+
+    guidance = (workspace / "AGENTS.md").read_text()
+    assert (
+        "'/opt/agent harness/python' -m pytest tests/test_app.py -q"
+        in guidance
+    )
+
+
 def test_replacements_fail_closed_when_source_drifted(tmp_path: Path) -> None:
     source = _make_source_repo(tmp_path)
     task = _make_task_assets(tmp_path, old="return 999")
@@ -258,10 +285,20 @@ def test_load_replacements_rejects_path_escape(tmp_path: Path) -> None:
 
 def test_condition_environment_removes_or_exposes_tldrs_bin(tmp_path: Path) -> None:
     tldrs_bin = tmp_path / "tldrs-bin"
+    duplicate_tldrs_bin = tmp_path / "duplicate-tldrs-bin"
     other_bin = tmp_path / "other-bin"
     tldrs_bin.mkdir()
+    duplicate_tldrs_bin.mkdir()
     other_bin.mkdir()
-    base = {"PATH": os.pathsep.join([str(tldrs_bin), str(other_bin)])}
+    for bin_dir in (tldrs_bin, duplicate_tldrs_bin):
+        executable = bin_dir / "tldrs"
+        executable.write_text("#!/bin/sh\nexit 0\n")
+        executable.chmod(0o755)
+    base = {
+        "PATH": os.pathsep.join(
+            [str(tldrs_bin), str(duplicate_tldrs_bin), str(other_bin)]
+        )
+    }
 
     baseline = build_condition_environment(
         Condition.BASELINE, base, tldrs_bin_dir=tldrs_bin
@@ -283,7 +320,7 @@ def test_condition_environment_removes_or_exposes_tldrs_bin(tmp_path: Path) -> N
     )
 
     assert baseline["PATH"] == str(other_bin)
-    assert adaptive["PATH"].split(os.pathsep)[0] == str(tldrs_bin)
+    assert adaptive["PATH"] == os.pathsep.join([str(tldrs_bin), str(other_bin)])
     assert injected["PATH"] == str(other_bin)
     assert injected["TLDRS_DISABLED"] == "1"
     assert injected_runtime["PATH"] == str(other_bin)

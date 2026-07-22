@@ -39,7 +39,9 @@ def test_parse_current_claude_stream_json_trace() -> None:
                             {
                                 "type": "tool_use",
                                 "name": "Read",
-                                "input": {"file_path": "src/owner.py"},
+                                "input": {
+                                    "file_path": "/tmp/workspace/src/owner.py"
+                                },
                             },
                         ]
                     },
@@ -76,7 +78,11 @@ def test_parse_current_claude_stream_json_trace() -> None:
         ]
     )
 
-    parsed = parse_claude_trace(trace, requested_model="sonnet")
+    parsed = parse_claude_trace(
+        trace,
+        requested_model="sonnet",
+        workspace=Path("/tmp/workspace"),
+    )
 
     assert parsed.session_id == "session-123"
     assert parsed.final_message == "Implemented and verified."

@@ -167,6 +167,16 @@ def _write_condition_guidance(
     else:
         if task.verification_command is not None:
             test_command = task.verification_command
+            if "{python}" in test_command:
+                if verification_python is None:
+                    raise ValueError(
+                        "injected_runtime verification command requires a "
+                        "verification Python"
+                    )
+                test_command = test_command.replace(
+                    "{python}",
+                    shlex.quote(str(verification_python)),
+                )
         else:
             if verification_python is None:
                 raise ValueError("injected_runtime requires a verification Python")
@@ -253,7 +263,12 @@ def build_condition_environment(
     parts = [
         part
         for part in current_path.split(os.pathsep)
-        if part and Path(part).resolve() != tldrs_dir
+        if part
+        and Path(part).resolve() != tldrs_dir
+        and not (
+            (Path(part) / "tldrs").is_file()
+            and os.access(Path(part) / "tldrs", os.X_OK)
+        )
     ]
     policy = parse_adaptive_policy(adaptive_policy)
     agent_tool_enabled = (
