@@ -113,3 +113,28 @@ Decision: model-initiated reconnaissance is exhausted as the primary product
 path. Next mutation is a deterministic, automatically injected, bounded packet
 derived only from the public task and visible source. The model will not spend a
 tool call deciding whether or how to discover context.
+
+## 2026-07-21 Automatic Bounded Packet
+
+Source `51e492d` added a deterministic lexical/local-invariant gateway. It runs
+before the agent, derives candidates only from public task text and the visible
+materialized workspace, injects at most three excerpts, and hides the
+agent-facing executable. Offline top-three hidden-owner recall is 12/12 after
+the evaluator surface is removed.
+
+On the same four-task screen the packet was correct on 4/4 and used zero tldrs
+calls. Eligible median savings improved from -11.8% for the best model-initiated
+policy to +24.2%:
+
+| Task | Baseline tokens | Packet tokens | Savings | Correct |
+|---|---:|---:|---:|---:|
+| Known-file control | 70,550 | 57,702 | 18.2% | yes |
+| Cross-file ignore | 70,153 | 71,024 | -1.2% | yes |
+| Diff boundary | 60,764 | 46,074 | 24.2% | yes |
+| Owner refactor | 76,892 | 42,126 | 45.2% | yes |
+
+The packet eliminated the prior refactor escape: it edited the hidden owner and
+passed while saving 45.2%. The cross-file outlier spent 22 tool calls and
+155,522 output bytes probing unavailable test runtimes and package managers.
+The source owner was already correct. Next mutation: add a validated execution
+contract naming the working test interpreter and discourage runtime probing.

@@ -24,6 +24,9 @@
   eligible median savings.
 - [x] Strict one-shot routing — correctness retained and owner recall restored,
   but rejected for savings at -11.8% eligible median.
+- [x] Automatic bounded context packet — retain: 4/4 correct, 12/12 offline
+  top-three owner recall, +24.2% eligible median savings, and +45.2% on the
+  owner-sensitive refactor. Needs one more hill-climb to clear the 25% target.
 
 ## Rejected
 
