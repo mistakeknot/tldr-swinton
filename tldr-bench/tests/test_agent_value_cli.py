@@ -200,3 +200,37 @@ def test_execute_resume_and_report_only(tmp_path: Path) -> None:
     assert reported.returncode == 0, reported.stderr
     report = json.loads((results / "report.json").read_text())
     assert f"Verdict: {report['verdict'].upper()}" in reported.stdout
+
+
+def test_injected_runtime_report_uses_context_owner_gate(tmp_path: Path) -> None:
+    results = tmp_path / "gateway-run"
+    fake_codex = _fake_codex(tmp_path)
+    grader_python = REPO_ROOT / ".venv/bin/python"
+    if not grader_python.exists():
+        grader_python = Path(sys.executable)
+
+    executed = _run_cli(
+        "--task",
+        "neg-token-fallback",
+        "--conditions",
+        "baseline",
+        "adaptive",
+        "--repeats",
+        "1",
+        "--adaptive-policy",
+        "injected_runtime",
+        "--model",
+        "test-model",
+        "--results-dir",
+        str(results),
+        "--codex-executable",
+        str(fake_codex),
+        "--grader-python",
+        str(grader_python),
+    )
+
+    assert executed.returncode == 0, executed.stderr
+    report = json.loads((results / "report.json").read_text())
+    gate_names = {gate["name"] for gate in report["gates"]}
+    assert "context_owner_recall" in gate_names
+    assert "routing_precision" not in gate_names

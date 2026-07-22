@@ -40,6 +40,8 @@ def render_markdown(analysis: EvaluationAnalysis) -> str:
             f"- Baseline successes: {analysis.metrics.baseline_successes}",
             f"- Adaptive successes: {analysis.metrics.adaptive_successes}",
             f"- Routing recall: {_format_observed(analysis.metrics.routing_recall)}",
+            "- Context owner recall: "
+            f"{_format_observed(analysis.metrics.context_owner_recall)}",
         ]
     )
     if analysis.incomplete_cells:

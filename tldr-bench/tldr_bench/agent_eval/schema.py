@@ -152,6 +152,7 @@ class GateThresholds:
     max_negative_control_overhead: float = 0.05
     max_latency_regression: float = 0.10
     min_routing_precision: float = 0.80
+    min_context_owner_recall: float = 0.95
 
 
 @dataclass(frozen=True)

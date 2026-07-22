@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .analysis import EvaluationAnalysis, analyze_outcomes
+from .analysis import EvaluationAnalysis, RoutingGate, analyze_outcomes
 from .codex_runner import CodexRunConfig, build_codex_command, run_codex
 from .policy import AdaptivePolicy
 from .report import write_reports
@@ -99,6 +99,15 @@ def _resolve_executable(executable: Path) -> Path:
 def _verification_python(executable: Path) -> Path:
     """Return an absolute path without dereferencing a virtualenv symlink."""
     return executable.absolute()
+
+
+def _routing_gate_for_policy(adaptive_policy: str | None) -> RoutingGate:
+    if adaptive_policy in {
+        AdaptivePolicy.INJECTED_PACKET.value,
+        AdaptivePolicy.INJECTED_RUNTIME.value,
+    }:
+        return RoutingGate.CONTEXT_OWNER
+    return RoutingGate.AGENT_TOOL
 
 
 def _select_tasks(args: argparse.Namespace, tasks: list[TaskSpec]) -> list[TaskSpec]:
@@ -287,9 +296,14 @@ def _write_analysis(
     outcomes: list[RunOutcome],
     repeats: int,
     seed: int,
+    routing_gate: RoutingGate = RoutingGate.AGENT_TOOL,
 ) -> EvaluationAnalysis:
     analysis = analyze_outcomes(
-        tasks, outcomes, expected_repeats=repeats, seed=seed
+        tasks,
+        outcomes,
+        expected_repeats=repeats,
+        seed=seed,
+        routing_gate=routing_gate,
     )
     write_reports(
         analysis,
@@ -461,6 +475,7 @@ def main(argv: list[str] | None = None) -> int:
                 outcomes,
                 int(metadata["repeats"]),
                 int(metadata["seed"]),
+                _routing_gate_for_policy(metadata.get("adaptive_policy")),
             )
             print(f"Verdict: {analysis.verdict.value.upper()}")
             return 0
@@ -470,6 +485,7 @@ def main(argv: list[str] | None = None) -> int:
         if len(set(conditions)) != len(conditions):
             raise ValueError("--conditions must not contain duplicates")
         repeats = _selected_repeats(args)
+        routing_gate = _routing_gate_for_policy(args.adaptive_policy)
         cells = _cells(tasks, conditions, repeats)
         if args.dry_run:
             _render_dry_run(args, results_dir, cells)
@@ -511,10 +527,22 @@ def main(argv: list[str] | None = None) -> int:
                 f"tldrs={outcome.trace.tldrs_calls}",
                 flush=True,
             )
-            _write_analysis(results_dir, tasks, outcomes, repeats, args.seed)
+            _write_analysis(
+                results_dir,
+                tasks,
+                outcomes,
+                repeats,
+                args.seed,
+                routing_gate,
+            )
 
         analysis = _write_analysis(
-            results_dir, tasks, outcomes, repeats, args.seed
+            results_dir,
+            tasks,
+            outcomes,
+            repeats,
+            args.seed,
+            routing_gate,
         )
         if skipped:
             print(f"Resume: skipped {skipped} completed cells")

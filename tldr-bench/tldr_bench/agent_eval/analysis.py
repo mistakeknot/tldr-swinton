@@ -15,6 +15,11 @@ class GateStatus(str, Enum):
     INCONCLUSIVE = "inconclusive"
 
 
+class RoutingGate(str, Enum):
+    AGENT_TOOL = "agent_tool"
+    CONTEXT_OWNER = "context_owner"
+
+
 @dataclass(frozen=True)
 class PairedCell:
     task_id: str
@@ -51,6 +56,8 @@ class PairedMetrics:
     routing_recall: float | None
     routing_true_positives: int
     routing_false_positives: int
+    context_owner_recall: float | None
+    context_owner_misses: int
 
 
 @dataclass(frozen=True)
@@ -141,10 +148,12 @@ def analyze_outcomes(
     thresholds: GateThresholds | None = None,
     bootstrap_samples: int = 2000,
     seed: int = 42,
+    routing_gate: RoutingGate | str = RoutingGate.AGENT_TOOL,
 ) -> EvaluationAnalysis:
     if expected_repeats <= 0:
         raise ValueError("expected_repeats must be positive")
     active_thresholds = thresholds or GateThresholds()
+    active_routing_gate = RoutingGate(routing_gate)
     task_by_id = {task.id: task for task in tasks}
     if len(task_by_id) != len(tasks):
         raise ValueError("task ids must be unique")
@@ -206,6 +215,7 @@ def analyze_outcomes(
     routing_true_positives = 0
     routing_false_positives = 0
     eligible_cells = 0
+    context_owner_recall_values: list[float] = []
     for pair in pairs:
         baseline_tokens = pair.baseline.trace.uncached_total_tokens
         adaptive_tokens = pair.adaptive.trace.uncached_total_tokens
@@ -223,6 +233,10 @@ def analyze_outcomes(
         adaptive_used_tldrs = pair.adaptive.trace.tldrs_calls > 0
         if pair.eligible_for_tldrs:
             eligible_cells += 1
+            if pair.adaptive.owner_change_recall is not None:
+                context_owner_recall_values.append(
+                    pair.adaptive.owner_change_recall
+                )
             if adaptive_used_tldrs:
                 routing_true_positives += 1
         elif adaptive_used_tldrs:
@@ -234,6 +248,14 @@ def analyze_outcomes(
     )
     routing_recall = (
         routing_true_positives / eligible_cells if eligible_cells else None
+    )
+    context_owner_recall = (
+        statistics.fmean(context_owner_recall_values)
+        if context_owner_recall_values
+        else None
+    )
+    context_owner_misses = sum(
+        recall < 1.0 for recall in context_owner_recall_values
     )
     metrics = PairedMetrics(
         pair_count=len(pairs),
@@ -264,7 +286,42 @@ def analyze_outcomes(
         routing_recall=routing_recall,
         routing_true_positives=routing_true_positives,
         routing_false_positives=routing_false_positives,
+        context_owner_recall=context_owner_recall,
+        context_owner_misses=context_owner_misses,
     )
+
+    if active_routing_gate is RoutingGate.CONTEXT_OWNER:
+        routing_result = _gate(
+            "context_owner_recall",
+            context_owner_recall,
+            threshold=f">= {active_thresholds.min_context_owner_recall:.0%}",
+            passes=(
+                context_owner_recall
+                >= active_thresholds.min_context_owner_recall
+            )
+            if context_owner_recall is not None
+            else None,
+            detail=(
+                f"measured={len(context_owner_recall_values)}, "
+                f"misses={context_owner_misses}"
+            ),
+        )
+    else:
+        routing_result = _gate(
+            "routing_precision",
+            routing_precision if eligible_cells else None,
+            threshold=f">= {active_thresholds.min_routing_precision:.0%}",
+            passes=(
+                routing_precision >= active_thresholds.min_routing_precision
+            )
+            if eligible_cells
+            else None,
+            detail=(
+                f"true_positives={routing_true_positives}, "
+                f"false_positives={routing_false_positives}, "
+                f"recall={routing_recall}"
+            ),
+        )
 
     gates = (
         _gate(
@@ -315,20 +372,7 @@ def analyze_outcomes(
             else None,
             detail=f"n={len(latency_regression)} paired cells",
         ),
-        _gate(
-            "routing_precision",
-            routing_precision if eligible_cells else None,
-            threshold=f">= {active_thresholds.min_routing_precision:.0%}",
-            passes=(
-                routing_precision >= active_thresholds.min_routing_precision
-            )
-            if eligible_cells
-            else None,
-            detail=(
-                f"true_positives={routing_true_positives}, "
-                f"false_positives={routing_false_positives}, recall={routing_recall}"
-            ),
-        ),
+        routing_result,
     )
 
     if incomplete or contamination:

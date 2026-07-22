@@ -44,6 +44,7 @@ def _outcome(
     tldrs_calls: int = 0,
     repeat: int = 1,
     contaminated: bool = False,
+    owner_change_recall: float | None = None,
 ) -> RunOutcome:
     return RunOutcome(
         task_id=task_id,
@@ -64,6 +65,7 @@ def _outcome(
         ),
         grade=GradeResult(passed=success, exit_code=0 if success else 1),
         contaminated=contaminated,
+        owner_change_recall=owner_change_recall,
     )
 
 
@@ -142,6 +144,43 @@ def test_paired_analysis_fails_without_moving_thresholds() -> None:
     assert analysis.gate("negative_control_overhead").status is GateStatus.FAIL
     assert analysis.gate("latency_regression").status is GateStatus.FAIL
     assert analysis.gate("routing_precision").status is GateStatus.FAIL
+
+
+def test_context_gateway_uses_owner_recall_instead_of_agent_tool_calls() -> None:
+    tasks = [
+        _task("eligible-a", TaskCategory.CROSS_FILE_BUG, True),
+        _task("negative-a", TaskCategory.NEGATIVE_CONTROL, False),
+    ]
+    outcomes = [
+        _outcome("eligible-a", Condition.BASELINE),
+        _outcome(
+            "eligible-a",
+            Condition.ADAPTIVE,
+            total_tokens=60,
+            elapsed_ms=800,
+            owner_change_recall=1.0,
+        ),
+        _outcome("negative-a", Condition.BASELINE),
+        _outcome(
+            "negative-a",
+            Condition.ADAPTIVE,
+            total_tokens=90,
+            elapsed_ms=800,
+            owner_change_recall=1.0,
+        ),
+    ]
+
+    analysis = analyze_outcomes(
+        tasks,
+        outcomes,
+        expected_repeats=1,
+        routing_gate="context_owner",
+    )
+
+    assert analysis.verdict is GateStatus.PASS
+    assert analysis.metrics.routing_precision == 0.0
+    assert analysis.metrics.context_owner_recall == 1.0
+    assert analysis.gate("context_owner_recall").status is GateStatus.PASS
 
 
 def test_missing_or_contaminated_cells_make_verdict_inconclusive() -> None:
