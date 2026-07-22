@@ -12,6 +12,7 @@ from pathlib import Path
 
 import yaml
 
+from .policy import AdaptivePolicy, parse_adaptive_policy
 from .schema import Condition, GradeResult, Replacement, TaskSpec
 
 
@@ -44,6 +45,22 @@ Solve the user's coding task and run relevant tests before reporting completion.
 Use tldrs when it materially narrows the next read: unfamiliar areas, cross-file relationships, semantic discovery, non-trivial diffs, or dependency-sensitive edits. Prefer compact commands such as `tldrs context`, `tldrs diff-context`, `tldrs structure`, or `tldrs find` before broad raw reads.
 
 Skip tldrs when the exact target is already known, the task is a small scoped edit, or the available context already identifies the required lines.
+"""
+
+_TOOL_ONLY_GUIDANCE = """# Evaluation condition: adaptive tool exposure
+
+Solve the user's coding task using the tools available in this repository.
+Run relevant tests before reporting completion.
+"""
+
+_ONE_SHOT_GUIDANCE = """# Evaluation condition: adaptive one-shot reconnaissance
+
+Solve the user's coding task and run relevant tests before reporting completion.
+
+For an unfamiliar or cross-file task, use at most one tldrs reconnaissance
+command before the first source edit when it can identify the likely owner and
+bound the next source read. Do not chain tldrs commands. Skip it when the target
+is already known or the task is a small scoped edit.
 """
 
 _TEST_COUNT = re.compile(r"EVAL_TESTS\s+passed=(\d+)\s+total=(\d+)")
@@ -113,11 +130,21 @@ def _apply_replacements(destination: Path, replacements: tuple[Replacement, ...]
         target.write_text(text.replace(replacement.old, replacement.new, 1))
 
 
-def _write_condition_guidance(destination: Path, condition: Condition) -> None:
+def _write_condition_guidance(
+    destination: Path,
+    condition: Condition,
+    adaptive_policy: AdaptivePolicy | str,
+) -> None:
+    policy = parse_adaptive_policy(adaptive_policy)
+    adaptive_guidance = {
+        AdaptivePolicy.CURRENT: _ADAPTIVE_GUIDANCE,
+        AdaptivePolicy.TOOL_ONLY: _TOOL_ONLY_GUIDANCE,
+        AdaptivePolicy.ONE_SHOT: _ONE_SHOT_GUIDANCE,
+    }[policy]
     guidance = (
         _BASELINE_GUIDANCE
         if condition is Condition.BASELINE
-        else _ADAPTIVE_GUIDANCE
+        else adaptive_guidance
     )
     (destination / "AGENTS.md").write_text(guidance)
 
@@ -146,13 +173,15 @@ def materialize_workspace(
     task: TaskSpec,
     condition: Condition,
     destination: Path,
+    *,
+    adaptive_policy: AdaptivePolicy | str = AdaptivePolicy.CURRENT,
 ) -> Path:
     if destination.exists():
         raise ValueError(f"workspace destination already exists: {destination}")
     _extract_git_archive(source_repo.resolve(), destination)
     _remove_evaluator_surface(destination)
     _apply_replacements(destination, load_replacements(task.mutation_path))
-    _write_condition_guidance(destination, condition)
+    _write_condition_guidance(destination, condition, adaptive_policy)
     _initialize_history_free_repo(destination)
     return destination
 

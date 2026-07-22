@@ -68,7 +68,20 @@ def test_resolve_executable_before_condition_path_is_sanitized(
 def test_default_model_uses_codex_supported_concrete_id(monkeypatch) -> None:
     monkeypatch.delenv("TLDRS_EVAL_MODEL", raising=False)
 
-    assert build_parser().parse_args([]).model == "gpt-5.6-sol"
+    args = build_parser().parse_args([])
+    assert args.model == "gpt-5.6-sol"
+    assert args.adaptive_policy == "current"
+
+
+def test_adaptive_policy_accepts_isolated_experiment_arms() -> None:
+    parser = build_parser()
+
+    assert parser.parse_args(["--adaptive-policy", "tool_only"]).adaptive_policy == (
+        "tool_only"
+    )
+    assert parser.parse_args(["--adaptive-policy", "one_shot"]).adaptive_policy == (
+        "one_shot"
+    )
 
 
 def test_list_tasks_and_dry_run_render_stable_cells(tmp_path: Path) -> None:
@@ -132,6 +145,7 @@ def test_execute_resume_and_report_only(tmp_path: Path) -> None:
     assert (results / "metadata.json").is_file()
     metadata = json.loads((results / "metadata.json").read_text())
     assert metadata["seed"] == 42
+    assert metadata["adaptive_policy"] == "current"
     assert len(metadata["task_corpus_sha256"]) == 64
     assert (results / "report.json").is_file()
     assert (results / "report.md").is_file()
@@ -140,6 +154,15 @@ def test_execute_resume_and_report_only(tmp_path: Path) -> None:
     assert resumed.returncode == 0, resumed.stderr
     assert "skipped 2 completed cells" in resumed.stdout
     assert len(outcomes_path.read_text().splitlines()) == 2
+
+    policy_mismatch = _run_cli(
+        *common,
+        "--resume",
+        "--adaptive-policy",
+        "one_shot",
+    )
+    assert policy_mismatch.returncode == 2
+    assert "resume configuration mismatch: adaptive_policy" in policy_mismatch.stderr
 
     reported = _run_cli(
         "--report-only",

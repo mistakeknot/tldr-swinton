@@ -132,6 +132,35 @@ def test_materialized_conditions_share_source_but_isolate_guidance(
     )
 
 
+def test_adaptive_policy_guidance_is_causally_isolated(tmp_path: Path) -> None:
+    source = _make_source_repo(tmp_path)
+    task = _make_task_assets(tmp_path)
+    tool_only = tmp_path / "tool-only"
+    one_shot = tmp_path / "one-shot"
+
+    materialize_workspace(
+        source,
+        task,
+        Condition.ADAPTIVE,
+        tool_only,
+        adaptive_policy="tool_only",
+    )
+    materialize_workspace(
+        source,
+        task,
+        Condition.ADAPTIVE,
+        one_shot,
+        adaptive_policy="one_shot",
+    )
+
+    tool_only_guidance = (tool_only / "AGENTS.md").read_text()
+    one_shot_guidance = (one_shot / "AGENTS.md").read_text()
+    assert "tldrs" not in tool_only_guidance.lower()
+    assert "at most one tldrs reconnaissance command" in one_shot_guidance.lower()
+    assert "do not chain tldrs commands" in one_shot_guidance.lower()
+    assert _tracked_content(tool_only) == _tracked_content(one_shot)
+
+
 def test_replacements_fail_closed_when_source_drifted(tmp_path: Path) -> None:
     source = _make_source_repo(tmp_path)
     task = _make_task_assets(tmp_path, old="return 999")

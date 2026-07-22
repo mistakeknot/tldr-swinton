@@ -17,6 +17,7 @@ from typing import Any
 
 from .analysis import EvaluationAnalysis, analyze_outcomes
 from .codex_runner import CodexRunConfig, build_codex_command, run_codex
+from .policy import AdaptivePolicy
 from .report import write_reports
 from .schema import Condition, RunOutcome, TaskCategory, TaskSpec
 from .tasks import load_agent_tasks
@@ -56,6 +57,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--reasoning-effort",
         choices=("low", "medium", "high", "xhigh", "max"),
         default="medium",
+    )
+    parser.add_argument(
+        "--adaptive-policy",
+        choices=[policy.value for policy in AdaptivePolicy],
+        default=AdaptivePolicy.CURRENT.value,
+        help="routing guidance used by the adaptive condition",
     )
     parser.add_argument("--timeout-seconds", type=int, default=900)
     parser.add_argument("--seed", type=int, default=42)
@@ -188,6 +195,7 @@ def _metadata(
         "repeats": repeats,
         "model": args.model,
         "reasoning_effort": args.reasoning_effort,
+        "adaptive_policy": args.adaptive_policy,
         "timeout_seconds": args.timeout_seconds,
         "seed": args.seed,
         "codex_version": _command_version(
@@ -219,6 +227,7 @@ def _validate_resume(expected: dict[str, Any], actual: dict[str, Any]) -> None:
         "repeats",
         "model",
         "reasoning_effort",
+        "adaptive_policy",
         "timeout_seconds",
         "seed",
     )
@@ -323,6 +332,7 @@ def _run_cell(
     environment = build_condition_environment(
         condition, tldrs_bin_dir=args.tldrs_bin_dir
     )
+    environment["TLDRS_EVAL_POLICY"] = args.adaptive_policy
     contamination: list[str] = []
     visible_tldrs = shutil.which("tldrs", path=environment.get("PATH"))
     if condition is Condition.BASELINE and visible_tldrs:
@@ -337,7 +347,13 @@ def _run_cell(
         temporary = tempfile.TemporaryDirectory(prefix=f"tldrs-eval-{cell}-")
         workspace = Path(temporary.name) / "workspace"
     try:
-        materialize_workspace(REPO_ROOT, task, condition, workspace)
+        materialize_workspace(
+            REPO_ROOT,
+            task,
+            condition,
+            workspace,
+            adaptive_policy=args.adaptive_policy,
+        )
         process = run_codex(
             config,
             workspace=workspace,
