@@ -1,5 +1,31 @@
 # interlab: end-to-end agent token savings
 
+## 2026-07-22 External Same-SHA Campaign
+
+Objective: validate the shipped 0.8.1 Context Gateway on pinned third-party
+Python and Go repositories under both Codex and Claude Code, then reduce the
+default packet budget only when hidden-grader correctness is non-inferior.
+
+- **Hard gate:** no adaptive correctness loss within any repository/model arm.
+- **Primary optimization metric:** paired median uncached total-token savings.
+- **Secondary metrics:** latency, tool calls, raw reads, duplicate reads,
+  owner-file recall/precision, and changed-file precision.
+- **Frozen sources:** `pallets/itsdangerous@672971d` and
+  `google/go-cmp@b133f1f` from `tldr-bench/agent_eval/external/sources.yaml`.
+- **Harnesses/models:** Codex `gpt-5.6-sol` and Claude Code `sonnet` (resolved
+  model IDs and harness versions are recorded per result directory).
+- **Initial treatment:** `injected_runtime`, three ranked files, 6000 source
+  characters, public language-specific test command.
+- **Hill-climb order:** smoke baseline/runtime at 6000; packet-only isolation;
+  then one-variable `packet_max_chars` trials at 3000 and 1500. Promote only a
+  correctness-preserving budget with lower paired token use.
+- **Comparability:** baseline and adaptive cells within a run archive the same
+  source SHA and mutation; cross-harness token totals are reported separately,
+  not treated as directly interchangeable prices.
+
+Pre-spend corpus gate: 4/4 mutations fail their hidden grader and the exact
+reference repair passes; source preparation is clean, detached, and SHA-pinned.
+
 ## Objective
 
 Hill-climb tldr-swinton context policy until it reduces eligible-task median

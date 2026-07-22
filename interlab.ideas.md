@@ -2,11 +2,15 @@
 
 ## Promising
 
-- [ ] External issue replays across Python, TypeScript, Go, and Rust.
-- [ ] Cross-model confirmation with at least one non-OpenAI coding model.
-- [ ] `max_files` × `max_chars` ablation below the current 3 × 6000 default.
-- [ ] Isolate packet versus validated-runtime effects on a larger corpus.
-- [ ] Native Codex, Claude Code, and MCP pre-invocation adapters.
+- [~] External issue replays: Python and Go pinned corpus built; TypeScript and
+  Rust remain future expansion.
+- [~] Cross-model confirmation: Codex and Claude Code harnesses ready; paid
+  matrix pending.
+- [~] `max_chars` ablation below the current 3 × 6000 default: 3000 and 1500
+  trials queued after the 6000 smoke gate.
+- [~] Isolate packet versus validated-runtime effects on the external corpus.
+- [x] Native Codex and Claude Code pre-invocation adapters; MCP remains future
+  middleware work.
 - [ ] Negative-control utility gate only if a larger sample shows packet cost.
 - [ ] Stable handles + read deduplication if packet/native replay reappears.
 - [ ] Local reranker only after deterministic ranking plateaus.
