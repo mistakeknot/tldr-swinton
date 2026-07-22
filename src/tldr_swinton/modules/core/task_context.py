@@ -386,9 +386,7 @@ def render_agent_packet(
         "Use the precomputed candidates below to bound the first source read. Do not "
         "perform repository-wide discovery or invoke additional reconnaissance tools. "
         "Read full source where needed for a safe edit; the packet is not a substitute "
-        "for verification. Defer task trackers, Git history and remotes, branch "
-        "inspection, commits, and pushes unless the user or repository guidance "
-        "explicitly requires them. Avoid repeated status checks.",
+        "for verification.",
     ]
     if test_command:
         sections.extend(

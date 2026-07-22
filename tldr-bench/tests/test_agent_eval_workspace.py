@@ -234,7 +234,6 @@ def test_injected_runtime_adds_a_validated_test_execution_contract(
     assert "Precomputed bounded context" in guidance
     assert "PYTHONPATH=src /opt/agent-harness/python -m pytest" in guidance
     assert "Do not probe alternative interpreters" in guidance
-    assert "Defer task trackers, Git history and remotes" in guidance
 
 
 def test_injected_runtime_expands_verification_python_placeholder(

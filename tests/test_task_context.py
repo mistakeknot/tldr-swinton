@@ -80,7 +80,6 @@ def test_agent_packet_includes_bounded_context_and_execution_contract(
     )
 
     assert "Use the precomputed candidates below to bound the first source read" in packet
-    assert "Defer task trackers, Git history and remotes" in packet
     assert "Validated execution contract" in packet
     assert "`uv run pytest tests/test_owner.py`" in packet
     assert "src/owner.py:1" in packet
