@@ -10,12 +10,12 @@ if ! command -v git-lfs >/dev/null 2>&1; then
 fi
 
 if [ ! -d "$DATA_DIR/.git" ]; then
-  echo "Dataset submodule not initialized at $DATA_DIR" >&2
-  echo "Run: git submodule update --init --recursive" >&2
+  echo "Dataset checkout not found at $DATA_DIR" >&2
+  echo "Run: git clone https://github.com/mistakeknot/tldr-bench-datasets.git $DATA_DIR" >&2
   exit 1
 fi
 
-echo "Configuring Git LFS in dataset submodule..."
+echo "Configuring Git LFS in dataset checkout..."
 if ! git -C "$DATA_DIR" lfs install; then
   echo "git lfs install failed (hooks conflict)." >&2
   echo "Run: git lfs update --manual and merge hooks, then re-run." >&2

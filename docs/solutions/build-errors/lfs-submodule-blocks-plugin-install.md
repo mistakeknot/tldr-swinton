@@ -10,6 +10,7 @@ symptoms:
   - "Unable to checkout in submodule path 'tldr-bench/data'"
 severity: high
 date_solved: 2026-02-08
+date_updated: 2026-07-22
 ---
 
 ## Problem
@@ -62,7 +63,7 @@ The `tldr-bench-datasets` repository contains large benchmark files stored with 
 
 The `.gitmodules` configuration didn't distinguish between these contexts.
 
-## Working Solution
+## Superseded Mitigation
 
 Add two configuration options to the `tldr-bench/data` submodule entry in `.gitmodules`:
 
@@ -79,32 +80,49 @@ Add two configuration options to the `tldr-bench/data` submodule entry in `.gitm
 - **`update = none`**: Git will not automatically update this submodule during `git pull` or `git submodule update`. It must be explicitly requested.
 - **`fetchRecurseSubmodules = false`**: Git will not recursively fetch this submodule during `git clone --recurse-submodules` or `git fetch --recurse-submodules`.
 
-**Effect on plugin installation:**
-- `claude plugin install tldr-swinton` will succeed
-- The `tldr-bench/data` directory will exist as an empty submodule entry (with `.git` reference but no content)
-- The plugin functions normally with no benchmark data present
+This stopped recursive LFS downloads, but it did not make the repository
+packageable. The Intercore publisher added a tracked-tree cache in 2026. Its
+copier enumerates `git ls-files` and accepts only regular files and symlinks. A
+mode-160000 gitlink is exposed as a directory in an uninitialized checkout, so
+the 0.8.0 release cache failed with:
+
+```
+tracked plugin path "tldr-bench/data" is not a regular file or symlink
+```
+
+## Working Solution
+
+Remove the dataset gitlink from the plugin repository entirely, ignore the
+local checkout path, and clone the dataset repository explicitly when running
+official benchmarks:
+
+```bash
+git clone https://github.com/mistakeknot/tldr-bench-datasets.git tldr-bench/data
+git -C tldr-bench/data lfs install
+git -C tldr-bench/data lfs pull
+```
+
+This keeps the existing benchmark paths stable without placing a gitlink in
+the plugin's tracked file set.
 
 **Effect on developer workflows:**
-- Developers who need benchmark data can manually initialize it:
-  ```bash
-  git submodule update --init tldr-bench/data
-  ```
+- Developers who need benchmark data clone it explicitly using the commands above.
 - This explicit step ensures they understand they're downloading large LFS objects
 - It separates "install the plugin" (automatic) from "fetch benchmark data" (opt-in)
 
 ### Implementation Status
-✅ **COMPLETED** — `.gitmodules` has been updated with both configuration options (as of commit 108e271).
+✅ **COMPLETED** — the dataset repository is no longer a tracked submodule; `tldr-bench/data/` is an ignored opt-in checkout.
 
 ## Prevention Strategy
 
 ### For This Project
-1. ✅ Verify `.gitmodules` has `update = none` and `fetchRecurseSubmodules = false` on all data-only submodules
+1. ✅ Assert the plugin's tracked tree contains no mode-160000 gitlinks
 2. ✅ Test `claude plugin install tldr-swinton` on a clean machine to confirm it works
 3. Document in `AGENTS.md` that benchmark data initialization is opt-in
 
 ### General Guidelines
 - **Never put large LFS data in submodules of repos that also serve as plugins/packages**
-  - If necessary, use `update = none` + `fetchRecurseSubmodules = false`
+  - `update = none` avoids downloads but does not make a gitlink packageable
 - **Prefer separate hosting for large datasets**
   - Consider hosting benchmark data on S3, Hugging Face Datasets, or a dedicated data repository
   - Link to it in documentation rather than embedding it as a submodule
@@ -116,10 +134,10 @@ Add two configuration options to the `tldr-bench/data` submodule entry in `.gitm
   - Simulate the exact `claude plugin install` workflow
 
 ### Testing Checklist
-- [ ] `git clone --recurse-submodules <repo>` succeeds
+- [ ] `git clone <repo>` succeeds without fetching benchmark data
 - [ ] `claude plugin install tldr-swinton` succeeds on a machine with no prior checkout
 - [ ] Plugin commands work (`/tldrs-find`, `/tldrs-context`, etc.)
-- [ ] `git submodule update --init tldr-bench/data` succeeds (for developers who need it)
+- [ ] Explicitly cloning `tldr-bench-datasets` into `tldr-bench/data` succeeds
 - [ ] `uv run pytest` passes in the cloned repository
 
 ## Technical Details
@@ -166,11 +184,11 @@ git clone --recurse-submodules https://github.com/mistakeknot/tldr-swinton.git p
 
 The `--recurse-submodules` flag is used to ensure complete repository state, but it conflicts with opt-in data dependencies.
 
-### Why Not Use .gitignore or .git/info/sparse-checkout?
+### Why Not Keep the Gitlink?
 
-- **`.gitignore`**: Only hides from tracking; doesn't prevent fetch
+- **`.gitignore`**: Works only after the gitlink is removed from the index; it then keeps the opt-in checkout local
 - **`sparse-checkout`**: Requires explicit setup and isn't inherited by clone
-- **`.gitmodules` configuration**: Standard, inheritable, and built for this use case
+- **`.gitmodules` configuration**: Can suppress updates, but the gitlink remains in `git ls-files` and breaks tracked-tree packaging
 
 ## Related Issues
 
@@ -181,7 +199,7 @@ The `--recurse-submodules` flag is used to ensure complete repository state, but
 
 ## See Also
 
-- `.gitmodules` — Current configuration (fixed)
+- `.gitmodules` — Contains only package-compatible development submodules
 - `AGENTS.md` — Development workflow documentation
 - `docs/agent-workflow.md` — Full agent integration guide
-- `tldr-bench/data` — Benchmark data submodule (initialized opt-in only)
+- `tldr-bench/data` — Ignored path for an opt-in dataset checkout

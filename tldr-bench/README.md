@@ -119,18 +119,16 @@ baseline runners to compute savings for your own strategy.
 
 ## Official datasets (SWE-bench / RepoBench / LongBench)
 
-The official dataset files live in the `tldr-bench/data` submodule and are
-tracked via Git LFS in that repo. The dataset files are under
+The official dataset files live in a separate, opt-in checkout at
+`tldr-bench/data` and are tracked via Git LFS in that repo. The dataset files are under
 `tldr-bench/data/data/`.
 
 Setup:
 
 ```bash
-git submodule update --init --recursive
-cd tldr-bench/data
-git lfs install
-git lfs pull
-cd -
+git clone https://github.com/mistakeknot/tldr-bench-datasets.git tldr-bench/data
+git -C tldr-bench/data lfs install
+git -C tldr-bench/data lfs pull
 python scripts/data/verify_datasets.py
 ```
 

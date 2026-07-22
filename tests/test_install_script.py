@@ -130,3 +130,33 @@ def test_check_versions_preserves_historical_monorepo_layout(tmp_path: Path) -> 
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "monorepo:"
+
+
+def test_tracked_plugin_tree_contains_no_gitlinks() -> None:
+    result = subprocess.run(
+        ["git", "ls-files", "--stage", "-z"],
+        check=True,
+        capture_output=True,
+    )
+    gitlinks: list[str] = []
+    for raw_entry in result.stdout.split(b"\0"):
+        if not raw_entry:
+            continue
+        metadata, raw_path = raw_entry.split(b"\t", 1)
+        if metadata.split()[0] == b"160000":
+            gitlinks.append(raw_path.decode())
+
+    assert gitlinks == [], (
+        "Claude's tracked-tree plugin cache cannot package gitlinks: "
+        + ", ".join(gitlinks)
+    )
+
+
+def test_post_bump_applies_target_version_before_reinstalling_cli() -> None:
+    script = Path("scripts/post-bump.sh").read_text()
+
+    version_update = script.index('uv version "$TARGET_VERSION" --no-sync')
+    cli_install = script.index("uv tool install --force .")
+
+    assert 'TARGET_VERSION="${1:?target version is required}"' in script
+    assert version_update < cli_install

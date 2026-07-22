@@ -75,6 +75,7 @@ venv.bak/
 *.tldr.cache
 .beads/
 results/
+tldr-bench/data/
 tldr-bench/vendor/openhands-benchmarks/
 logs/
 .venv311/
