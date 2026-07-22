@@ -16,6 +16,11 @@ from pathlib import Path
 from typing import Any
 
 from .analysis import EvaluationAnalysis, RoutingGate, analyze_outcomes
+from .claude_runner import (
+    ClaudeRunConfig,
+    build_claude_command,
+    run_claude,
+)
 from .codex_runner import CodexRunConfig, build_codex_command, run_codex
 from .policy import AdaptivePolicy
 from .report import write_reports
@@ -53,6 +58,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument(
+        "--harness", choices=("codex", "claude"), default="codex"
+    )
+    parser.add_argument(
         "--model", default=os.environ.get("TLDRS_EVAL_MODEL", "gpt-5.6-sol")
     )
     parser.add_argument(
@@ -74,6 +82,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--keep-workspaces", action="store_true")
     parser.add_argument("--codex-executable", type=Path, default=Path("codex"))
+    parser.add_argument(
+        "--claude-executable", type=Path, default=Path("claude")
+    )
     parser.add_argument(
         "--grader-python", type=Path, default=Path(sys.executable)
     )
@@ -220,6 +231,11 @@ def _metadata(
 ) -> dict[str, Any]:
     tldrs_executable = args.tldrs_bin_dir / "tldrs"
     source_repo = args.source_repo.resolve()
+    harness_executable = (
+        args.codex_executable
+        if args.harness == "codex"
+        else args.claude_executable
+    )
     return {
         "format_version": FORMAT_VERSION,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -231,14 +247,15 @@ def _metadata(
         "task_ids": [task.id for task in tasks],
         "conditions": [condition.value for condition in conditions],
         "repeats": repeats,
+        "harness": args.harness,
+        "harness_version": _command_version(
+            [str(_resolve_executable(harness_executable)), "--version"]
+        ),
         "model": args.model,
         "reasoning_effort": args.reasoning_effort,
         "adaptive_policy": args.adaptive_policy,
         "timeout_seconds": args.timeout_seconds,
         "seed": args.seed,
-        "codex_version": _command_version(
-            [str(_resolve_executable(args.codex_executable)), "--version"]
-        ),
         "tldrs_version": _command_version([str(tldrs_executable), "--version"]),
         "python_version": platform.python_version(),
         "host_os": platform.system(),
@@ -265,6 +282,8 @@ def _validate_resume(expected: dict[str, Any], actual: dict[str, Any]) -> None:
         "task_ids",
         "conditions",
         "repeats",
+        "harness",
+        "harness_version",
         "model",
         "reasoning_effort",
         "adaptive_policy",
@@ -343,20 +362,35 @@ def _render_dry_run(
     cells: list[tuple[TaskSpec, Condition, int]],
 ) -> None:
     print(f"Dry run: {len(cells)} cells")
-    config = CodexRunConfig(
-        model=args.model,
-        reasoning_effort=args.reasoning_effort,
-        timeout_s=args.timeout_seconds,
-        codex_executable=_resolve_executable(args.codex_executable),
-    )
     for task, condition, repeat in cells:
         cell = _cell_id(task, condition, repeat)
-        command = build_codex_command(
-            config,
-            workspace=results_dir / "workspaces" / cell,
-            prompt=task.prompt,
-            output_last_message=results_dir / "messages" / f"{cell}.md",
-        )
+        workspace = results_dir / "workspaces" / cell
+        if args.harness == "codex":
+            config = CodexRunConfig(
+                model=args.model,
+                reasoning_effort=args.reasoning_effort,
+                timeout_s=args.timeout_seconds,
+                codex_executable=_resolve_executable(args.codex_executable),
+            )
+            command = build_codex_command(
+                config,
+                workspace=workspace,
+                prompt=task.prompt,
+                output_last_message=results_dir / "messages" / f"{cell}.md",
+            )
+        else:
+            claude_config = ClaudeRunConfig(
+                model=args.model,
+                reasoning_effort=args.reasoning_effort,
+                timeout_s=args.timeout_seconds,
+                claude_executable=_resolve_executable(args.claude_executable),
+            )
+            command = build_claude_command(
+                claude_config,
+                workspace=workspace,
+                prompt=task.prompt,
+                guidance=f"Evaluation condition: {condition.value}",
+            )
         print(f"{cell}: {shlex.join(command)}")
 
 
@@ -368,12 +402,6 @@ def _run_cell(
     repeat: int,
 ) -> RunOutcome:
     cell = _cell_id(task, condition, repeat)
-    config = CodexRunConfig(
-        model=args.model,
-        reasoning_effort=args.reasoning_effort,
-        timeout_s=args.timeout_seconds,
-        codex_executable=_resolve_executable(args.codex_executable),
-    )
     environment = build_condition_environment(
         condition,
         tldrs_bin_dir=args.tldrs_bin_dir,
@@ -405,14 +433,39 @@ def _run_cell(
             adaptive_policy=args.adaptive_policy,
             verification_python=_verification_python(args.grader_python),
         )
-        process = run_codex(
-            config,
-            workspace=workspace,
-            prompt=task.prompt,
-            environment=environment,
-            trace_path=results_dir / "traces" / f"{cell}.jsonl",
-            output_last_message=results_dir / "messages" / f"{cell}.md",
-        )
+        trace_path = results_dir / "traces" / f"{cell}.jsonl"
+        output_last_message = results_dir / "messages" / f"{cell}.md"
+        if args.harness == "codex":
+            config = CodexRunConfig(
+                model=args.model,
+                reasoning_effort=args.reasoning_effort,
+                timeout_s=args.timeout_seconds,
+                codex_executable=_resolve_executable(args.codex_executable),
+            )
+            process = run_codex(
+                config,
+                workspace=workspace,
+                prompt=task.prompt,
+                environment=environment,
+                trace_path=trace_path,
+                output_last_message=output_last_message,
+            )
+        else:
+            claude_config = ClaudeRunConfig(
+                model=args.model,
+                reasoning_effort=args.reasoning_effort,
+                timeout_s=args.timeout_seconds,
+                claude_executable=_resolve_executable(args.claude_executable),
+            )
+            process = run_claude(
+                claude_config,
+                workspace=workspace,
+                prompt=task.prompt,
+                guidance=(workspace / "AGENTS.md").read_text(),
+                environment=environment,
+                trace_path=trace_path,
+                output_last_message=output_last_message,
+            )
         (results_dir / "stderr").mkdir(parents=True, exist_ok=True)
         (results_dir / "stderr" / f"{cell}.log").write_text(process.stderr)
         patch = capture_patch(workspace)

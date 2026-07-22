@@ -131,6 +131,26 @@ def _fake_external_codex(tmp_path: Path) -> Path:
     return executable
 
 
+def _fake_external_claude(tmp_path: Path) -> Path:
+    executable = tmp_path / "fake-external-claude"
+    executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json\n"
+        "from pathlib import Path\n"
+        "target = Path.cwd() / 'app.py'\n"
+        "target.write_text(target.read_text().replace('return 40', 'return 42'))\n"
+        "print(json.dumps({'type': 'system', 'subtype': 'init', "
+        "'session_id': 'external-claude', 'model': 'claude-test'}))\n"
+        "print(json.dumps({'type': 'result', 'subtype': 'success', "
+        "'is_error': False, 'result': 'fixed', "
+        "'session_id': 'external-claude', 'usage': {'input_tokens': 40, "
+        "'cache_creation_input_tokens': 10, 'cache_read_input_tokens': 0, "
+        "'output_tokens': 5}}))\n"
+    )
+    executable.chmod(0o755)
+    return executable
+
+
 def test_resolve_executable_before_condition_path_is_sanitized(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -157,6 +177,7 @@ def test_default_model_uses_codex_supported_concrete_id(monkeypatch) -> None:
     monkeypatch.delenv("TLDRS_EVAL_MODEL", raising=False)
 
     args = build_parser().parse_args([])
+    assert args.harness == "codex"
     assert args.model == "gpt-5.6-sol"
     assert args.adaptive_policy == "current"
 
@@ -247,6 +268,45 @@ def test_external_source_and_arbitrary_corpus_record_same_sha(tmp_path: Path) ->
     ]
     assert len(outcomes) == 1
     assert outcomes[0]["success"] is True
+
+
+def test_external_source_runs_with_claude_harness(tmp_path: Path) -> None:
+    source, tasks = _make_external_eval(tmp_path)
+    results = tmp_path / "claude-results"
+    fake_claude = _fake_external_claude(tmp_path)
+
+    executed = _run_cli(
+        "--harness",
+        "claude",
+        "--source-repo",
+        str(source),
+        "--tasks-file",
+        str(tasks),
+        "--task",
+        "external-001",
+        "--conditions",
+        "adaptive",
+        "--repeats",
+        "1",
+        "--adaptive-policy",
+        "injected_runtime",
+        "--model",
+        "sonnet",
+        "--results-dir",
+        str(results),
+        "--claude-executable",
+        str(fake_claude),
+        "--grader-python",
+        sys.executable,
+    )
+
+    assert executed.returncode == 0, executed.stderr
+    metadata = json.loads((results / "metadata.json").read_text())
+    assert metadata["harness"] == "claude"
+    assert metadata["model"] == "sonnet"
+    outcome = json.loads((results / "outcomes.jsonl").read_text())
+    assert outcome["success"] is True
+    assert outcome["trace"]["model"] == "claude-test"
 
 
 def test_execute_resume_and_report_only(tmp_path: Path) -> None:
