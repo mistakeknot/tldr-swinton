@@ -1,6 +1,6 @@
 # Harness and Model Capabilities
 
-Last verified: 2026-07-21
+Last verified: 2026-07-22
 
 This is the capability baseline behind tldr-swinton's adaptive integration. It is intentionally dated because agent harnesses and frontier models change quickly.
 
@@ -38,6 +38,15 @@ confirmed deterministic packet plus validated test runtime completed 36/36
 tasks versus 35/36 baseline, with 32.1% median eligible token savings (95% paired
 bootstrap interval 25.2% to 41.1%) and 34.7% lower median latency.
 
+The July 22 external confirmation added pinned Python and Go repositories plus
+Claude Code. At the balanced 1500-character budget, all 32 cells passed and the
+four repository/harness arms saved 6.8% to 19.8% in aggregate. A model-aware
+Codex/Python profile with an explicit test-file owner hint then passed 8/8 cells
+with 22.5% median paired savings, 26.9% aggregate savings, and 46.4% lower
+median latency. The product therefore defaults to 1500 characters and exposes
+`--harness-profile codex` for the validated 750-character owner-routed case;
+it does not claim one budget is optimal for every model and language.
+
 The result shows that compact tool output alone is insufficient when the agent
 adds tool turns and raw reads. The preferred architecture is middleware-first:
 rank a bounded source-owner packet from the public task before the model starts,
@@ -59,7 +68,10 @@ surgery. See [Context Gateway Token Savings](research/2026-07-21-context-gateway
 Do not chain reconnaissance commands by default. A second command needs a
 specific unresolved question from the first result.
 
-Do not route by model name in durable skills. Route by observable task shape and available harness isolation. Re-run representative evaluations when model, harness, tool schema, prompt caching, or pricing changes.
+Keep the generic route task-shaped. Apply a harness profile only where a
+counterbalanced evaluation supports it, and retain an explicit override. Re-run
+representative evaluations when model, harness, tool schema, prompt caching, or
+pricing changes.
 
 ## Evaluation contract
 

@@ -234,7 +234,7 @@ def materialize_workspace(
     *,
     adaptive_policy: AdaptivePolicy | str = AdaptivePolicy.CURRENT,
     verification_python: Path | None = None,
-    packet_max_chars: int = 6_000,
+    packet_max_chars: int = 1_500,
 ) -> Path:
     if packet_max_chars <= 0:
         raise ValueError("packet_max_chars must be positive")

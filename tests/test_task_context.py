@@ -7,6 +7,7 @@ from pathlib import Path
 
 from tldr_swinton.modules.core.task_context import (
     rank_source_excerpts,
+    recommended_packet_max_chars,
     render_agent_packet,
 )
 
@@ -117,6 +118,15 @@ def test_test_command_routes_matching_source_owner_before_test_facade(
     )
 
 
+def test_recommended_budget_is_model_and_owner_signal_aware() -> None:
+    test_command = "python -m pytest tests/pkg/test_encoding.py -q"
+
+    assert recommended_packet_max_chars("generic", test_command) == 1_500
+    assert recommended_packet_max_chars("claude", test_command) == 1_500
+    assert recommended_packet_max_chars("codex", test_command) == 750
+    assert recommended_packet_max_chars("codex", "go test ./cmp/cmpopts") == 1_500
+
+
 def test_packet_cli_emits_machine_readable_ranked_excerpts(tmp_path: Path) -> None:
     _write(tmp_path, "src/owner.py", "def normalize_widget(widget):\n    return widget\n")
 
@@ -147,3 +157,32 @@ def test_packet_cli_emits_machine_readable_ranked_excerpts(tmp_path: Path) -> No
     assert payload["success"] is True
     assert payload["result"]["excerpts"][0]["path"] == "src/owner.py"
     assert payload["result"]["test_command"] == "uv run pytest tests/test_owner.py"
+
+
+def test_packet_cli_applies_codex_owner_hint_budget(tmp_path: Path) -> None:
+    _write(tmp_path, "src/owner.py", "def normalize_widget(widget):\n    return widget\n")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "tldr_swinton.cli",
+            "--machine",
+            "packet",
+            "Fix widget normalization",
+            "--project",
+            str(tmp_path),
+            "--harness-profile",
+            "codex",
+            "--test-command",
+            "python -m pytest tests/test_owner.py -q",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)["result"]
+    assert payload["harness_profile"] == "codex"
+    assert payload["max_chars"] == 750

@@ -77,7 +77,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--packet-max-chars",
         type=int,
-        default=6_000,
+        default=1_500,
         help="maximum source characters injected by packet policies",
     )
     parser.add_argument("--timeout-seconds", type=int, default=900)

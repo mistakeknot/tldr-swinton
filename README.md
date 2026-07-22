@@ -35,7 +35,9 @@ cd tldr-swinton && uv sync --extra semantic-ollama
 ```bash
 tldrs structure src/              # Code structure (functions, classes, imports)
 tldrs diff-context --project .    # Context pack for your recent changes
-tldrs packet "fix auth expiry" --project . --test-command "uv run pytest"  # Pre-model agent packet
+tldrs packet "fix auth expiry" --project . --test-command "uv run pytest"  # 1500-char generic packet
+tldrs packet "fix auth expiry" --project . --harness-profile codex \
+  --test-command "uv run pytest tests/test_auth.py"  # 750-char owner-routed profile
 tldrs index . && tldrs find "authentication logic"   # Semantic search
 tldrs context main --project .    # Call-graph context around a symbol
 ```
@@ -170,6 +172,7 @@ Any agent with shell access can call `tldrs` directly:
 ```bash
 # Best when middleware sees the task first:
 # tldrs packet "<task>" --project . --test-command "<known-good test command>"
+# Codex + explicit test file? Add --harness-profile codex.
 # Use tldrs when it will narrow the next read, edit, test, or handoff.
 # Working on recent changes?     → tldrs diff-context --project .
 # Need context around a symbol?  → tldrs context <name> --project . --budget 2000

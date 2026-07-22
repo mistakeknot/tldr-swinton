@@ -180,7 +180,7 @@ def test_default_model_uses_codex_supported_concrete_id(monkeypatch) -> None:
     assert args.harness == "codex"
     assert args.model == "gpt-5.6-sol"
     assert args.adaptive_policy == "current"
-    assert args.packet_max_chars == 6_000
+    assert args.packet_max_chars == 1_500
 
 
 def test_adaptive_policy_accepts_isolated_experiment_arms() -> None:

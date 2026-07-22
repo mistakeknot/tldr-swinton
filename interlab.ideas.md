@@ -2,13 +2,14 @@
 
 ## Promising
 
-- [~] External issue replays: Python and Go pinned corpus built; TypeScript and
-  Rust remain future expansion.
-- [~] Cross-model confirmation: Codex and Claude Code harnesses ready; paid
-  matrix pending.
-- [~] `max_chars` ablation below the current 3 × 6000 default: 3000 and 1500
-  trials queued after the 6000 smoke gate.
-- [~] Isolate packet versus validated-runtime effects on the external corpus.
+- [x] External issue replays: pinned Python and Go corpora confirmed; TypeScript
+  and Rust remain future expansion.
+- [x] Cross-model confirmation: balanced Codex and Claude matrix completed
+  32/32 correct cells.
+- [x] `max_chars` ablation: 1500 retained as general default; 750 promoted for
+  Codex when an explicit test-file path supplies an owner hint.
+- [x] Packet versus validated-runtime isolation: validated runtime retained in
+  three of four smoke arms.
 - [x] Native Codex and Claude Code pre-invocation adapters; MCP remains future
   middleware work.
 - [ ] Negative-control utility gate only if a larger sample shows packet cost.
@@ -35,6 +36,11 @@
 - [x] Full packet + runtime confirmation — retain: 36/36 vs 35/36 baseline,
   +32.1% eligible median savings (95% interval +25.2% to +41.1%), 100% owner
   recall, and 34.7% lower median latency.
+- [x] External 1500-character balanced matrix — retain as general default:
+  32/32 correct, 14.0% aggregate cross-model savings, lower median latency in
+  every repository/harness arm.
+- [x] Codex/Python 750-character owner-hint profile — retain: 8/8 correct,
+  22.5% median paired savings, 26.9% aggregate savings, 46.4% lower latency.
 
 ## Rejected
 
@@ -44,3 +50,6 @@
 - [-] Generic lossy compression of code — fidelity and preprocessing risk.
 - [-] Multi-agent exploration as a savings strategy — normally increases tokens.
 - [-] Prompt caching counted as logical-token savings — different economic layer.
+- [-] Bounded task-tracker/Git ceremony guidance — fewer tool calls but 20.3%
+  higher median Codex/Go adaptive tokens.
+- [-] Universal 750-character budget — Claude/Python aggregate regressed 3.7%.

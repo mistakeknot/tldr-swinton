@@ -59,6 +59,29 @@ workspace, and uses operating-system temporary workspaces. Each correction has
 a focused regression test. Attempt 3 starts from a new evaluator SHA and fresh
 result directories.
 
+### Balanced external confirmation — retain model-aware profile
+
+After isolating Codex user skills with a temporary `HOME`, the 1500-character
+runtime packet completed 32/32 balanced cells across the two pinned repositories
+and two harnesses. Each task ran once with each condition first. Median paired
+savings were 24.6% for Codex/Python, 15.4% for Codex/Go, 11.3% for
+Claude/Python, and 13.0% for Claude/Go; all four arms reduced median latency and
+retained 100% owner recall. The aggregate cross-model saving was 14.0%, so 1500
+is retained as a conservative general default rather than a universal 20%
+claim.
+
+The public Python test paths exposed a stronger deterministic owner signal.
+Mapping `test_encoding.py` and `test_signer.py` to matching non-test source
+stems enabled a 750-character Codex profile. Its same-SHA, counterbalanced
+confirmation passed 8/8 cells with 22.5% median paired savings, 26.9% aggregate
+savings, 46.4% lower median latency, and 100% owner recall. The 750 budget
+regressed Claude/Python aggregate tokens by 3.7%, so it is promoted only for
+Codex with an explicit test-file owner hint.
+
+A bounded-work instruction removed task-tracker and Git ceremony and reduced
+tool calls to 3–4, but raised median Codex/Go adaptive tokens from 19,401 to
+23,335 (+20.3%). It was reverted under the primary-metric rule.
+
 ## Objective
 
 Hill-climb tldr-swinton context policy until it reduces eligible-task median

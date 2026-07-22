@@ -81,6 +81,8 @@ _CAMEL = re.compile(r"[A-Z]+(?=[A-Z][a-z]|\b)|[A-Z]?[a-z]+|[0-9]+")
 _EXPLICIT_PATH = re.compile(
     r"(?P<path>(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+\.[A-Za-z0-9]+)"
 )
+_DEFAULT_PACKET_MAX_CHARS = 1_500
+_CODEX_OWNER_HINT_MAX_CHARS = 750
 
 
 @dataclass(frozen=True)
@@ -184,6 +186,19 @@ def _is_test_source(relative: str) -> bool:
     ) or stem.endswith(("_test", "_spec"))
 
 
+def recommended_packet_max_chars(
+    harness_profile: str,
+    test_command: str | None = None,
+) -> int:
+    """Return the validated packet budget for a harness and owner signal."""
+
+    if harness_profile not in {"generic", "codex", "claude"}:
+        raise ValueError(f"unknown harness profile: {harness_profile}")
+    if harness_profile == "codex" and _test_owner_terms(test_command):
+        return _CODEX_OWNER_HINT_MAX_CHARS
+    return _DEFAULT_PACKET_MAX_CHARS
+
+
 def _best_window(
     lines: list[str],
     query_terms: set[str],
@@ -230,7 +245,7 @@ def rank_source_excerpts(
     *,
     test_command: str | None = None,
     max_files: int = 3,
-    max_chars: int = 6_000,
+    max_chars: int = _DEFAULT_PACKET_MAX_CHARS,
 ) -> tuple[TaskContextExcerpt, ...]:
     """Rank compact source windows likely to own the task's local invariant."""
 
@@ -336,7 +351,7 @@ def render_bounded_context(
     *,
     test_command: str | None = None,
     max_files: int = 3,
-    max_chars: int = 6_000,
+    max_chars: int = _DEFAULT_PACKET_MAX_CHARS,
 ) -> str:
     """Render ranked excerpts as a compact Markdown context block."""
 
@@ -376,7 +391,7 @@ def render_agent_packet(
     *,
     test_command: str | None = None,
     max_files: int = 3,
-    max_chars: int = 6_000,
+    max_chars: int = _DEFAULT_PACKET_MAX_CHARS,
 ) -> str:
     """Render middleware-ready guidance plus bounded source context."""
 
@@ -422,6 +437,7 @@ __all__ = [
     "ReconExcerpt",
     "TaskContextExcerpt",
     "rank_source_excerpts",
+    "recommended_packet_max_chars",
     "render_agent_packet",
     "render_bounded_context",
 ]

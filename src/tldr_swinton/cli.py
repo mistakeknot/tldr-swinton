@@ -881,8 +881,16 @@ Semantic Search:
     packet_p.add_argument(
         "--max-chars",
         type=int,
-        default=6000,
-        help="Maximum source characters across excerpts (default: 6000)",
+        help=(
+            "Maximum source characters across excerpts (overrides the "
+            "harness profile)"
+        ),
+    )
+    packet_p.add_argument(
+        "--harness-profile",
+        choices=("generic", "codex", "claude"),
+        default="generic",
+        help="Validated packet budget profile (default: generic)",
     )
     packet_p.add_argument(
         "--test-command",
@@ -1998,23 +2006,33 @@ Semantic Search:
         elif args.command == "packet":
             from .modules.core.task_context import (
                 rank_source_excerpts,
+                recommended_packet_max_chars,
                 render_agent_packet,
             )
 
             project_root = Path(args.project).resolve()
+            max_chars = (
+                args.max_chars
+                if args.max_chars is not None
+                else recommended_packet_max_chars(
+                    args.harness_profile,
+                    args.test_command,
+                )
+            )
             if getattr(args, "machine", False):
                 excerpts = rank_source_excerpts(
                     project_root,
                     args.task,
                     test_command=args.test_command,
                     max_files=args.max_files,
-                    max_chars=args.max_chars,
+                    max_chars=max_chars,
                 )
                 _machine_output(
                     {
                         "project": str(project_root),
                         "max_files": args.max_files,
-                        "max_chars": args.max_chars,
+                        "max_chars": max_chars,
+                        "harness_profile": args.harness_profile,
                         "test_command": args.test_command,
                         "excerpts": [
                             {
@@ -2036,7 +2054,7 @@ Semantic Search:
                         args.task,
                         test_command=args.test_command,
                         max_files=args.max_files,
-                        max_chars=args.max_chars,
+                        max_chars=max_chars,
                     ),
                     end="",
                 )

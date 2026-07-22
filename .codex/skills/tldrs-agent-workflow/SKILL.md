@@ -19,6 +19,11 @@ tldrs packet "<public task text>" --project . \
   --test-command "<known-good focused test command>"
 ```
 
+Use `--harness-profile codex` when the focused command names a test file. The
+validated Codex profile caps the packet at 750 source characters when that path
+provides a source-owner hint; generic and Claude profiles use 1500. An explicit
+`--max-chars` always overrides the profile.
+
 This is the preferred route for unfamiliar and multi-file coding work. It gives
 the model up to three ranked source windows and a validated execution contract
 without spending an agent turn on tool selection, index setup, or repository-
@@ -39,6 +44,7 @@ agent would immediately reread the same breadth of code, skip tldrs.
 | Task | Command | Then |
 |------|---------|------|
 | Harness can preprocess the task | `tldrs packet "task" --project . --test-command "..."` | Inject before the model starts |
+| Codex + explicit test file | `tldrs packet "task" --harness-profile codex --test-command "...test_owner.py"` | Inject the 750-char owner-routed packet |
 | Review a non-trivial diff | `tldrs diff-context --project . --preset compact` | Review changed symbols |
 | Find code by concept | `tldrs find "auth logic"` | Read top results |
 | Find code by structure | `tldrs structural 'pattern' --lang python` | Read matches |

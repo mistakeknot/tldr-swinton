@@ -23,6 +23,11 @@ tldrs packet "fix duplicate call-graph insertion" --project . \
   --test-command "uv run pytest tests/test_call_graph.py"
 ```
 
+The generic and Claude profiles use the validated 1500-character source
+budget. For Codex, add `--harness-profile codex`; when the test command names a
+test file, tldrs maps that stem to a likely source owner and uses the confirmed
+750-character budget. `--max-chars` remains an explicit override.
+
 Inject the Markdown output with the task, or use global `--machine` for JSON.
 The packet contains at most three ranked source windows and an optional known-
 good test command. This removes model turns for tool selection and index setup;
@@ -41,6 +46,7 @@ better than model-initiated reconnaissance.
 
 - The repo-scoped skill is `./.codex/skills/tldrs-agent-workflow/SKILL.md`.
 - The skill prefers `tldrs packet` injection for unfamiliar and multi-file work when the harness sees the task first, with an explicit bypass for already-scoped edits.
+- Use `--harness-profile codex` with an explicit test-file command to select the confirmed 750-character owner-routed budget.
 - Use `tldrs distill` when a Codex subagent needs a bounded packet; otherwise let the explorer keep raw reconnaissance in its own thread.
 
 ### Other harnesses
