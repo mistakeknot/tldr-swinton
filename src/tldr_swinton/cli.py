@@ -2006,6 +2006,7 @@ Semantic Search:
                 excerpts = rank_source_excerpts(
                     project_root,
                     args.task,
+                    test_command=args.test_command,
                     max_files=args.max_files,
                     max_chars=args.max_chars,
                 )

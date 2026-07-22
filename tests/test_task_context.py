@@ -85,6 +85,38 @@ def test_agent_packet_includes_bounded_context_and_execution_contract(
     assert "src/owner.py:1" in packet
 
 
+def test_test_command_routes_matching_source_owner_before_test_facade(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/pkg/url_safe.py",
+        "def decode_url_safe_base64(value):\n    return value\n",
+    )
+    _write(
+        tmp_path,
+        "src/pkg/encoding.py",
+        "def decode_base64(value):\n    return value\n",
+    )
+    _write(
+        tmp_path,
+        "tests/pkg/test_encoding.py",
+        "def test_decode_base64():\n    assert True\n",
+    )
+
+    packet = render_agent_packet(
+        tmp_path,
+        "URL-safe base64 decoding fails for unpadded values.",
+        test_command="python -m pytest tests/pkg/test_encoding.py -q",
+        max_files=3,
+        max_chars=1_500,
+    )
+
+    assert packet.index("Candidate 1: src/pkg/encoding.py") < packet.index(
+        "src/pkg/url_safe.py"
+    )
+
+
 def test_packet_cli_emits_machine_readable_ranked_excerpts(tmp_path: Path) -> None:
     _write(tmp_path, "src/owner.py", "def normalize_widget(widget):\n    return widget\n")
 

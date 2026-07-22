@@ -161,7 +161,9 @@ def _write_condition_guidance(
             _INJECTED_PACKET_GUIDANCE
             + "\n"
             + render_bounded_context(
-                destination, task.prompt, max_chars=packet_max_chars
+                destination,
+                task.prompt,
+                max_chars=packet_max_chars,
             )
         )
     else:
@@ -191,7 +193,10 @@ def _write_condition_guidance(
             + "Do not probe alternative interpreters or package managers unless "
             + "this command cannot start.\n\n"
             + render_bounded_context(
-                destination, task.prompt, max_chars=packet_max_chars
+                destination,
+                task.prompt,
+                test_command=test_command,
+                max_chars=packet_max_chars,
             )
         )
     guidance = (

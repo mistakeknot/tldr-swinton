@@ -262,6 +262,61 @@ def test_injected_runtime_expands_verification_python_placeholder(
     )
 
 
+def test_injected_runtime_uses_test_path_to_route_source_owner(
+    tmp_path: Path,
+) -> None:
+    source = _make_source_repo(tmp_path)
+    source_files = {
+        "src/pkg/url_safe.py": (
+            "def decode_url_safe_base64(value):\n    return value\n"
+        ),
+        "src/pkg/encoding.py": "def decode_base64(value):\n    return value\n",
+        "tests/pkg/test_encoding.py": (
+            "def test_decode_base64():\n    assert True\n"
+        ),
+    }
+    for relative, content in source_files.items():
+        target = source / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content)
+    subprocess.run(["git", "add", "-A"], cwd=source, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Agent Eval Test",
+            "-c",
+            "user.email=agent-eval@example.invalid",
+            "commit",
+            "-qm",
+            "add routing fixtures",
+        ],
+        cwd=source,
+        check=True,
+    )
+    task = replace(
+        _make_task_assets(tmp_path),
+        prompt="URL-safe base64 decoding fails for unpadded values.",
+        verification_command=(
+            "{python} -m pytest tests/pkg/test_encoding.py -q"
+        ),
+    )
+    workspace = tmp_path / "test-guided-routing"
+
+    materialize_workspace(
+        source,
+        task,
+        Condition.ADAPTIVE,
+        workspace,
+        adaptive_policy="injected_runtime",
+        verification_python=Path("/opt/python"),
+        packet_max_chars=1_500,
+    )
+
+    guidance = (workspace / "AGENTS.md").read_text()
+    assert "Candidate 1: src/pkg/encoding.py" in guidance
+
+
 def test_replacements_fail_closed_when_source_drifted(tmp_path: Path) -> None:
     source = _make_source_repo(tmp_path)
     task = _make_task_assets(tmp_path, old="return 999")

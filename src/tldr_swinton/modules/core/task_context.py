@@ -153,6 +153,37 @@ def _source_files(root: Path) -> list[Path]:
     return sorted(files)
 
 
+def _test_owner_terms(test_command: str | None) -> set[str]:
+    """Derive likely source-owner terms from explicit test file paths."""
+
+    if not test_command:
+        return set()
+    owner_terms: set[str] = set()
+    for match in _EXPLICIT_PATH.finditer(test_command):
+        path = Path(match.group("path"))
+        stem = path.stem.lower()
+        parts = {part.lower() for part in path.parts}
+        is_test_path = bool(parts & {"test", "tests", "spec", "specs"})
+        is_test_name = stem.startswith(("test_", "spec_")) or stem.endswith(
+            ("_test", "_spec")
+        )
+        if not is_test_path and not is_test_name:
+            continue
+        owner = re.sub(r"^(?:test|spec)[_-]", "", stem)
+        owner = re.sub(r"[_-](?:test|spec)$", "", owner)
+        owner_terms.update(_terms(owner))
+    return owner_terms
+
+
+def _is_test_source(relative: str) -> bool:
+    path = Path(relative)
+    stem = path.stem.lower()
+    parts = {part.lower() for part in path.parts}
+    return bool(parts & {"test", "tests", "spec", "specs"}) or stem.startswith(
+        ("test_", "spec_")
+    ) or stem.endswith(("_test", "_spec"))
+
+
 def _best_window(
     lines: list[str],
     query_terms: set[str],
@@ -197,13 +228,15 @@ def rank_source_excerpts(
     root: Path,
     prompt: str,
     *,
+    test_command: str | None = None,
     max_files: int = 3,
     max_chars: int = 6_000,
 ) -> tuple[TaskContextExcerpt, ...]:
     """Rank compact source windows likely to own the task's local invariant."""
 
     root = Path(root)
-    query = set(_terms(prompt))
+    test_owner_terms = _test_owner_terms(test_command)
+    query = set(_terms(prompt)) | test_owner_terms
     if not query or max_files <= 0 or max_chars <= 0:
         return ()
 
@@ -240,6 +273,12 @@ def rank_source_excerpts(
         content_score = sum(idf[term] for term in coverage)
         path_score = sum(24.0 * idf[term] for term in query & path_terms)
         exact_path_score = 100.0 if relative in explicit_paths else 0.0
+        test_owner_score = (
+            96.0
+            if test_owner_terms & set(_terms(path.stem))
+            and not _is_test_source(relative)
+            else 0.0
+        )
         lines = text.splitlines()
         start, end, window_score = _best_window(lines, query, idf)
         suspicious_line = _suspicious_guard_line(lines, query)
@@ -254,6 +293,7 @@ def rank_source_excerpts(
             + path_score
             + 4.0 * window_score
             + exact_path_score
+            + test_owner_score
             + anomaly_score
         )
         score *= source_bias
@@ -294,6 +334,7 @@ def render_bounded_context(
     root: Path,
     prompt: str,
     *,
+    test_command: str | None = None,
     max_files: int = 3,
     max_chars: int = 6_000,
 ) -> str:
@@ -302,6 +343,7 @@ def render_bounded_context(
     excerpts = rank_source_excerpts(
         root,
         prompt,
+        test_command=test_command,
         max_files=max_files,
         max_chars=max_chars,
     )
@@ -363,6 +405,7 @@ def render_agent_packet(
             render_bounded_context(
                 root,
                 prompt,
+                test_command=test_command,
                 max_files=max_files,
                 max_chars=max_chars,
             ).rstrip(),
