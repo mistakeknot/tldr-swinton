@@ -184,6 +184,35 @@ def test_injected_packet_uses_public_prompt_and_visible_source(tmp_path: Path) -
     assert "tldrs" not in guidance.lower()
 
 
+def test_injected_packet_threads_explicit_character_budget(
+    tmp_path: Path, monkeypatch
+) -> None:
+    source = _make_source_repo(tmp_path)
+    task = _make_task_assets(tmp_path)
+    workspace = tmp_path / "budgeted"
+    seen: list[int] = []
+
+    def fake_render(root: Path, prompt: str, *, max_chars: int) -> str:
+        del root, prompt
+        seen.append(max_chars)
+        return "## Precomputed bounded context\n"
+
+    monkeypatch.setattr(
+        "tldr_bench.agent_eval.workspace.render_bounded_context", fake_render
+    )
+
+    materialize_workspace(
+        source,
+        task,
+        Condition.ADAPTIVE,
+        workspace,
+        adaptive_policy="injected_packet",
+        packet_max_chars=1200,
+    )
+
+    assert seen == [1200]
+
+
 def test_injected_runtime_adds_a_validated_test_execution_contract(
     tmp_path: Path,
 ) -> None:

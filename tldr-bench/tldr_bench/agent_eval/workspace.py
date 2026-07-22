@@ -147,6 +147,7 @@ def _write_condition_guidance(
     adaptive_policy: AdaptivePolicy | str,
     prompt: str,
     verification_python: Path | None,
+    packet_max_chars: int,
 ) -> None:
     policy = parse_adaptive_policy(adaptive_policy)
     if policy is AdaptivePolicy.CURRENT:
@@ -159,7 +160,9 @@ def _write_condition_guidance(
         adaptive_guidance = (
             _INJECTED_PACKET_GUIDANCE
             + "\n"
-            + render_bounded_context(destination, prompt)
+            + render_bounded_context(
+                destination, prompt, max_chars=packet_max_chars
+            )
         )
     else:
         if verification_python is None:
@@ -174,7 +177,9 @@ def _write_condition_guidance(
             + f"Run focused tests with `{test_command}` and append target paths.\n"
             + "Do not probe alternative interpreters or package managers unless "
             + "this command cannot start.\n\n"
-            + render_bounded_context(destination, prompt)
+            + render_bounded_context(
+                destination, prompt, max_chars=packet_max_chars
+            )
         )
     guidance = (
         _BASELINE_GUIDANCE
@@ -211,7 +216,10 @@ def materialize_workspace(
     *,
     adaptive_policy: AdaptivePolicy | str = AdaptivePolicy.CURRENT,
     verification_python: Path | None = None,
+    packet_max_chars: int = 6_000,
 ) -> Path:
+    if packet_max_chars <= 0:
+        raise ValueError("packet_max_chars must be positive")
     if destination.exists():
         raise ValueError(f"workspace destination already exists: {destination}")
     _extract_git_archive(source_repo.resolve(), destination)
@@ -223,6 +231,7 @@ def materialize_workspace(
         adaptive_policy,
         task.prompt,
         verification_python,
+        packet_max_chars,
     )
     _initialize_history_free_repo(destination)
     return destination

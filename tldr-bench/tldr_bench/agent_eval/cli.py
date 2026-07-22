@@ -74,6 +74,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=AdaptivePolicy.CURRENT.value,
         help="routing guidance used by the adaptive condition",
     )
+    parser.add_argument(
+        "--packet-max-chars",
+        type=int,
+        default=6_000,
+        help="maximum source characters injected by packet policies",
+    )
     parser.add_argument("--timeout-seconds", type=int, default=900)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--results-dir", type=Path)
@@ -254,6 +260,7 @@ def _metadata(
         "model": args.model,
         "reasoning_effort": args.reasoning_effort,
         "adaptive_policy": args.adaptive_policy,
+        "packet_max_chars": args.packet_max_chars,
         "timeout_seconds": args.timeout_seconds,
         "seed": args.seed,
         "tldrs_version": _command_version([str(tldrs_executable), "--version"]),
@@ -287,6 +294,7 @@ def _validate_resume(expected: dict[str, Any], actual: dict[str, Any]) -> None:
         "model",
         "reasoning_effort",
         "adaptive_policy",
+        "packet_max_chars",
         "timeout_seconds",
         "seed",
     )
@@ -432,6 +440,7 @@ def _run_cell(
             workspace,
             adaptive_policy=args.adaptive_policy,
             verification_python=_verification_python(args.grader_python),
+            packet_max_chars=args.packet_max_chars,
         )
         trace_path = results_dir / "traces" / f"{cell}.jsonl"
         output_last_message = results_dir / "messages" / f"{cell}.md"
@@ -568,6 +577,8 @@ def main(argv: list[str] | None = None) -> int:
         if len(set(conditions)) != len(conditions):
             raise ValueError("--conditions must not contain duplicates")
         repeats = _selected_repeats(args)
+        if args.packet_max_chars <= 0:
+            raise ValueError("--packet-max-chars must be positive")
         routing_gate = _routing_gate_for_policy(args.adaptive_policy)
         cells = _cells(tasks, conditions, repeats)
         if args.dry_run:
