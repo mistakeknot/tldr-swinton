@@ -865,6 +865,30 @@ Semantic Search:
         help="Search backend (auto-detects from index metadata)",
     )
 
+    # tldrs packet <task> - Precompute a bounded context packet for an agent harness
+    packet_p = subparsers.add_parser(
+        "packet",
+        help="Build a bounded task-to-source context packet for an agent harness",
+    )
+    packet_p.add_argument("task", help="Public coding task text")
+    packet_p.add_argument("--project", default=".", help="Project root")
+    packet_p.add_argument(
+        "--max-files",
+        type=int,
+        default=3,
+        help="Maximum ranked source excerpts (default: 3)",
+    )
+    packet_p.add_argument(
+        "--max-chars",
+        type=int,
+        default=6000,
+        help="Maximum source characters across excerpts (default: 6000)",
+    )
+    packet_p.add_argument(
+        "--test-command",
+        help="Known-good test command to include as an execution contract",
+    )
+
     # tldrs quickstart - Show agent-focused quick reference
     quickstart_p = subparsers.add_parser(
         "quickstart", help="Show quick reference guide for AI agents"
@@ -1970,6 +1994,51 @@ Semantic Search:
                     if r.get('summary'):
                         print(f"      → {r['summary']}")
                     print()
+
+        elif args.command == "packet":
+            from .modules.core.task_context import (
+                rank_source_excerpts,
+                render_agent_packet,
+            )
+
+            project_root = Path(args.project).resolve()
+            if getattr(args, "machine", False):
+                excerpts = rank_source_excerpts(
+                    project_root,
+                    args.task,
+                    max_files=args.max_files,
+                    max_chars=args.max_chars,
+                )
+                _machine_output(
+                    {
+                        "project": str(project_root),
+                        "max_files": args.max_files,
+                        "max_chars": args.max_chars,
+                        "test_command": args.test_command,
+                        "excerpts": [
+                            {
+                                "path": excerpt.path,
+                                "start_line": excerpt.start_line,
+                                "end_line": excerpt.end_line,
+                                "score": excerpt.score,
+                                "text": excerpt.text,
+                            }
+                            for excerpt in excerpts
+                        ],
+                    },
+                    args,
+                )
+            else:
+                print(
+                    render_agent_packet(
+                        project_root,
+                        args.task,
+                        test_command=args.test_command,
+                        max_files=args.max_files,
+                        max_chars=args.max_chars,
+                    ),
+                    end="",
+                )
 
         elif args.command == "quickstart":
             # Print the quickstart guide
