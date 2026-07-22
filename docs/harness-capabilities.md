@@ -28,6 +28,20 @@ This makes an unconditional session-start dump or a second structural dump after
 
 The plugin keeps CLI/MCP commands precise and moves routing policy into short skills. It does not add another always-on enforcement layer.
 
+## Current end-to-end evidence
+
+The July 2026 paired Codex pilot used GPT-5.6 Sol, Codex CLI 0.144.6, 12 hidden-
+grader tasks, and three repeats per condition. Adaptive tldrs was correctness
+non-inferior and routed precisely, but failed the value gates: median eligible-
+task token savings were -11.9% (an 11.9% regression), and median latency regressed
+17.0%. See [Paired Agent Value Evaluation](research/paired-agent-value-eval-2026-07.md).
+
+This does not invalidate command-output compression. It shows that compact tool
+output alone is insufficient when the agent adds more tool calls and raw reads.
+The durable policy is therefore selective and one-shot: choose one reconnaissance
+command, stop when the target is narrowed, and verify the source layer that owns
+the behavior.
+
 ## Stable routing policy
 
 | Situation | Preferred route |
@@ -38,6 +52,9 @@ The plugin keeps CLI/MCP commands precise and moves routing policy into short sk
 | Cross-file risk | `context`, `impact`, or `change-impact` |
 | Parallel worker | Explorer thread or `distill --budget ...` handoff |
 | Repeated prompt prefix | `cache-friendly` only when cache reuse is measured |
+
+Do not chain reconnaissance commands by default. A second command needs a
+specific unresolved question from the first result.
 
 Do not route by model name in durable skills. Route by observable task shape and available harness isolation. Re-run representative evaluations when model, harness, tool schema, prompt caching, or pricing changes.
 

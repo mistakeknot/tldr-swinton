@@ -51,6 +51,18 @@ Read or edit directly when all are true:
 - No cross-file relationship needs analysis.
 - The harness has already provided sufficient context.
 
+## One-shot stop rule
+
+Choose one reconnaissance command that can answer the current navigation
+question. Inspect its result, then stop and read the exact implementation and
+tests it identified. Run a second tldrs command only when the first output
+reveals a specific unresolved ambiguity or dependency edge.
+
+Do not chain `find`, `structure`, `context`, and `impact` by ritual. Command-level
+compression does not create end-to-end savings when the agent then performs the
+same broad raw reads, adds extra tool loops, or tests the wrong abstraction
+layer.
+
 ## Command ladder
 
 1. Recent changes:
@@ -89,13 +101,15 @@ If unsure, use `tldrs structure <dir>` first. If tldrs reports ambiguity, select
 ### Non-trivial bug fix
 
 ```bash
-tldrs diff-context --project . --preset compact
+# Choose the one command that matches the unknown.
 tldrs find "error handling"
-tldrs context src/api.py:handle_request --project . --preset compact
-tldrs change-impact --git
+# Or, for a change-induced regression:
+# tldrs diff-context --project . --preset compact
 ```
 
-Then read the exact implementation and tests needed for the change.
+Then stop reconnaissance and read the exact implementation and tests it
+identified. Use `context` or `impact` only if the first result leaves a concrete
+symbol or dependency question unresolved.
 
 ### Large codebase exploration
 

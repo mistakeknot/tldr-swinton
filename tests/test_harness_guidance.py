@@ -25,6 +25,8 @@ def test_codex_guidance_is_adaptive_instead_of_a_pre_read_gate() -> None:
     assert "Use tldrs when" in skill
     assert "Run tldrs BEFORE using Read" not in skill
     assert "already narrowed" in skill
+    assert "Start with one reconnaissance command" in skill
+    assert "Do not chain commands by default" in skill
 
 
 def test_plugin_does_not_duplicate_content_after_raw_reads() -> None:

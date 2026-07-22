@@ -181,9 +181,13 @@ Any agent with shell access can call `tldrs` directly:
 | DiffLens | Diff-focused context vs diff+deps baseline | **48% token savings**, ~0.77s latency |
 | Token efficiency | Compact signatures vs full files | **93% savings** (compact), **66%** (structure JSON) |
 | Semantic search | Search results vs entire repo | **85% token savings**, top-1 accuracy on auth/db |
-| Agent workflow | Realistic editing tasks with full context | **50–85% savings** (varies by compression) |
+| Context-packet proxy | Static task context vs full-context packet | **50–85% packet savings** (varies by compression) |
+| Paired Codex agent pilot | Hidden-grader coding tasks, GPT-5.6 Sol | **FAIL**: -11.9% median savings, +17.0% latency |
 
-Agent workflow detail: 53% (none) → 78% (two-stage) → 84% (chunk-summary) at budget=2000.
+Context-packet proxy detail: 53% (none) → 78% (two-stage) → 84%
+(chunk-summary) at budget=2000. These are component-output measurements, not
+end-to-end agent savings. The current paired pilot is documented in
+[`docs/research/paired-agent-value-eval-2026-07.md`](docs/research/paired-agent-value-eval-2026-07.md).
 
 **Reproduce:**
 ```bash

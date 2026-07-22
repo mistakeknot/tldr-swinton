@@ -9,6 +9,12 @@ Use tldrs when it materially narrows the code the agent must inspect: unfamiliar
 
 Skip it when the exact target is already known, the file is small, the task is docs/config only, or the harness already narrowed the context enough to read or edit directly.
 
+Start with one reconnaissance command, inspect whether it narrowed the target,
+then switch to the exact source and tests. Do not chain commands by default.
+Escalate to a second tldrs command only when the first result exposes a concrete
+ambiguity or dependency question that the next command can resolve. If the
+agent would immediately reread the same breadth of code, skip tldrs.
+
 ## Quick Decision
 
 | Task | Command | Then |
@@ -27,13 +33,14 @@ Skip it when the exact target is already known, the file is small, the task is d
 
 ## Core Commands
 
-### 1. Diff-Context (Start Here)
+### 1. Diff-Context (For Non-Trivial Diffs)
 
 ```bash
 tldrs diff-context --project . --budget 2000
 ```
 
-With compression for large diffs (35-73% savings):
+With compression for large diffs (35-73% command-output savings; not an
+end-to-end agent guarantee):
 ```bash
 tldrs diff-context --project . --budget 1500 --compress two-stage
 ```
@@ -137,11 +144,12 @@ Supported: python, typescript, javascript, rust, go, java, c, cpp, ruby, php, ko
 ## Common Mistakes
 
 1. **Running reconnaissance by ritual**: Use it only when the output changes the next read, edit, or delegation.
-2. **No budget on large codebases**: Use `--preset compact` or an explicit `--budget`.
-3. **Double-quoting structural patterns**: Use single quotes for `$VAR` patterns — `$$$` expands to PID in double quotes.
-4. **Searching without index**: Run `tldrs index .` once for semantic search.
-5. **Ambiguous symbol names**: Use `file.py:symbol` format.
-6. **No output cap on large repos**: Add `--max-lines 50` or `--max-bytes 4096`.
+2. **Chaining reconnaissance commands**: Start with one. Continue only when its output identifies the next question; otherwise read the narrowed source.
+3. **No budget on large codebases**: Use `--preset compact` or an explicit `--budget`.
+4. **Double-quoting structural patterns**: Use single quotes for `$VAR` patterns — `$$$` expands to PID in double quotes.
+5. **Searching without index**: Run `tldrs index .` once for semantic search.
+6. **Ambiguous symbol names**: Use `file.py:symbol` format.
+7. **No output cap on large repos**: Add `--max-lines 50` or `--max-bytes 4096`.
 
 ## Common Errors
 

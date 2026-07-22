@@ -51,6 +51,13 @@ baseline/adaptive cell starts from a fresh history-free repository with a hidden
 mutation; hidden graders run only after the agent exits. The 12-task pilot has
 three negative controls and three tasks in each exploratory category.
 
+The July 2026 GPT-5.6 Sol pilot failed the end-to-end value gate despite passing
+correctness and routing: eligible tasks had -11.9% median token savings (an
+11.9% regression) and 17.0% median latency regression. See
+[`docs/research/paired-agent-value-eval-2026-07.md`](../docs/research/paired-agent-value-eval-2026-07.md).
+Treat older command-output savings as component benchmarks, not proof that an
+agent workflow saves total context.
+
 GPT-5.6 Sol is the default current Codex model. The Codex ChatGPT transport uses
 the concrete `gpt-5.6-sol` ID (the API's `gpt-5.6` alias may be rejected). The
 pilot fixes reasoning effort at `medium`; use the same model and effort for both
