@@ -6,10 +6,20 @@ Skip it when the exact target is already known, the file is small, the task is d
 
 Historical repository benchmarks show substantial token reductions for selected workflows; they are not a promise that every extra tool call saves time or tokens. See [Harness and Model Capabilities](harness-capabilities.md) for the current routing rationale.
 
+When the harness receives the public task before the model starts, prefer:
+
+```bash
+tldrs packet "<task>" --project . --test-command "<known-good test command>"
+```
+
+Inject its output with the task. The agent should then read the full candidate
+owner before editing and run focused verification.
+
 ## Quick decision
 
 | Need | Command | Next |
 |------|---------|------|
+| Prepare context before model invocation | `tldrs packet "task" --project . --test-command "..."` | Inject the bounded packet |
 | Review a non-trivial diff | `tldrs diff-context --project . --preset compact` | Inspect changed symbols |
 | Find code by concept | `tldrs find "auth logic"` | Read the best matches |
 | Find code by structure | `tldrs structural 'pattern' --lang python` | Inspect exact matches |

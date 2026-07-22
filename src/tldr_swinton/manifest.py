@@ -23,6 +23,7 @@ _EVAL_COMMANDS = frozenset({
     "diff-context",
     "distill",
     "hotspots",
+    "packet",
     "slice",
     "structural",
 })

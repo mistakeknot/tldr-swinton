@@ -2,15 +2,14 @@
 
 ## Promising
 
-- [ ] Tool-only arm — isolate binary availability from routing text.
-- [ ] One-shot arm — one reconnaissance call, then exact-source surgery.
-- [ ] Hard one-call wrapper — enforce rather than merely request the stop rule.
-- [ ] Transparent lexical/structural packet — remove the extra model turn.
-- [ ] Owner-definition boost — correct downstream-consumer localization.
-- [ ] Test/import/call expansion — add direct behavioral evidence under budget.
-- [ ] Negative-control utility gate — spend zero gateway tokens on scoped edits.
-- [ ] Stable handles + read deduplication — prevent packet/native replay.
-- [ ] Local reranker — only after deterministic ranking plateaus.
+- [ ] External issue replays across Python, TypeScript, Go, and Rust.
+- [ ] Cross-model confirmation with at least one non-OpenAI coding model.
+- [ ] `max_files` × `max_chars` ablation below the current 3 × 6000 default.
+- [ ] Isolate packet versus validated-runtime effects on a larger corpus.
+- [ ] Native Codex, Claude Code, and MCP pre-invocation adapters.
+- [ ] Negative-control utility gate only if a larger sample shows packet cost.
+- [ ] Stable handles + read deduplication if packet/native replay reappears.
+- [ ] Local reranker only after deterministic ranking plateaus.
 
 ## Tried
 
@@ -26,7 +25,12 @@
   but rejected for savings at -11.8% eligible median.
 - [x] Automatic bounded context packet — retain: 4/4 correct, 12/12 offline
   top-three owner recall, +24.2% eligible median savings, and +45.2% on the
-  owner-sensitive refactor. Needs one more hill-climb to clear the 25% target.
+  owner-sensitive refactor.
+- [x] Validated test runtime — corrected screen passed 4/4 with +45.0% eligible
+  median savings; virtualenv symlinks must not be dereferenced.
+- [x] Full packet + runtime confirmation — retain: 36/36 vs 35/36 baseline,
+  +32.1% eligible median savings (95% interval +25.2% to +41.1%), 100% owner
+  recall, and 34.7% lower median latency.
 
 ## Rejected
 

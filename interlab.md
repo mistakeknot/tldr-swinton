@@ -79,9 +79,11 @@ Frozen GPT-5.6 Sol / Codex 0.144.6 / tldrs 0.7.19, 12 tasks × 2 conditions ×
 
 ## Campaign State
 
-Setup and implementation plan complete. Next experiment: add the isolated
-`tool_only` and `one_shot` adaptive policies with TDD, then run a stratified
-screen against fresh baselines.
+Target cleared and independently confirmed. The retained policy is a
+deterministic, pre-model source packet plus a validated test execution contract.
+It is now exposed through `tldrs packet` and the evaluator imports the production
+implementation. Follow-up generalization experiments are recorded in
+`interlab.ideas.md` and the final report.
 
 ## 2026-07-21 Stratified Policy Screen
 
@@ -138,3 +140,46 @@ passed while saving 45.2%. The cross-file outlier spent 22 tool calls and
 155,522 output bytes probing unavailable test runtimes and package managers.
 The source owner was already correct. Next mutation: add a validated execution
 contract naming the working test interpreter and discourage runtime probing.
+
+## 2026-07-21 Validated Runtime Screen
+
+The first runtime-contract implementation accidentally dereferenced the
+virtualenv interpreter symlink to a bare uv Python. A regression test exposed
+the mismatch; preserving the absolute symlink path restored the environment.
+The corrected four-task screen passed 4/4 with zero agent-side tldrs calls and
+45.0% median eligible savings:
+
+| Task | Baseline tokens | Packet + runtime tokens | Savings |
+|---|---:|---:|---:|
+| Known-file control | 70,550 | 25,851 | 63.4% |
+| Cross-file ignore | 70,153 | 36,476 | 48.0% |
+| Diff boundary | 60,764 | 33,432 | 45.0% |
+| Owner refactor | 76,892 | 51,284 | 33.3% |
+
+Decision: promote to the full three-repeat corpus.
+
+## 2026-07-21 Full Confirmation
+
+The adaptive confirmation ran all 12 tasks for three repeats under GPT-5.6 Sol,
+medium reasoning, Codex 0.144.6, and the same task corpus hash as the frozen
+baseline. The paired analysis used 20,000 bootstrap resamples and the source-
+owner routing gate.
+
+| Metric | Result |
+|---|---:|
+| Correctness | 36/36 vs baseline 35/36 |
+| Eligible median token savings | 32.1% |
+| Eligible savings 95% interval | 25.2% to 41.1% |
+| Negative-control median overhead | -20.6% |
+| Median latency regression | -34.7% |
+| Context-owner recall | 100%, 0/27 misses |
+| Agent-side tldrs calls | 0 |
+
+All five promotion gates pass. The gateway recovered the frozen baseline miss
+on `refactor-callgraph-dedupe` repeat 3 while reducing that cell from 108,121 to
+39,612 uncached tokens. Eligible aggregate tokens fell from 1,961,420 to
+1,304,615; tool calls from 453 to 272; raw reads from 210 to 109.
+
+Final decision: retain and ship. The complete methodology, comparability caveat,
+dead ends, and next generalization experiments are in
+`docs/research/2026-07-21-context-gateway-token-savings.md`.

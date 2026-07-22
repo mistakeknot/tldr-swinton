@@ -23,6 +23,8 @@ def test_codex_guidance_is_adaptive_instead_of_a_pre_read_gate() -> None:
     skill = Path(".codex/skills/tldrs-agent-workflow/SKILL.md").read_text()
 
     assert "Use tldrs when" in skill
+    assert "tldrs packet" in skill
+    assert "before the model starts" in skill
     assert "Run tldrs BEFORE using Read" not in skill
     assert "already narrowed" in skill
     assert "Start with one reconnaissance command" in skill

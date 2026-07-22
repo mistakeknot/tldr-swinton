@@ -13,6 +13,23 @@ The installer creates launchers in `~/.local/bin` that preserve the caller's wor
 
 ## Harness integration
 
+### Preferred: precomputed agent packet
+
+When a harness can preprocess the public task, compute the first context packet
+before starting the model:
+
+```bash
+tldrs packet "fix duplicate call-graph insertion" --project . \
+  --test-command "uv run pytest tests/test_call_graph.py"
+```
+
+Inject the Markdown output with the task, or use global `--machine` for JSON.
+The packet contains at most three ranked source windows and an optional known-
+good test command. This removes model turns for tool selection and index setup;
+the agent still reads full owner source and runs focused verification before
+editing. The July 2026 paired confirmation found this middleware path materially
+better than model-initiated reconnaissance.
+
 ### Claude Code
 
 - The plugin exposes six slash commands, four skills, and the `tldr-code` MCP server.
@@ -23,7 +40,7 @@ The installer creates launchers in `~/.local/bin` that preserve the caller's wor
 ### Codex
 
 - The repo-scoped skill is `./.codex/skills/tldrs-agent-workflow/SKILL.md`.
-- The skill recommends tldrs for unfamiliar, multi-file, diff-heavy, and delegation-heavy work, with an explicit bypass for already-scoped edits.
+- The skill prefers `tldrs packet` injection for unfamiliar and multi-file work when the harness sees the task first, with an explicit bypass for already-scoped edits.
 - Use `tldrs distill` when a Codex subagent needs a bounded packet; otherwise let the explorer keep raw reconnaissance in its own thread.
 
 ### Other harnesses
@@ -52,6 +69,9 @@ Read or edit directly when all are true:
 - The harness has already provided sufficient context.
 
 ## One-shot stop rule
+
+Use this fallback when the harness cannot generate a packet before the model
+starts.
 
 Choose one reconnaissance command that can answer the current navigation
 question. Inspect its result, then stop and read the exact implementation and

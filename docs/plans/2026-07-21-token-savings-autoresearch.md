@@ -18,6 +18,11 @@ external hidden graders, paired bootstrap intervals, Bash metric wrapper.
 
 **Bead:** `mk-gimi`
 
+**Result:** Completed 2026-07-21. The confirmed packet + runtime policy achieved
+36/36 hidden-grader successes versus 35/36 baseline and 32.1% median eligible
+token savings (95% interval 25.2% to 41.1%). Production surface: `tldrs packet`.
+See `docs/research/2026-07-21-context-gateway-token-savings.md`.
+
 ## Prior Learnings
 
 - The 72-cell GPT-5.6 Sol evaluation passed 35/36 in both conditions but the

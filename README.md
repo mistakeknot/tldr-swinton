@@ -2,7 +2,7 @@
 
 Token-efficient code analysis platform for LLMs and AI agents.
 
-33 commands. 5 analysis layers. 13+ languages. Adaptive context selection for modern coding agents.
+34 commands. 5 analysis layers. 13+ languages. Adaptive context selection for modern coding agents.
 
 ## Why tldrs?
 
@@ -35,6 +35,7 @@ cd tldr-swinton && uv sync --extra semantic-ollama
 ```bash
 tldrs structure src/              # Code structure (functions, classes, imports)
 tldrs diff-context --project .    # Context pack for your recent changes
+tldrs packet "fix auth expiry" --project . --test-command "uv run pytest"  # Pre-model agent packet
 tldrs index . && tldrs find "authentication logic"   # Semantic search
 tldrs context main --project .    # Call-graph context around a symbol
 ```
@@ -48,7 +49,7 @@ tldrs doctor      # Check optional tools (type checkers, linters)
 
 ## Commands
 
-All 33 top-level commands grouped by use case. Each command supports `--help` for full options.
+All 34 top-level commands grouped by use case. Each command supports `--help` for full options.
 
 ### Reconnaissance
 
@@ -57,6 +58,7 @@ Get oriented in a codebase or understand recent changes.
 | Command | Description |
 |---------|-------------|
 | `diff-context` | Diff-focused context pack (merge-base → HEAD) |
+| `packet` | Deterministic task-to-source packet for pre-model harness injection |
 | `context` | Call-graph context around a symbol (`--depth`, `--budget`, `--format`) |
 | `find` | Semantic code search (requires `tldrs index` first) |
 | `structural` | Structural search using ast-grep patterns |
@@ -166,6 +168,8 @@ Exposes tldrs commands as MCP tools: 1:1 mapping with the CLI. Add to your MCP c
 Any agent with shell access can call `tldrs` directly:
 
 ```bash
+# Best when middleware sees the task first:
+# tldrs packet "<task>" --project . --test-command "<known-good test command>"
 # Use tldrs when it will narrow the next read, edit, test, or handoff.
 # Working on recent changes?     → tldrs diff-context --project .
 # Need context around a symbol?  → tldrs context <name> --project . --budget 2000
@@ -182,12 +186,14 @@ Any agent with shell access can call `tldrs` directly:
 | Token efficiency | Compact signatures vs full files | **93% savings** (compact), **66%** (structure JSON) |
 | Semantic search | Search results vs entire repo | **85% token savings**, top-1 accuracy on auth/db |
 | Context-packet proxy | Static task context vs full-context packet | **50–85% packet savings** (varies by compression) |
-| Paired Codex agent pilot | Hidden-grader coding tasks, GPT-5.6 Sol | **FAIL**: -11.9% median savings, +17.0% latency |
+| Paired Codex context gateway | 12 hidden-grader tasks × 3 repeats, GPT-5.6 Sol | **PASS**: 36/36 vs 35/36; **32.1%** median savings (95% CI 25.2–41.1%); 34.7% lower latency |
 
 Context-packet proxy detail: 53% (none) → 78% (two-stage) → 84%
 (chunk-summary) at budget=2000. These are component-output measurements, not
-end-to-end agent savings. The current paired pilot is documented in
-[`docs/research/paired-agent-value-eval-2026-07.md`](docs/research/paired-agent-value-eval-2026-07.md).
+end-to-end agent savings. The failed model-initiated pilot and successful
+middleware confirmation are documented in
+[`docs/research/paired-agent-value-eval-2026-07.md`](docs/research/paired-agent-value-eval-2026-07.md)
+and [`docs/research/2026-07-21-context-gateway-token-savings.md`](docs/research/2026-07-21-context-gateway-token-savings.md).
 
 **Reproduce:**
 ```bash

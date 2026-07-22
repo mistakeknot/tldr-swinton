@@ -7,6 +7,7 @@ def test_quickstart_and_readme_describe_the_adaptive_plugin_surface() -> None:
 
     assert "Run tldrs BEFORE using Read" not in quickstart
     assert "Use tldrs when" in quickstart
+    assert "tldrs packet" in quickstart
     assert "6 autonomous skills" not in readme
     assert "forked Explore" in readme
 

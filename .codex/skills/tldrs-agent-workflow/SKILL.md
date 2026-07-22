@@ -9,6 +9,25 @@ Use tldrs when it materially narrows the code the agent must inspect: unfamiliar
 
 Skip it when the exact target is already known, the file is small, the task is docs/config only, or the harness already narrowed the context enough to read or edit directly.
 
+## Preferred Harness Path
+
+When the harness receives the public task before the model starts, generate and
+inject a bounded packet outside the agent loop:
+
+```bash
+tldrs packet "<public task text>" --project . \
+  --test-command "<known-good focused test command>"
+```
+
+This is the preferred route for unfamiliar and multi-file coding work. It gives
+the model up to three ranked source windows and a validated execution contract
+without spending an agent turn on tool selection, index setup, or repository-
+wide discovery. Treat candidates as hints: read the full owner source before
+editing and verify the change. Use `--machine` for a structured harness payload.
+
+If the harness cannot inject context before the model starts, use the one-shot
+interactive workflow below.
+
 Start with one reconnaissance command, inspect whether it narrowed the target,
 then switch to the exact source and tests. Do not chain commands by default.
 Escalate to a second tldrs command only when the first result exposes a concrete
@@ -19,6 +38,7 @@ agent would immediately reread the same breadth of code, skip tldrs.
 
 | Task | Command | Then |
 |------|---------|------|
+| Harness can preprocess the task | `tldrs packet "task" --project . --test-command "..."` | Inject before the model starts |
 | Review a non-trivial diff | `tldrs diff-context --project . --preset compact` | Review changed symbols |
 | Find code by concept | `tldrs find "auth logic"` | Read top results |
 | Find code by structure | `tldrs structural 'pattern' --lang python` | Read matches |

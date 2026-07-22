@@ -2053,6 +2053,9 @@ Semantic Search:
 
 What are you trying to do?
 
+0. "Prepare bounded context before the model starts"
+   → tldrs packet "<task>" --project . --test-command "<test command>"
+
 1. "Understand recent changes"
    → tldrs diff-context --project . --budget 2000
 
@@ -2069,6 +2072,9 @@ What are you trying to do?
    → Read the full file (tldr is for recon, not surgery)
 
 ## Essential Commands
+
+# Pre-model task packet (preferred harness path)
+tldrs packet "<task>" --project . --test-command "<test command>"
 
 # Diff-first context (start here)
 tldrs diff-context --project . --budget 2000
