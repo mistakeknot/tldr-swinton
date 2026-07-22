@@ -249,7 +249,7 @@ def test_external_source_and_arbitrary_corpus_record_same_sha(tmp_path: Path) ->
         "--codex-executable",
         str(fake_codex),
         "--grader-python",
-        sys.executable,
+        ".venv/bin/python",
     )
 
     assert executed.returncode == 0, executed.stderr

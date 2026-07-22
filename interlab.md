@@ -26,6 +26,15 @@ default packet budget only when hidden-grader correctness is non-inferior.
 Pre-spend corpus gate: 4/4 mutations fail their hidden grader and the exact
 reference repair passes; source preparation is clean, detached, and SHA-pinned.
 
+### Smoke attempt 1 — infrastructure reject
+
+All four first adaptive model cells completed, but no hidden grader could start:
+the CLI preserved a relative `.venv/bin/python` path and the grader subprocess
+resolved it from the isolated workspace. No outcome rows were written, so this
+attempt is excluded from correctness and token comparisons. A fake-harness
+regression now proves the grader executable is absolutized before materializing
+any workspace. Reruns use fresh result directories and the new evaluator SHA.
+
 ## Objective
 
 Hill-climb tldr-swinton context policy until it reduces eligible-task median

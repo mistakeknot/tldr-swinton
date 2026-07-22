@@ -543,6 +543,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         args.source_repo = args.source_repo.resolve()
+        args.grader_python = _verification_python(args.grader_python)
         require_pilot_corpus = (
             args.tasks_file.resolve() == DEFAULT_TASKS_FILE.resolve()
         )
