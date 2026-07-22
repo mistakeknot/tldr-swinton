@@ -174,7 +174,11 @@ def _write_fake_codex(path: Path) -> None:
         "output = pathlib.Path(args[args.index('--output-last-message') + 1])\n"
         "output.write_text('fake final')\n"
         "print(json.dumps({'type': 'thread.started', 'thread_id': 'fake-thread'}))\n"
-        "command = 'condition=' + os.environ.get('TLDRS_EVAL_CONDITION', 'missing')\n"
+        "command = ';'.join([\n"
+        "    'condition=' + os.environ.get('TLDRS_EVAL_CONDITION', 'missing'),\n"
+        "    'home=' + os.environ.get('HOME', 'missing'),\n"
+        "    'codex_home=' + os.environ.get('CODEX_HOME', 'missing'),\n"
+        "])\n"
         "print(json.dumps({'type': 'item.completed', 'item': {'id': 'i0', 'type': 'command_execution', 'command': command, 'aggregated_output': '', 'exit_code': 0, 'status': 'completed'}}))\n"
         "print(json.dumps({'type': 'item.completed', 'item': {'id': 'i1', 'type': 'agent_message', 'text': 'fake final'}}))\n"
         "print(json.dumps({'type': 'turn.completed', 'usage': {'input_tokens': 7, 'cached_input_tokens': 2, 'output_tokens': 3, 'reasoning_output_tokens': 0}}))\n"
@@ -190,7 +194,18 @@ def test_run_codex_persists_real_process_trace_and_environment(tmp_path: Path) -
     workspace.mkdir()
     trace_path = tmp_path / "trace.jsonl"
     output_path = tmp_path / "last.txt"
-    environment = build_condition_environment(Condition.ADAPTIVE, {"PATH": "/bin"})
+    real_home = tmp_path / "real-home"
+    codex_home = tmp_path / "codex-home"
+    real_home.mkdir()
+    codex_home.mkdir()
+    environment = build_condition_environment(
+        Condition.ADAPTIVE,
+        {
+            "PATH": "/bin",
+            "HOME": str(real_home),
+            "CODEX_HOME": str(codex_home),
+        },
+    )
     config = CodexRunConfig(
         model="gpt-eval", timeout_s=5, codex_executable=fake
     )
@@ -208,7 +223,9 @@ def test_run_codex_persists_real_process_trace_and_environment(tmp_path: Path) -
     assert result.timed_out is False
     assert result.trace.final_message == "fake final"
     assert result.trace.metrics.total_tokens == 10
-    assert "condition=adaptive" in result.trace.metrics.commands
+    assert "condition=adaptive" in result.trace.metrics.commands[0]
+    assert f"home={real_home}" not in result.trace.metrics.commands[0]
+    assert f"codex_home={codex_home}" in result.trace.metrics.commands[0]
     assert trace_path.read_text() == result.stdout
     assert output_path.read_text() == "fake final"
 

@@ -4,6 +4,7 @@ import json
 import re
 import shlex
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -381,28 +382,34 @@ def run_codex(
     )
     started = time.perf_counter()
     timed_out = False
-    try:
-        completed = subprocess.run(
-            command,
-            cwd=workspace,
-            env=environment,
-            text=True,
-            capture_output=True,
-            check=False,
-            stdin=subprocess.DEVNULL,
-            timeout=config.timeout_s,
-        )
-        exit_code = completed.returncode
-        stdout = completed.stdout
-        stderr = completed.stderr
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        exit_code = 124
-        stdout = _text(exc.stdout)
-        stderr = _text(exc.stderr)
-        if stderr and not stderr.endswith("\n"):
-            stderr += "\n"
-        stderr += f"codex timed out after {config.timeout_s}s"
+    current_home = Path(environment.get("HOME") or Path.home())
+    codex_home = environment.get("CODEX_HOME") or str(current_home / ".codex")
+    with tempfile.TemporaryDirectory(prefix="tldrs-codex-home-") as home:
+        isolated_environment = dict(environment)
+        isolated_environment["HOME"] = home
+        isolated_environment["CODEX_HOME"] = codex_home
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=workspace,
+                env=isolated_environment,
+                text=True,
+                capture_output=True,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                timeout=config.timeout_s,
+            )
+            exit_code = completed.returncode
+            stdout = completed.stdout
+            stderr = completed.stderr
+        except subprocess.TimeoutExpired as exc:
+            timed_out = True
+            exit_code = 124
+            stdout = _text(exc.stdout)
+            stderr = _text(exc.stderr)
+            if stderr and not stderr.endswith("\n"):
+                stderr += "\n"
+            stderr += f"codex timed out after {config.timeout_s}s"
     elapsed_ms = int((time.perf_counter() - started) * 1000)
     trace_path.write_text(stdout)
     parsed = parse_codex_trace(stdout, requested_model=config.model)
