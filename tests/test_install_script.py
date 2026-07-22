@@ -114,6 +114,40 @@ def test_check_versions_discovers_sibling_sylveste_checkout(tmp_path: Path) -> N
     assert result.stdout.strip() == "sibling:--strict"
 
 
+def test_check_versions_selects_registered_marketplace_clone(tmp_path: Path) -> None:
+    wrapper = tmp_path / "projects/tldr-swinton/scripts/check-versions.sh"
+    checker = tmp_path / "custom/intercheck-versions.sh"
+    home = tmp_path / "home"
+    marketplace = (
+        home
+        / ".claude/plugins/marketplaces/interagency-marketplace"
+        / ".claude-plugin/marketplace.json"
+    )
+    _copy_version_wrapper(wrapper)
+    checker.parent.mkdir(parents=True)
+    checker.write_text(
+        "#!/bin/bash\nprintf '%s\\n' \"${INTERCHECK_MARKETPLACE_JSON:-}\"\n"
+    )
+    checker.chmod(0o755)
+    marketplace.parent.mkdir(parents=True)
+    marketplace.write_text("{}\n")
+    environment = dict(os.environ)
+    environment["HOME"] = str(home)
+    environment["TLDRS_INTERCHECK_VERSIONS"] = str(checker)
+    environment.pop("INTERCHECK_MARKETPLACE_JSON", None)
+
+    result = subprocess.run(
+        [str(wrapper)],
+        text=True,
+        capture_output=True,
+        env=environment,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == str(marketplace)
+
+
 def test_check_versions_preserves_historical_monorepo_layout(tmp_path: Path) -> None:
     sylveste = tmp_path / "Sylveste"
     wrapper = sylveste / "os" / "tldr-swinton" / "scripts" / "check-versions.sh"
