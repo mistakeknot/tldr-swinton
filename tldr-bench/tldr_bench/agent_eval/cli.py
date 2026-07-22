@@ -96,6 +96,11 @@ def _resolve_executable(executable: Path) -> Path:
     return Path(resolved).resolve() if resolved else executable
 
 
+def _verification_python(executable: Path) -> Path:
+    """Return an absolute path without dereferencing a virtualenv symlink."""
+    return executable.absolute()
+
+
 def _select_tasks(args: argparse.Namespace, tasks: list[TaskSpec]) -> list[TaskSpec]:
     if args.smoke and args.task:
         raise ValueError("--smoke and --task cannot be combined")
@@ -360,7 +365,7 @@ def _run_cell(
             condition,
             workspace,
             adaptive_policy=args.adaptive_policy,
-            verification_python=args.grader_python.resolve(),
+            verification_python=_verification_python(args.grader_python),
         )
         process = run_codex(
             config,

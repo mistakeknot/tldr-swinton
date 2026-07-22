@@ -6,7 +6,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from tldr_bench.agent_eval.cli import _resolve_executable, build_parser
+from tldr_bench.agent_eval.cli import (
+    _resolve_executable,
+    _verification_python,
+    build_parser,
+)
 
 
 REPO_ROOT = Path(__file__).parents[2]
@@ -63,6 +67,17 @@ def test_resolve_executable_before_condition_path_is_sanitized(
     monkeypatch.setenv("PATH", str(tmp_path))
 
     assert _resolve_executable(Path("codex")) == executable.resolve()
+
+
+def test_verification_python_preserves_virtualenv_entrypoint(tmp_path: Path) -> None:
+    real_python = tmp_path / "base-python"
+    real_python.write_text("#!/bin/sh\n")
+    virtualenv_python = tmp_path / ".venv/bin/python"
+    virtualenv_python.parent.mkdir(parents=True)
+    virtualenv_python.symlink_to(real_python)
+
+    assert _verification_python(virtualenv_python) == virtualenv_python.absolute()
+    assert _verification_python(virtualenv_python) != real_python.resolve()
 
 
 def test_default_model_uses_codex_supported_concrete_id(monkeypatch) -> None:
