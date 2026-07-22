@@ -58,6 +58,79 @@ def _fake_codex(tmp_path: Path) -> Path:
     return executable
 
 
+def _make_external_eval(tmp_path: Path) -> tuple[Path, Path]:
+    source = tmp_path / "external-source"
+    source.mkdir()
+    (source / "app.py").write_text("def answer() -> int:\n    return 41\n")
+    subprocess.run(["git", "init", "-q"], cwd=source, check=True)
+    subprocess.run(["git", "add", "app.py"], cwd=source, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Agent Eval Test",
+            "-c",
+            "user.email=agent-eval@example.invalid",
+            "commit",
+            "-qm",
+            "external source",
+        ],
+        cwd=source,
+        check=True,
+    )
+
+    assets = tmp_path / "external-assets"
+    assets.mkdir()
+    (assets / "mutation.yaml").write_text(
+        "replacements:\n"
+        "  - path: app.py\n"
+        "    old: 'return 41'\n"
+        "    new: 'return 40'\n"
+    )
+    (assets / "grader.py").write_text(
+        "from pathlib import Path\n"
+        "import sys\n"
+        "text = (Path(sys.argv[1]) / 'app.py').read_text()\n"
+        "passed = int('return 42' in text)\n"
+        "print(f'EVAL_TESTS passed={passed} total=1')\n"
+        "raise SystemExit(0 if passed else 1)\n"
+    )
+    tasks = assets / "tasks.yaml"
+    tasks.write_text(
+        "- id: external-001\n"
+        "  title: Repair the answer\n"
+        "  category: cross_file_bug\n"
+        "  eligible_for_tldrs: true\n"
+        "  prompt: Make answer return the expected value.\n"
+        "  mutation: mutation.yaml\n"
+        "  grader: grader.py\n"
+    )
+    return source, tasks
+
+
+def _fake_external_codex(tmp_path: Path) -> Path:
+    executable = tmp_path / "fake-external-codex"
+    executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        "from pathlib import Path\n"
+        "args = sys.argv[1:]\n"
+        "workspace = Path(args[args.index('-C') + 1])\n"
+        "message = Path(args[args.index('--output-last-message') + 1])\n"
+        "target = workspace / 'app.py'\n"
+        "target.write_text(target.read_text().replace('return 40', 'return 42'))\n"
+        "message.write_text('fixed')\n"
+        "print(json.dumps({'type': 'thread.started', 'thread_id': 'external'}))\n"
+        "print(json.dumps({'type': 'item.completed', 'item': {"
+        "'type': 'agent_message', 'text': 'fixed'}}))\n"
+        "print(json.dumps({'type': 'turn.completed', 'usage': {"
+        "'input_tokens': 50, 'cached_input_tokens': 0, 'output_tokens': 5, "
+        "'reasoning_output_tokens': 1}}))\n"
+    )
+    executable.chmod(0o755)
+    return executable
+
+
 def test_resolve_executable_before_condition_path_is_sanitized(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -125,6 +198,55 @@ def test_list_tasks_and_dry_run_render_stable_cells(tmp_path: Path) -> None:
     assert "cross-gitignore-nested__adaptive__r01" in dry.stdout
     assert "codex exec" in dry.stdout
     assert not (tmp_path / "dry").exists()
+
+
+def test_external_source_and_arbitrary_corpus_record_same_sha(tmp_path: Path) -> None:
+    source, tasks = _make_external_eval(tmp_path)
+    results = tmp_path / "external-results"
+    fake_codex = _fake_external_codex(tmp_path)
+
+    listed = _run_cli("--list-tasks", "--tasks-file", str(tasks))
+    assert listed.returncode == 0, listed.stderr
+    assert "1 tasks" in listed.stdout
+
+    executed = _run_cli(
+        "--source-repo",
+        str(source),
+        "--tasks-file",
+        str(tasks),
+        "--task",
+        "external-001",
+        "--conditions",
+        "baseline",
+        "--repeats",
+        "1",
+        "--model",
+        "test-model",
+        "--results-dir",
+        str(results),
+        "--codex-executable",
+        str(fake_codex),
+        "--grader-python",
+        sys.executable,
+    )
+
+    assert executed.returncode == 0, executed.stderr
+    metadata = json.loads((results / "metadata.json").read_text())
+    source_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=source,
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+    assert metadata["source_repo"] == str(source.resolve())
+    assert metadata["source_sha"] == source_sha
+    assert len(metadata["evaluator_sha"]) == 40
+    outcomes = [
+        json.loads(line) for line in (results / "outcomes.jsonl").read_text().splitlines()
+    ]
+    assert len(outcomes) == 1
+    assert outcomes[0]["success"] is True
 
 
 def test_execute_resume_and_report_only(tmp_path: Path) -> None:

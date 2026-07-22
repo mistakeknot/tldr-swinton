@@ -81,6 +81,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--tldrs-bin-dir", type=Path, default=Path("/Users/sma/.local/bin")
     )
     parser.add_argument("--tasks-file", type=Path, default=DEFAULT_TASKS_FILE)
+    parser.add_argument(
+        "--source-repo",
+        type=Path,
+        default=REPO_ROOT,
+        help="clean Git checkout whose HEAD is materialized for every cell",
+    )
     return parser
 
 
@@ -173,20 +179,32 @@ def _git_sha(repo: Path) -> str:
     ).stdout.strip()
 
 
-def _corpus_hash(tasks_file: Path) -> str:
+def _git_remote(repo: Path) -> str | None:
+    result = subprocess.run(
+        ["git", "config", "--get", "remote.origin.url"],
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    remote = result.stdout.strip()
+    return remote or None
+
+
+def _corpus_hash(tasks_file: Path, tasks: list[TaskSpec]) -> str:
     digest = hashlib.sha256()
     assets = [tasks_file.resolve()]
-    asset_root = REPO_ROOT / "tldr-bench/agent_eval"
     assets.extend(
         path
-        for path in sorted(asset_root.rglob("*"))
-        if path.is_file() and path.suffix in {".py", ".yaml"}
+        for task in tasks
+        for path in (task.mutation_path.resolve(), task.grader_path.resolve())
     )
+    assets = list(dict.fromkeys(assets))
     for path in assets:
         try:
-            label = path.relative_to(REPO_ROOT)
+            label = path.relative_to(tasks_file.resolve().parent)
         except ValueError:
-            label = path
+            label = Path(path.name)
         digest.update(str(label).encode())
         digest.update(b"\0")
         digest.update(path.read_bytes())
@@ -201,11 +219,15 @@ def _metadata(
     repeats: int,
 ) -> dict[str, Any]:
     tldrs_executable = args.tldrs_bin_dir / "tldrs"
+    source_repo = args.source_repo.resolve()
     return {
         "format_version": FORMAT_VERSION,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "source_sha": _git_sha(REPO_ROOT),
-        "task_corpus_sha256": _corpus_hash(args.tasks_file),
+        "evaluator_sha": _git_sha(REPO_ROOT),
+        "source_repo": str(source_repo),
+        "source_remote": _git_remote(source_repo),
+        "source_sha": _git_sha(source_repo),
+        "task_corpus_sha256": _corpus_hash(args.tasks_file, tasks),
         "task_ids": [task.id for task in tasks],
         "conditions": [condition.value for condition in conditions],
         "repeats": repeats,
@@ -236,6 +258,8 @@ def _load_metadata(path: Path) -> dict[str, Any]:
 
 def _validate_resume(expected: dict[str, Any], actual: dict[str, Any]) -> None:
     fields = (
+        "evaluator_sha",
+        "source_repo",
         "source_sha",
         "task_corpus_sha256",
         "task_ids",
@@ -374,7 +398,7 @@ def _run_cell(
         workspace = Path(temporary.name) / "workspace"
     try:
         materialize_workspace(
-            REPO_ROOT,
+            args.source_repo,
             task,
             condition,
             workspace,
@@ -456,7 +480,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        all_tasks = load_agent_tasks(args.tasks_file, require_pilot_corpus=True)
+        args.source_repo = args.source_repo.resolve()
+        require_pilot_corpus = (
+            args.tasks_file.resolve() == DEFAULT_TASKS_FILE.resolve()
+        )
+        all_tasks = load_agent_tasks(
+            args.tasks_file, require_pilot_corpus=require_pilot_corpus
+        )
         if args.list_tasks:
             _print_tasks(all_tasks)
             return 0
@@ -465,9 +495,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.report_only:
             metadata = _load_metadata(results_dir / "metadata.json")
-            if _corpus_hash(args.tasks_file) != metadata["task_corpus_sha256"]:
-                raise ValueError("task corpus differs from the recorded run")
             tasks = _tasks_from_metadata(all_tasks, metadata)
+            if _corpus_hash(args.tasks_file, tasks) != metadata["task_corpus_sha256"]:
+                raise ValueError("task corpus differs from the recorded run")
             outcomes = _load_outcomes(outcomes_path)
             analysis = _write_analysis(
                 results_dir,
