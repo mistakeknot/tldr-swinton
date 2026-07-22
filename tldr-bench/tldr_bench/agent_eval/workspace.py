@@ -4,6 +4,7 @@ import hashlib
 import io
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tarfile
@@ -145,18 +146,36 @@ def _write_condition_guidance(
     condition: Condition,
     adaptive_policy: AdaptivePolicy | str,
     prompt: str,
+    verification_python: Path | None,
 ) -> None:
     policy = parse_adaptive_policy(adaptive_policy)
-    adaptive_guidance = {
-        AdaptivePolicy.CURRENT: _ADAPTIVE_GUIDANCE,
-        AdaptivePolicy.TOOL_ONLY: _TOOL_ONLY_GUIDANCE,
-        AdaptivePolicy.ONE_SHOT: _ONE_SHOT_GUIDANCE,
-        AdaptivePolicy.INJECTED_PACKET: (
+    if policy is AdaptivePolicy.CURRENT:
+        adaptive_guidance = _ADAPTIVE_GUIDANCE
+    elif policy is AdaptivePolicy.TOOL_ONLY:
+        adaptive_guidance = _TOOL_ONLY_GUIDANCE
+    elif policy is AdaptivePolicy.ONE_SHOT:
+        adaptive_guidance = _ONE_SHOT_GUIDANCE
+    elif policy is AdaptivePolicy.INJECTED_PACKET:
+        adaptive_guidance = (
             _INJECTED_PACKET_GUIDANCE
             + "\n"
             + render_bounded_context(destination, prompt)
-        ),
-    }[policy]
+        )
+    else:
+        if verification_python is None:
+            raise ValueError("injected_runtime requires a verification Python")
+        test_command = (
+            f"PYTHONPATH=src {shlex.quote(str(verification_python))} -m pytest"
+        )
+        adaptive_guidance = (
+            _INJECTED_PACKET_GUIDANCE
+            + "\n"
+            + "## Validated execution contract\n\n"
+            + f"Run focused tests with `{test_command}` and append target paths.\n"
+            + "Do not probe alternative interpreters or package managers unless "
+            + "this command cannot start.\n\n"
+            + render_bounded_context(destination, prompt)
+        )
     guidance = (
         _BASELINE_GUIDANCE
         if condition is Condition.BASELINE
@@ -191,13 +210,20 @@ def materialize_workspace(
     destination: Path,
     *,
     adaptive_policy: AdaptivePolicy | str = AdaptivePolicy.CURRENT,
+    verification_python: Path | None = None,
 ) -> Path:
     if destination.exists():
         raise ValueError(f"workspace destination already exists: {destination}")
     _extract_git_archive(source_repo.resolve(), destination)
     _remove_evaluator_surface(destination)
     _apply_replacements(destination, load_replacements(task.mutation_path))
-    _write_condition_guidance(destination, condition, adaptive_policy, task.prompt)
+    _write_condition_guidance(
+        destination,
+        condition,
+        adaptive_policy,
+        task.prompt,
+        verification_python,
+    )
     _initialize_history_free_repo(destination)
     return destination
 
@@ -220,7 +246,8 @@ def build_condition_environment(
     policy = parse_adaptive_policy(adaptive_policy)
     agent_tool_enabled = (
         condition is Condition.ADAPTIVE
-        and policy is not AdaptivePolicy.INJECTED_PACKET
+        and policy
+        not in {AdaptivePolicy.INJECTED_PACKET, AdaptivePolicy.INJECTED_RUNTIME}
     )
     if agent_tool_enabled:
         parts.insert(0, str(tldrs_dir))

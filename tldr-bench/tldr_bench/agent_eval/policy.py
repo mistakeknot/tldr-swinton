@@ -10,6 +10,7 @@ class AdaptivePolicy(str, Enum):
     TOOL_ONLY = "tool_only"
     ONE_SHOT = "one_shot"
     INJECTED_PACKET = "injected_packet"
+    INJECTED_RUNTIME = "injected_runtime"
 
 
 def parse_adaptive_policy(value: AdaptivePolicy | str) -> AdaptivePolicy:

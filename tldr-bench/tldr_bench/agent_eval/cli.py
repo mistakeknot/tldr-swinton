@@ -340,7 +340,10 @@ def _run_cell(
     visible_tldrs = shutil.which("tldrs", path=environment.get("PATH"))
     if condition is Condition.BASELINE and visible_tldrs:
         contamination.append(f"tldrs executable visible at {visible_tldrs}")
-    expects_agent_tool = args.adaptive_policy != AdaptivePolicy.INJECTED_PACKET.value
+    expects_agent_tool = args.adaptive_policy not in {
+        AdaptivePolicy.INJECTED_PACKET.value,
+        AdaptivePolicy.INJECTED_RUNTIME.value,
+    }
     if condition is Condition.ADAPTIVE and expects_agent_tool and not visible_tldrs:
         contamination.append("tldrs executable is unavailable")
 
@@ -357,6 +360,7 @@ def _run_cell(
             condition,
             workspace,
             adaptive_policy=args.adaptive_policy,
+            verification_python=args.grader_python.resolve(),
         )
         process = run_codex(
             config,

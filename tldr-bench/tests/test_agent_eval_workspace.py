@@ -184,6 +184,28 @@ def test_injected_packet_uses_public_prompt_and_visible_source(tmp_path: Path) -
     assert "tldrs" not in guidance.lower()
 
 
+def test_injected_runtime_adds_a_validated_test_execution_contract(
+    tmp_path: Path,
+) -> None:
+    source = _make_source_repo(tmp_path)
+    task = _make_task_assets(tmp_path)
+    workspace = tmp_path / "injected-runtime"
+
+    materialize_workspace(
+        source,
+        task,
+        Condition.ADAPTIVE,
+        workspace,
+        adaptive_policy="injected_runtime",
+        verification_python=Path("/opt/agent-harness/python"),
+    )
+
+    guidance = " ".join((workspace / "AGENTS.md").read_text().split())
+    assert "Precomputed bounded context" in guidance
+    assert "PYTHONPATH=src /opt/agent-harness/python -m pytest" in guidance
+    assert "Do not probe alternative interpreters" in guidance
+
+
 def test_replacements_fail_closed_when_source_drifted(tmp_path: Path) -> None:
     source = _make_source_repo(tmp_path)
     task = _make_task_assets(tmp_path, old="return 999")
@@ -224,11 +246,19 @@ def test_condition_environment_removes_or_exposes_tldrs_bin(tmp_path: Path) -> N
         tldrs_bin_dir=tldrs_bin,
         adaptive_policy="injected_packet",
     )
+    injected_runtime = build_condition_environment(
+        Condition.ADAPTIVE,
+        base,
+        tldrs_bin_dir=tldrs_bin,
+        adaptive_policy="injected_runtime",
+    )
 
     assert baseline["PATH"] == str(other_bin)
     assert adaptive["PATH"].split(os.pathsep)[0] == str(tldrs_bin)
     assert injected["PATH"] == str(other_bin)
     assert injected["TLDRS_DISABLED"] == "1"
+    assert injected_runtime["PATH"] == str(other_bin)
+    assert injected_runtime["TLDRS_DISABLED"] == "1"
 
 
 def test_external_grader_owns_success_and_patch_hash(tmp_path: Path) -> None:

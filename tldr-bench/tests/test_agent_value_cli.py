@@ -85,6 +85,9 @@ def test_adaptive_policy_accepts_isolated_experiment_arms() -> None:
     assert parser.parse_args(
         ["--adaptive-policy", "injected_packet"]
     ).adaptive_policy == "injected_packet"
+    assert parser.parse_args(
+        ["--adaptive-policy", "injected_runtime"]
+    ).adaptive_policy == "injected_runtime"
 
 
 def test_list_tasks_and_dry_run_render_stable_cells(tmp_path: Path) -> None:
