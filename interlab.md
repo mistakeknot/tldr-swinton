@@ -82,3 +82,34 @@ Frozen GPT-5.6 Sol / Codex 0.144.6 / tldrs 0.7.19, 12 tasks × 2 conditions ×
 Setup and implementation plan complete. Next experiment: add the isolated
 `tool_only` and `one_shot` adaptive policies with TDD, then run a stratified
 screen against fresh baselines.
+
+## 2026-07-21 Stratified Policy Screen
+
+Model and harness: `gpt-5.6-sol`, medium reasoning, Codex `0.144.6`, source
+`634756b`. Tasks: one known-file negative control plus cross-file, diff, and
+owner-sensitive refactor tasks. The current-policy run produced fresh paired
+baselines. The byte-identical baseline cells were reused for the two subsequent
+adaptive-only arms, avoiding eight redundant model runs.
+
+| Policy | Correct | Eligible median savings | Eligible tldrs calls | Refactor owner recall | Decision |
+|---|---:|---:|---:|---:|---|
+| Baseline | 4/4 | reference | 0/3 | 100% | control |
+| Current broad guidance | 3/4 | -35.8% | 3/3 | 0% | reject |
+| Tool exposure only | 3/4 | -37.0% | 1/3 | 0% | reject |
+| Strict one-shot | 4/4 | -11.8% | 3/3 | 100% | reject for savings; retain owner/cap idea |
+
+Negative-control savings were noisy: current 19.0%, tool-only 22.4%, and
+one-shot 40.9%, all correct and with zero tldrs calls. They are not attributed
+to the tool.
+
+The decisive failure mechanism was stable across current and exposure-only:
+the agent invoked `tldrs find`, the installed runtime had no usable semantic
+backend, and the agent then edited a downstream consumer rather than hidden
+owner `ast_extractor.py`. Current used 111,632 tokens and exposure-only used
+199,615 versus the 76,892-token passing baseline. Strict one-shot restored
+owner read/change recall and correctness, but still cost 85,202 tokens.
+
+Decision: model-initiated reconnaissance is exhausted as the primary product
+path. Next mutation is a deterministic, automatically injected, bounded packet
+derived only from the public task and visible source. The model will not spend a
+tool call deciding whether or how to discover context.
