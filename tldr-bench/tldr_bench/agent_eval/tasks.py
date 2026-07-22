@@ -17,7 +17,7 @@ _REQUIRED_FIELDS = {
     "mutation",
     "grader",
 }
-_OPTIONAL_FIELDS = {"grader_timeout_s"}
+_OPTIONAL_FIELDS = {"grader_timeout_s", "verification_command"}
 
 
 def _resolve_asset(base: Path, value: Any, label: str) -> Path:
@@ -67,6 +67,11 @@ def _parse_task(raw: Any, base: Path) -> TaskSpec:
     timeout = raw.get("grader_timeout_s", 120)
     if not isinstance(timeout, int) or timeout <= 0:
         raise ValueError("grader_timeout_s must be a positive integer")
+    verification_command = raw.get("verification_command")
+    if verification_command is not None and (
+        not isinstance(verification_command, str) or not verification_command.strip()
+    ):
+        raise ValueError("verification_command must be a non-empty string")
 
     return TaskSpec(
         id=task_id,
@@ -76,6 +81,7 @@ def _parse_task(raw: Any, base: Path) -> TaskSpec:
         prompt=prompt,
         mutation_path=mutation_path,
         grader_path=grader_path,
+        verification_command=verification_command,
         grader_timeout_s=timeout,
     )
 

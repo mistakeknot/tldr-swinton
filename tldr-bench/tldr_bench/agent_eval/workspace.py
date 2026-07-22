@@ -145,7 +145,7 @@ def _write_condition_guidance(
     destination: Path,
     condition: Condition,
     adaptive_policy: AdaptivePolicy | str,
-    prompt: str,
+    task: TaskSpec,
     verification_python: Path | None,
     packet_max_chars: int,
 ) -> None:
@@ -161,15 +161,18 @@ def _write_condition_guidance(
             _INJECTED_PACKET_GUIDANCE
             + "\n"
             + render_bounded_context(
-                destination, prompt, max_chars=packet_max_chars
+                destination, task.prompt, max_chars=packet_max_chars
             )
         )
     else:
-        if verification_python is None:
-            raise ValueError("injected_runtime requires a verification Python")
-        test_command = (
-            f"PYTHONPATH=src {shlex.quote(str(verification_python))} -m pytest"
-        )
+        if task.verification_command is not None:
+            test_command = task.verification_command
+        else:
+            if verification_python is None:
+                raise ValueError("injected_runtime requires a verification Python")
+            test_command = (
+                f"PYTHONPATH=src {shlex.quote(str(verification_python))} -m pytest"
+            )
         adaptive_guidance = (
             _INJECTED_PACKET_GUIDANCE
             + "\n"
@@ -178,7 +181,7 @@ def _write_condition_guidance(
             + "Do not probe alternative interpreters or package managers unless "
             + "this command cannot start.\n\n"
             + render_bounded_context(
-                destination, prompt, max_chars=packet_max_chars
+                destination, task.prompt, max_chars=packet_max_chars
             )
         )
     guidance = (
@@ -229,7 +232,7 @@ def materialize_workspace(
         destination,
         condition,
         adaptive_policy,
-        task.prompt,
+        task,
         verification_python,
         packet_max_chars,
     )

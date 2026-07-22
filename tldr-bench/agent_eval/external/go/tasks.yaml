@@ -8,6 +8,7 @@
     that boundary for both collection kinds.
   mutation: mutations/equate-empty.yaml
   grader: graders/equate_empty.py
+  verification_command: go test ./cmp/cmpopts
 
 - id: go-cmp-equate-approx
   title: Honor either relative or absolute approximation margin
@@ -20,3 +21,4 @@
     smaller. Restore the documented tolerance rule for float32 and float64.
   mutation: mutations/equate-approx.yaml
   grader: graders/equate_approx.py
+  verification_command: go test ./cmp/cmpopts

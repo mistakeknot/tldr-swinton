@@ -8,6 +8,7 @@
     the padding calculation without weakening invalid-data handling.
   mutation: mutations/base64-padding.yaml
   grader: graders/base64_padding.py
+  verification_command: python -m pytest tests/test_itsdangerous/test_encoding.py -q
 
 - id: itsdangerous-key-rotation
   title: Sign with the newest rotated secret key
@@ -20,3 +21,4 @@
     intended key-rotation behavior.
   mutation: mutations/key-rotation.yaml
   grader: graders/key_rotation.py
+  verification_command: python -m pytest tests/test_itsdangerous/test_signer.py -q

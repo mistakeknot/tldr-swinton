@@ -34,6 +34,7 @@ class TaskSpec:
     prompt: str
     mutation_path: Path
     grader_path: Path
+    verification_command: str | None = None
     grader_timeout_s: int = 120
 
 

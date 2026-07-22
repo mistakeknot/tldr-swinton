@@ -31,7 +31,13 @@ def _task_yaml(
     *,
     eligible: bool,
     prompt: str = "Repair the described behavior.",
+    verification_command: str | None = None,
 ) -> str:
+    verification = (
+        f"  verification_command: {verification_command!r}\n"
+        if verification_command is not None
+        else ""
+    )
     return f"""
 - id: {task_id}
   title: Task {task_id}
@@ -40,7 +46,7 @@ def _task_yaml(
   prompt: {prompt!r}
   mutation: {mutation.name}
   grader: {grader.name}
-"""
+{verification}"""
 
 
 def test_load_agent_tasks_builds_strict_typed_specs(tmp_path: Path) -> None:
@@ -55,7 +61,12 @@ def test_load_agent_tasks_builds_strict_typed_specs(tmp_path: Path) -> None:
             eligible=False,
         )
         + _task_yaml(
-            "cross-001", "cross_file_bug", mutation, grader, eligible=True
+            "cross-001",
+            "cross_file_bug",
+            mutation,
+            grader,
+            eligible=True,
+            verification_command="go test ./...",
         )
         + _task_yaml(
             "diff-001", "diff_regression", mutation, grader, eligible=True
@@ -81,6 +92,7 @@ def test_load_agent_tasks_builds_strict_typed_specs(tmp_path: Path) -> None:
     assert tasks[0].eligible_for_tldrs is False
     assert tasks[1].mutation_path == mutation.resolve()
     assert tasks[1].grader_path == grader.resolve()
+    assert tasks[1].verification_command == "go test ./..."
 
 
 @pytest.mark.parametrize(
