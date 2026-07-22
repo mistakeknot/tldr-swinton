@@ -82,6 +82,9 @@ def test_adaptive_policy_accepts_isolated_experiment_arms() -> None:
     assert parser.parse_args(["--adaptive-policy", "one_shot"]).adaptive_policy == (
         "one_shot"
     )
+    assert parser.parse_args(
+        ["--adaptive-policy", "injected_packet"]
+    ).adaptive_policy == "injected_packet"
 
 
 def test_list_tasks_and_dry_run_render_stable_cells(tmp_path: Path) -> None:

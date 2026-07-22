@@ -163,6 +163,27 @@ def test_adaptive_policy_guidance_is_causally_isolated(tmp_path: Path) -> None:
     assert _tracked_content(tool_only) == _tracked_content(one_shot)
 
 
+def test_injected_packet_uses_public_prompt_and_visible_source(tmp_path: Path) -> None:
+    source = _make_source_repo(tmp_path)
+    task = _make_task_assets(tmp_path)
+    workspace = tmp_path / "injected"
+
+    materialize_workspace(
+        source,
+        task,
+        Condition.ADAPTIVE,
+        workspace,
+        adaptive_policy="injected_packet",
+    )
+
+    guidance = (workspace / "AGENTS.md").read_text()
+    assert "Precomputed bounded context" in guidance
+    assert "app.py" in guidance
+    assert "def answer" in guidance
+    assert "Do not perform repository-wide discovery" in " ".join(guidance.split())
+    assert "tldrs" not in guidance.lower()
+
+
 def test_replacements_fail_closed_when_source_drifted(tmp_path: Path) -> None:
     source = _make_source_repo(tmp_path)
     task = _make_task_assets(tmp_path, old="return 999")
@@ -197,9 +218,17 @@ def test_condition_environment_removes_or_exposes_tldrs_bin(tmp_path: Path) -> N
     adaptive = build_condition_environment(
         Condition.ADAPTIVE, base, tldrs_bin_dir=tldrs_bin
     )
+    injected = build_condition_environment(
+        Condition.ADAPTIVE,
+        base,
+        tldrs_bin_dir=tldrs_bin,
+        adaptive_policy="injected_packet",
+    )
 
     assert baseline["PATH"] == str(other_bin)
     assert adaptive["PATH"].split(os.pathsep)[0] == str(tldrs_bin)
+    assert injected["PATH"] == str(other_bin)
+    assert injected["TLDRS_DISABLED"] == "1"
 
 
 def test_external_grader_owns_success_and_patch_hash(tmp_path: Path) -> None:

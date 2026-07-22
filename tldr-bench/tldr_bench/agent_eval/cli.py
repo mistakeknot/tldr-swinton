@@ -332,14 +332,16 @@ def _run_cell(
         codex_executable=_resolve_executable(args.codex_executable),
     )
     environment = build_condition_environment(
-        condition, tldrs_bin_dir=args.tldrs_bin_dir
+        condition,
+        tldrs_bin_dir=args.tldrs_bin_dir,
+        adaptive_policy=args.adaptive_policy,
     )
-    environment["TLDRS_EVAL_POLICY"] = args.adaptive_policy
     contamination: list[str] = []
     visible_tldrs = shutil.which("tldrs", path=environment.get("PATH"))
     if condition is Condition.BASELINE and visible_tldrs:
         contamination.append(f"tldrs executable visible at {visible_tldrs}")
-    if condition is Condition.ADAPTIVE and not visible_tldrs:
+    expects_agent_tool = args.adaptive_policy != AdaptivePolicy.INJECTED_PACKET.value
+    if condition is Condition.ADAPTIVE and expects_agent_tool and not visible_tldrs:
         contamination.append("tldrs executable is unavailable")
 
     temporary: tempfile.TemporaryDirectory[str] | None = None

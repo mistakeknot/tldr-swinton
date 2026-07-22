@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 
 from .policy import AdaptivePolicy, parse_adaptive_policy
+from .recon import render_bounded_context
 from .schema import Condition, GradeResult, Replacement, TaskSpec
 
 
@@ -61,6 +62,15 @@ For an unfamiliar or cross-file task, use at most one tldrs reconnaissance
 command before the first source edit when it can identify the likely owner and
 bound the next source read. Do not chain tldrs commands. Skip it when the target
 is already known or the task is a small scoped edit.
+"""
+
+_INJECTED_PACKET_GUIDANCE = """# Evaluation condition: injected bounded context
+
+Solve the user's coding task and run relevant tests before reporting completion.
+Use the precomputed candidates below to bound the first source read. Do not
+perform repository-wide discovery or invoke additional reconnaissance tools.
+Read full source where needed for a safe edit; the packet is not a substitute
+for verification.
 """
 
 _TEST_COUNT = re.compile(r"EVAL_TESTS\s+passed=(\d+)\s+total=(\d+)")
@@ -134,12 +144,18 @@ def _write_condition_guidance(
     destination: Path,
     condition: Condition,
     adaptive_policy: AdaptivePolicy | str,
+    prompt: str,
 ) -> None:
     policy = parse_adaptive_policy(adaptive_policy)
     adaptive_guidance = {
         AdaptivePolicy.CURRENT: _ADAPTIVE_GUIDANCE,
         AdaptivePolicy.TOOL_ONLY: _TOOL_ONLY_GUIDANCE,
         AdaptivePolicy.ONE_SHOT: _ONE_SHOT_GUIDANCE,
+        AdaptivePolicy.INJECTED_PACKET: (
+            _INJECTED_PACKET_GUIDANCE
+            + "\n"
+            + render_bounded_context(destination, prompt)
+        ),
     }[policy]
     guidance = (
         _BASELINE_GUIDANCE
@@ -181,7 +197,7 @@ def materialize_workspace(
     _extract_git_archive(source_repo.resolve(), destination)
     _remove_evaluator_surface(destination)
     _apply_replacements(destination, load_replacements(task.mutation_path))
-    _write_condition_guidance(destination, condition, adaptive_policy)
+    _write_condition_guidance(destination, condition, adaptive_policy, task.prompt)
     _initialize_history_free_repo(destination)
     return destination
 
@@ -191,6 +207,7 @@ def build_condition_environment(
     base: Mapping[str, str] | None = None,
     *,
     tldrs_bin_dir: Path = Path("/Users/sma/.local/bin"),
+    adaptive_policy: AdaptivePolicy | str = AdaptivePolicy.CURRENT,
 ) -> dict[str, str]:
     environment = dict(os.environ if base is None else base)
     current_path = environment.get("PATH", "")
@@ -200,7 +217,12 @@ def build_condition_environment(
         for part in current_path.split(os.pathsep)
         if part and Path(part).resolve() != tldrs_dir
     ]
-    if condition is Condition.ADAPTIVE:
+    policy = parse_adaptive_policy(adaptive_policy)
+    agent_tool_enabled = (
+        condition is Condition.ADAPTIVE
+        and policy is not AdaptivePolicy.INJECTED_PACKET
+    )
+    if agent_tool_enabled:
         parts.insert(0, str(tldrs_dir))
         environment["TLDRS_ENABLED"] = "1"
         environment.pop("TLDRS_DISABLED", None)
@@ -208,6 +230,7 @@ def build_condition_environment(
         environment["TLDRS_DISABLED"] = "1"
         environment.pop("TLDRS_ENABLED", None)
     environment["TLDRS_EVAL_CONDITION"] = condition.value
+    environment["TLDRS_EVAL_POLICY"] = policy.value
     environment["PATH"] = os.pathsep.join(parts)
     return environment
 
