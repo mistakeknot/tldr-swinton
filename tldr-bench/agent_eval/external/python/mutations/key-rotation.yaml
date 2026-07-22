@@ -1,0 +1,4 @@
+replacements:
+  - path: src/itsdangerous/signer.py
+    old: 'secret_key = self.secret_keys[-1]'
+    new: 'secret_key = self.secret_keys[0]'

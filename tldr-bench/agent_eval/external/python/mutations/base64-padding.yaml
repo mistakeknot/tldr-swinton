@@ -1,0 +1,4 @@
+replacements:
+  - path: src/itsdangerous/encoding.py
+    old: 'string += b"=" * (-len(string) % 4)'
+    new: 'string += b"=" * ((-len(string) % 4) - 1)'

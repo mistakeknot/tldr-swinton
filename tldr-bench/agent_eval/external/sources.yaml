@@ -1,0 +1,11 @@
+sources:
+  - id: itsdangerous-python
+    repository: https://github.com/pallets/itsdangerous.git
+    revision: 672971d66a2ef9f85151e53283113f33d642dabd
+    language: python
+    license: BSD-3-Clause
+  - id: go-cmp
+    repository: https://github.com/google/go-cmp.git
+    revision: b133f1f1932e48f466f597a3346ce6f5a49a0dc1
+    language: go
+    license: BSD-3-Clause

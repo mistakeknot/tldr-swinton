@@ -1,0 +1,4 @@
+replacements:
+  - path: cmp/cmpopts/equate.go
+    old: 'return math.Abs(x-y) <= math.Max(a.marg, relMarg)'
+    new: 'return math.Abs(x-y) <= math.Min(a.marg, relMarg)'

@@ -1,0 +1,22 @@
+- id: itsdangerous-base64-padding
+  title: Restore unpadded URL-safe base64 decoding
+  category: diff_regression
+  eligible_for_tldrs: true
+  prompt: >-
+    URL-safe base64 decoding fails for valid unpadded inputs whose lengths are
+    two or three modulo four, while already padded inputs still work. Restore
+    the padding calculation without weakening invalid-data handling.
+  mutation: mutations/base64-padding.yaml
+  grader: graders/base64_padding.py
+
+- id: itsdangerous-key-rotation
+  title: Sign with the newest rotated secret key
+  category: cross_file_bug
+  eligible_for_tldrs: true
+  prompt: >-
+    A signer configured with an old and a new secret must create new signatures
+    with the newest key while continuing to verify signatures created with the
+    old key. New values are currently signed with the stale key. Restore the
+    intended key-rotation behavior.
+  mutation: mutations/key-rotation.yaml
+  grader: graders/key_rotation.py

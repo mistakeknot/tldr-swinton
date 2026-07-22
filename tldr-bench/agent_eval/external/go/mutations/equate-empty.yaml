@@ -1,0 +1,4 @@
+replacements:
+  - path: cmp/cmpopts/equate.go
+    old: '(vx.Len() == 0 && vy.Len() == 0)'
+    new: '(vx.Len() == 0 || vy.Len() == 0)'
