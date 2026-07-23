@@ -15,6 +15,8 @@ from pathlib import Path
 
 
 _SOURCE_SUFFIXES = {
+    ".bash",
+    ".bats",
     ".c",
     ".cc",
     ".cpp",
@@ -28,9 +30,11 @@ _SOURCE_SUFFIXES = {
     ".py",
     ".rb",
     ".rs",
+    ".sh",
     ".swift",
     ".ts",
     ".tsx",
+    ".zsh",
 }
 _SKIP_PARTS = {
     ".git",
@@ -38,6 +42,8 @@ _SKIP_PARTS = {
     ".pytest_cache",
     ".tldrs",
     ".venv",
+    ".worktree",
+    ".worktrees",
     "build",
     "dist",
     "node_modules",

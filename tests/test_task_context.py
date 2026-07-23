@@ -67,6 +67,62 @@ def test_ranker_prioritizes_a_suspicious_dedup_guard(tmp_path: Path) -> None:
     assert excerpts[0].path == "src/core/owner.py"
 
 
+def test_ranker_includes_shell_owners_and_ignores_worktree_copies(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "scripts/dispatch.sh",
+        "build_backend_command() {\n"
+        "    context_gateway_prepare \"$prompt\" \"$workdir\"\n"
+        "}\n",
+    )
+    _write(
+        tmp_path,
+        ".worktrees/stale/scripts/dispatch.sh",
+        "build_backend_command() {\n"
+        "    legacy_context_gateway_prepare \"$prompt\" \"$workdir\"\n"
+        "}\n",
+    )
+    _write(
+        tmp_path,
+        "tests/structural/test_dispatch.py",
+        "def test_dispatch_context_gateway():\n    assert True\n",
+    )
+
+    excerpts = rank_source_excerpts(
+        tmp_path,
+        "Modify scripts/dispatch.sh so the context gateway prepares the prompt "
+        "before building the backend command.",
+    )
+
+    assert excerpts[0].path == "scripts/dispatch.sh"
+    assert all(".worktrees" not in excerpt.path for excerpt in excerpts)
+
+
+def test_ranker_includes_bats_contracts(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "tests/shell/dispatch_context_gateway.bats",
+        '@test "dispatch injects context gateway packet" {\n'
+        '  run dispatch --context-gateway auto "fix owner"\n'
+        '  [ "$status" -eq 0 ]\n'
+        "}\n",
+    )
+    _write(
+        tmp_path,
+        "src/generic.py",
+        "def dispatch(value):\n    return value\n",
+    )
+
+    excerpts = rank_source_excerpts(
+        tmp_path,
+        "Update the Bats dispatch context gateway contract.",
+    )
+
+    assert excerpts[0].path == "tests/shell/dispatch_context_gateway.bats"
+
+
 def test_agent_packet_includes_bounded_context_and_execution_contract(
     tmp_path: Path,
 ) -> None:
