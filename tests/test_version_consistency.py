@@ -19,6 +19,13 @@ def test_kimi_manifest_tracks_current_package_and_claude_metadata() -> None:
     assert kimi["author"] == claude["author"]["name"]
 
 
+def test_post_bump_keeps_kimi_release_metadata_in_sync() -> None:
+    post_bump = Path("scripts/post-bump.sh").read_text()
+
+    assert "kimi.plugin.json" in post_bump
+    assert "TARGET_VERSION" in post_bump
+
+
 def test_kimi_manifest_exposes_current_skills_commands_and_mcp() -> None:
     kimi = _json("kimi.plugin.json")
 

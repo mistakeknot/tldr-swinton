@@ -1,6 +1,6 @@
 {
   "name": "tldr-swinton",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Adaptive code reconnaissance for LLMs. Forked skills, compact CLI output, semantic search, and MCP tools narrow large or noisy code tasks without taxing every edit.",
   "license": "MIT",
   "keywords": [
@@ -15,7 +15,7 @@
   "author": "MK",
   "interface": {
     "displayName": "tldr-swinton",
-    "shortDescription": "Adaptive, token-efficient code reconnaissance for large or noisy coding tasks."
+    "shortDescription": "Adaptive code reconnaissance for LLMs. Forked skills, compact CLI output, semantic search, and MCP tools narrow large..."
   },
   "skills": "./.claude-plugin/skills/",
   "commands": "./.claude-plugin/commands/",
