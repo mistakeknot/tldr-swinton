@@ -1,6 +1,6 @@
 {
   "name": "tldr-swinton",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Adaptive code reconnaissance for LLMs. Forked skills, compact CLI output, semantic search, and MCP tools narrow large or noisy code tasks without taxing every edit.",
   "author": {
     "name": "MK",
