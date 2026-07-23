@@ -210,6 +210,56 @@ def test_packet_assessment_trusts_an_explicit_owner_path(tmp_path: Path) -> None
     assert result.excerpts[0].path == "scripts/dispatch.sh"
 
 
+def test_packet_reserves_budget_for_every_explicit_owner_before_distractors(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "hooks/context-gateway.sh",
+        "\n".join(
+            f"gateway_hook_line_{index}() {{ context_gateway_fail_open_with_receipt; }}"
+            for index in range(80)
+        ),
+    )
+    _write(
+        tmp_path,
+        "tests/shell/context_gateway_hook.bats",
+        "\n".join(
+            f'@test "context gateway hook failure {index} preserves unrelated output" '
+            "{ run context_gateway_fail_open_with_receipt; }"
+            for index in range(80)
+        ),
+    )
+    _write(
+        tmp_path,
+        "tests/shell/dispatch_context_gateway.bats",
+        "\n".join(
+            f'@test "context gateway hook dispatch {index} preserves unrelated output" '
+            "{ run context_gateway_fail_open_with_receipt; }"
+            for index in range(80)
+        ),
+    )
+
+    result = build_agent_packet(
+        tmp_path,
+        "Fix hooks/context-gateway.sh and update "
+        "tests/shell/context_gateway_hook.bats so hook failures remain fail-open.",
+        harness_profile="kimi",
+        max_chars=900,
+    )
+
+    assert result.decision == "inject"
+    assert result.reason == "explicit_path"
+    assert {excerpt.path for excerpt in result.excerpts[:2]} == {
+        "hooks/context-gateway.sh",
+        "tests/shell/context_gateway_hook.bats",
+    }
+    assert all(excerpt.text for excerpt in result.excerpts[:2])
+    assert "tests/shell/dispatch_context_gateway.bats" not in {
+        excerpt.path for excerpt in result.excerpts
+    }
+
+
 def test_packet_assessment_falls_back_when_ranked_owners_are_tied(
     tmp_path: Path,
 ) -> None:

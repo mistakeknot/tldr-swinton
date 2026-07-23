@@ -393,14 +393,30 @@ def rank_source_excerpts(
             )
         )
 
-    ranked = sorted(candidates, key=lambda item: (-item.score, item.path))
+    ranked = sorted(
+        candidates,
+        key=lambda item: (
+            -(item.path in explicit_paths),
+            -item.score,
+            item.path,
+        ),
+    )
     selected: list[TaskContextExcerpt] = []
     used_chars = 0
-    for candidate in ranked:
+    for candidate_index, candidate in enumerate(ranked):
         remaining = max_chars - used_chars
         if remaining <= 0 or len(selected) >= max_files:
             break
-        excerpt_text = candidate.text[:remaining]
+        excerpt_limit = remaining
+        if candidate.path in explicit_paths:
+            explicit_remaining = sum(
+                item.path in explicit_paths for item in ranked[candidate_index:]
+            )
+            available_slots = max_files - len(selected)
+            explicit_remaining = min(explicit_remaining, available_slots)
+            if explicit_remaining > 1:
+                excerpt_limit = max(1, remaining // explicit_remaining)
+        excerpt_text = candidate.text[:excerpt_limit]
         if not excerpt_text.strip():
             continue
         selected.append(
