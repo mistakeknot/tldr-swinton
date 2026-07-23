@@ -1,7 +1,7 @@
 {
   "name": "tldr-swinton",
-  "version": "0.7.19",
-  "description": "Token-efficient code reconnaissance for LLMs. Autonomous skills save 48-85% tokens via diff-context, semantic search, structural patterns, and symbol analysis. Includes MCP server for direct tool integration.",
+  "version": "0.8.2",
+  "description": "Adaptive code reconnaissance for LLMs. Forked skills, compact CLI output, semantic search, and MCP tools narrow large or noisy code tasks without taxing every edit.",
   "license": "MIT",
   "keywords": [
     "code-analysis",
@@ -15,8 +15,10 @@
   "author": "MK",
   "interface": {
     "displayName": "tldr-swinton",
-    "shortDescription": "Token-efficient code reconnaissance for LLMs. Autonomous skills save 48-85% tokens via diff-context, semantic search,..."
+    "shortDescription": "Adaptive, token-efficient code reconnaissance for large or noisy coding tasks."
   },
+  "skills": "./.claude-plugin/skills/",
+  "commands": "./.claude-plugin/commands/",
   "mcpServers": {
     "tldr-code": {
       "command": "./bin/launch-mcp.sh",
