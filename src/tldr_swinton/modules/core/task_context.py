@@ -7,6 +7,7 @@ index, embedding model, or an agent tool call.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 from collections import Counter
@@ -89,6 +90,8 @@ _EXPLICIT_PATH = re.compile(
 )
 _DEFAULT_PACKET_MAX_CHARS = 1_500
 _CODEX_OWNER_HINT_MAX_CHARS = 750
+_DEFAULT_MIN_CONFIDENCE = 0.6
+_PACKET_SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -100,6 +103,68 @@ class TaskContextExcerpt:
     end_line: int
     score: float
     text: str
+
+
+@dataclass(frozen=True)
+class TaskContextPacket:
+    """One assessed, middleware-ready task packet and its audit metadata."""
+
+    project: str
+    decision: str
+    reason: str
+    confidence: float
+    min_confidence: float
+    packet: str
+    excerpts: tuple[TaskContextExcerpt, ...]
+    max_files: int
+    max_chars: int
+    harness_profile: str
+    test_command: str | None
+
+    def as_dict(self) -> dict[str, object]:
+        """Return the stable JSON-serializable harness contract."""
+
+        packet_sha256 = (
+            hashlib.sha256(self.packet.encode("utf-8")).hexdigest()
+            if self.packet
+            else None
+        )
+        candidate_paths = [excerpt.path for excerpt in self.excerpts]
+        receipt: dict[str, object] = {
+            "schema_version": _PACKET_SCHEMA_VERSION,
+            "decision": self.decision,
+            "reason": self.reason,
+            "confidence": self.confidence,
+            "min_confidence": self.min_confidence,
+            "harness_profile": self.harness_profile,
+            "packet_sha256": packet_sha256,
+            "packet_chars": len(self.packet),
+            "candidate_paths": candidate_paths,
+        }
+        return {
+            "schema_version": _PACKET_SCHEMA_VERSION,
+            "project": self.project,
+            "decision": self.decision,
+            "reason": self.reason,
+            "confidence": self.confidence,
+            "min_confidence": self.min_confidence,
+            "packet": self.packet,
+            "max_files": self.max_files,
+            "max_chars": self.max_chars,
+            "harness_profile": self.harness_profile,
+            "test_command": self.test_command,
+            "receipt": receipt,
+            "excerpts": [
+                {
+                    "path": excerpt.path,
+                    "start_line": excerpt.start_line,
+                    "end_line": excerpt.end_line,
+                    "score": excerpt.score,
+                    "text": excerpt.text,
+                }
+                for excerpt in self.excerpts
+            ],
+        }
 
 
 def _canonical_term(value: str) -> str | None:
@@ -198,7 +263,7 @@ def recommended_packet_max_chars(
 ) -> int:
     """Return the validated packet budget for a harness and owner signal."""
 
-    if harness_profile not in {"generic", "codex", "claude"}:
+    if harness_profile not in {"generic", "codex", "claude", "kimi"}:
         raise ValueError(f"unknown harness profile: {harness_profile}")
     if harness_profile == "codex" and _test_owner_terms(test_command):
         return _CODEX_OWNER_HINT_MAX_CHARS
@@ -351,23 +416,9 @@ def rank_source_excerpts(
     return tuple(selected)
 
 
-def render_bounded_context(
-    root: Path,
-    prompt: str,
-    *,
-    test_command: str | None = None,
-    max_files: int = 3,
-    max_chars: int = _DEFAULT_PACKET_MAX_CHARS,
+def _render_bounded_context_from_excerpts(
+    excerpts: tuple[TaskContextExcerpt, ...],
 ) -> str:
-    """Render ranked excerpts as a compact Markdown context block."""
-
-    excerpts = rank_source_excerpts(
-        root,
-        prompt,
-        test_command=test_command,
-        max_files=max_files,
-        max_chars=max_chars,
-    )
     if not excerpts:
         return "## Precomputed bounded context\n\nNo confident source candidate was found.\n"
     lines = [
@@ -391,7 +442,7 @@ def render_bounded_context(
     return "\n".join(lines) + "\n"
 
 
-def render_agent_packet(
+def render_bounded_context(
     root: Path,
     prompt: str,
     *,
@@ -399,8 +450,23 @@ def render_agent_packet(
     max_files: int = 3,
     max_chars: int = _DEFAULT_PACKET_MAX_CHARS,
 ) -> str:
-    """Render middleware-ready guidance plus bounded source context."""
+    """Render ranked excerpts as a compact Markdown context block."""
 
+    excerpts = rank_source_excerpts(
+        root,
+        prompt,
+        test_command=test_command,
+        max_files=max_files,
+        max_chars=max_chars,
+    )
+    return _render_bounded_context_from_excerpts(excerpts)
+
+
+def _render_agent_packet_from_excerpts(
+    excerpts: tuple[TaskContextExcerpt, ...],
+    *,
+    test_command: str | None,
+) -> str:
     sections = [
         "# Agent context packet",
         "",
@@ -423,16 +489,123 @@ def render_agent_packet(
     sections.extend(
         [
             "",
-            render_bounded_context(
-                root,
-                prompt,
-                test_command=test_command,
-                max_files=max_files,
-                max_chars=max_chars,
-            ).rstrip(),
+            _render_bounded_context_from_excerpts(excerpts).rstrip(),
         ]
     )
     return "\n".join(sections) + "\n"
+
+
+def render_agent_packet(
+    root: Path,
+    prompt: str,
+    *,
+    test_command: str | None = None,
+    max_files: int = 3,
+    max_chars: int = _DEFAULT_PACKET_MAX_CHARS,
+) -> str:
+    """Render middleware-ready guidance plus bounded source context."""
+
+    excerpts = rank_source_excerpts(
+        root,
+        prompt,
+        test_command=test_command,
+        max_files=max_files,
+        max_chars=max_chars,
+    )
+    return _render_agent_packet_from_excerpts(
+        excerpts,
+        test_command=test_command,
+    )
+
+
+def _assess_excerpts(
+    prompt: str,
+    test_command: str | None,
+    excerpts: tuple[TaskContextExcerpt, ...],
+    *,
+    min_confidence: float,
+) -> tuple[str, str, float]:
+    if not excerpts:
+        return ("fallback", "no_candidates", 0.0)
+
+    top = excerpts[0]
+    explicit_paths = {
+        match.group("path").lstrip("./") for match in _EXPLICIT_PATH.finditer(prompt)
+    }
+    if top.path in explicit_paths:
+        return ("inject", "explicit_path", 1.0)
+
+    test_owner_terms = _test_owner_terms(test_command)
+    if (
+        test_owner_terms
+        and test_owner_terms & set(_terms(Path(top.path).stem))
+        and not _is_test_source(top.path)
+    ):
+        return ("inject", "test_owner", 0.95)
+
+    if len(excerpts) == 1:
+        confidence = 0.75
+    else:
+        second = excerpts[1]
+        separation = max(0.0, (top.score - second.score) / max(top.score, 1.0))
+        confidence = round(min(0.9, 0.55 + separation), 4)
+
+    if confidence < min_confidence:
+        return ("fallback", "low_confidence", confidence)
+    return ("inject", "ranked_candidate", confidence)
+
+
+def build_agent_packet(
+    root: Path,
+    prompt: str,
+    *,
+    test_command: str | None = None,
+    max_files: int = 3,
+    max_chars: int | None = None,
+    harness_profile: str = "generic",
+    min_confidence: float = _DEFAULT_MIN_CONFIDENCE,
+) -> TaskContextPacket:
+    """Build and assess one deterministic packet for an agent harness."""
+
+    if not 0.0 <= min_confidence <= 1.0:
+        raise ValueError("min_confidence must be between 0 and 1")
+    effective_max_chars = (
+        max_chars
+        if max_chars is not None
+        else recommended_packet_max_chars(harness_profile, test_command)
+    )
+    project_root = Path(root).resolve()
+    excerpts = rank_source_excerpts(
+        project_root,
+        prompt,
+        test_command=test_command,
+        max_files=max_files,
+        max_chars=effective_max_chars,
+    )
+    decision, reason, confidence = _assess_excerpts(
+        prompt,
+        test_command,
+        excerpts,
+        min_confidence=min_confidence,
+    )
+    packet = (
+        _render_agent_packet_from_excerpts(excerpts, test_command=test_command)
+        if decision == "inject"
+        else ""
+    )
+    return TaskContextPacket(
+        project=str(project_root),
+        decision=decision,
+        reason=reason,
+        confidence=confidence,
+        min_confidence=min_confidence,
+        packet=packet,
+        excerpts=excerpts,
+        max_files=max_files,
+        max_chars=effective_max_chars,
+        harness_profile=harness_profile,
+        test_command=test_command,
+    )
 
 
 # Backwards-compatible name used by the paired agent evaluator.
@@ -442,6 +615,8 @@ ReconExcerpt = TaskContextExcerpt
 __all__ = [
     "ReconExcerpt",
     "TaskContextExcerpt",
+    "TaskContextPacket",
+    "build_agent_packet",
     "rank_source_excerpts",
     "recommended_packet_max_chars",
     "render_agent_packet",

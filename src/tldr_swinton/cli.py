@@ -888,9 +888,15 @@ Semantic Search:
     )
     packet_p.add_argument(
         "--harness-profile",
-        choices=("generic", "codex", "claude"),
+        choices=("generic", "codex", "claude", "kimi"),
         default="generic",
         help="Validated packet budget profile (default: generic)",
+    )
+    packet_p.add_argument(
+        "--min-confidence",
+        type=float,
+        default=0.6,
+        help="Minimum ranked-candidate confidence required for injection (default: 0.6)",
     )
     packet_p.add_argument(
         "--test-command",
@@ -2004,60 +2010,30 @@ Semantic Search:
                     print()
 
         elif args.command == "packet":
-            from .modules.core.task_context import (
-                rank_source_excerpts,
-                recommended_packet_max_chars,
-                render_agent_packet,
-            )
+            from .modules.core.task_context import build_agent_packet
 
             project_root = Path(args.project).resolve()
-            max_chars = (
-                args.max_chars
-                if args.max_chars is not None
-                else recommended_packet_max_chars(
-                    args.harness_profile,
-                    args.test_command,
-                )
+            packet = build_agent_packet(
+                project_root,
+                args.task,
+                test_command=args.test_command,
+                max_files=args.max_files,
+                max_chars=args.max_chars,
+                harness_profile=args.harness_profile,
+                min_confidence=args.min_confidence,
             )
             if getattr(args, "machine", False):
-                excerpts = rank_source_excerpts(
-                    project_root,
-                    args.task,
-                    test_command=args.test_command,
-                    max_files=args.max_files,
-                    max_chars=max_chars,
-                )
-                _machine_output(
-                    {
-                        "project": str(project_root),
-                        "max_files": args.max_files,
-                        "max_chars": max_chars,
-                        "harness_profile": args.harness_profile,
-                        "test_command": args.test_command,
-                        "excerpts": [
-                            {
-                                "path": excerpt.path,
-                                "start_line": excerpt.start_line,
-                                "end_line": excerpt.end_line,
-                                "score": excerpt.score,
-                                "text": excerpt.text,
-                            }
-                            for excerpt in excerpts
-                        ],
-                    },
-                    args,
-                )
+                _machine_output(packet.as_dict(), args)
             else:
-                print(
-                    render_agent_packet(
-                        project_root,
-                        args.task,
-                        test_command=args.test_command,
-                        max_files=args.max_files,
-                        max_chars=max_chars,
-                    ),
-                    end="",
-                )
+                if packet.packet:
+                    print(packet.packet, end="")
+                else:
+                    print(
+                        "# Agent context packet\n\n"
+                        f"No packet injected: {packet.reason} "
+                        f"(confidence {packet.confidence:.3f}, "
+                        f"minimum {packet.min_confidence:.3f})."
+                    )
 
         elif args.command == "quickstart":
             # Print the quickstart guide

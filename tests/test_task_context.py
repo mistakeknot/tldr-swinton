@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
 from pathlib import Path
 
 from tldr_swinton.modules.core.task_context import (
+    build_agent_packet,
     rank_source_excerpts,
     recommended_packet_max_chars,
     render_agent_packet,
@@ -179,8 +181,91 @@ def test_recommended_budget_is_model_and_owner_signal_aware() -> None:
 
     assert recommended_packet_max_chars("generic", test_command) == 1_500
     assert recommended_packet_max_chars("claude", test_command) == 1_500
+    assert recommended_packet_max_chars("kimi", test_command) == 1_500
     assert recommended_packet_max_chars("codex", test_command) == 750
     assert recommended_packet_max_chars("codex", "go test ./cmp/cmpopts") == 1_500
+
+
+def test_packet_assessment_trusts_an_explicit_owner_path(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "scripts/dispatch.sh",
+        "context_gateway_prepare() {\n    printf '%s' \"$prompt\"\n}\n",
+    )
+    _write(
+        tmp_path,
+        "tests/test_dispatch.py",
+        "def test_context_gateway_prepare():\n    assert True\n",
+    )
+
+    result = build_agent_packet(
+        tmp_path,
+        "Modify scripts/dispatch.sh so context_gateway_prepare injects the packet.",
+        harness_profile="codex",
+    )
+
+    assert result.decision == "inject"
+    assert result.reason == "explicit_path"
+    assert result.confidence == 1.0
+    assert result.excerpts[0].path == "scripts/dispatch.sh"
+
+
+def test_packet_assessment_falls_back_when_ranked_owners_are_tied(
+    tmp_path: Path,
+) -> None:
+    source = "def normalize_widget(widget):\n    return widget\n"
+    _write(tmp_path, "src/a/widget.py", source)
+    _write(tmp_path, "src/b/widget.py", source)
+
+    result = build_agent_packet(tmp_path, "Fix widget normalization")
+
+    assert result.decision == "fallback"
+    assert result.reason == "low_confidence"
+    assert result.confidence < 0.6
+    assert result.packet == ""
+    assert {excerpt.path for excerpt in result.excerpts} == {
+        "src/a/widget.py",
+        "src/b/widget.py",
+    }
+
+
+def test_packet_assessment_falls_back_without_source_candidates(tmp_path: Path) -> None:
+    _write(tmp_path, "README.md", "widget normalization\n")
+
+    result = build_agent_packet(tmp_path, "Fix widget normalization")
+
+    assert result.decision == "fallback"
+    assert result.reason == "no_candidates"
+    assert result.confidence == 0.0
+    assert result.packet == ""
+
+
+def test_packet_receipt_hashes_the_exact_packet_without_prompt_text(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/owner.py",
+        "def normalize_widget(widget):\n    return widget\n",
+    )
+    secret_marker = "customer-ticket-49382"
+
+    result = build_agent_packet(
+        tmp_path,
+        f"Fix widget normalization for {secret_marker}",
+    )
+    payload = result.as_dict()
+    receipt = payload["receipt"]
+
+    assert result.decision == "inject"
+    assert receipt["schema_version"] == 1
+    assert receipt["decision"] == "inject"
+    assert receipt["packet_chars"] == len(result.packet)
+    assert receipt["packet_sha256"] == hashlib.sha256(
+        result.packet.encode()
+    ).hexdigest()
+    assert receipt["candidate_paths"] == ["src/owner.py"]
+    assert secret_marker not in json.dumps(receipt)
 
 
 def test_packet_cli_emits_machine_readable_ranked_excerpts(tmp_path: Path) -> None:
@@ -211,8 +296,13 @@ def test_packet_cli_emits_machine_readable_ranked_excerpts(tmp_path: Path) -> No
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["success"] is True
-    assert payload["result"]["excerpts"][0]["path"] == "src/owner.py"
-    assert payload["result"]["test_command"] == "uv run pytest tests/test_owner.py"
+    packet_result = payload["result"]
+    assert packet_result["schema_version"] == 1
+    assert packet_result["decision"] == "inject"
+    assert packet_result["packet"].startswith("# Agent context packet")
+    assert packet_result["receipt"]["decision"] == "inject"
+    assert packet_result["excerpts"][0]["path"] == "src/owner.py"
+    assert packet_result["test_command"] == "uv run pytest tests/test_owner.py"
 
 
 def test_packet_cli_applies_codex_owner_hint_budget(tmp_path: Path) -> None:
@@ -242,3 +332,37 @@ def test_packet_cli_applies_codex_owner_hint_budget(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)["result"]
     assert payload["harness_profile"] == "codex"
     assert payload["max_chars"] == 750
+
+
+def test_packet_cli_accepts_kimi_profile_and_confidence_override(
+    tmp_path: Path,
+) -> None:
+    source = "def normalize_widget(widget):\n    return widget\n"
+    _write(tmp_path, "src/a/widget.py", source)
+    _write(tmp_path, "src/b/widget.py", source)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "tldr_swinton.cli",
+            "--machine",
+            "packet",
+            "Fix widget normalization",
+            "--project",
+            str(tmp_path),
+            "--harness-profile",
+            "kimi",
+            "--min-confidence",
+            "0.5",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)["result"]
+    assert payload["harness_profile"] == "kimi"
+    assert payload["max_chars"] == 1_500
+    assert payload["decision"] == "inject"
