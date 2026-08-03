@@ -17,6 +17,8 @@
     "displayName": "tldr-swinton",
     "shortDescription": "Adaptive code reconnaissance for LLMs. Forked skills, compact CLI output, semantic search, and MCP tools narrow large..."
   },
+  "skills": "./.claude-plugin/skills/",
+  "commands": "./.claude-plugin/commands/",
   "mcpServers": {
     "tldr-code": {
       "command": "./bin/launch-mcp.sh",
