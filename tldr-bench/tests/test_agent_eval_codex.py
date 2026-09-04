@@ -135,6 +135,7 @@ def test_build_codex_command_fixes_harness_controls(tmp_path: Path) -> None:
     config = CodexRunConfig(
         model="gpt-eval",
         reasoning_effort="medium",
+        service_tier="standard",
         timeout_s=60,
         codex_executable=Path("/opt/tools/codex"),
     )
@@ -160,6 +161,7 @@ def test_build_codex_command_fixes_harness_controls(tmp_path: Path) -> None:
     )
     assert 'approval_policy="never"' in command
     assert 'model_reasoning_effort="medium"' in command
+    assert 'service_tier="default"' in command
     assert command[-1] == "Repair the bug."
 
 

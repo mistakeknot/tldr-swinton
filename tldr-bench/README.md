@@ -68,6 +68,7 @@ PYTHONPATH=tldr-bench python3 tldr-bench/scripts/run_agent_value_eval.py \
   --smoke \
   --model gpt-5.6-sol \
   --reasoning-effort medium \
+  --service-tier standard \
   --results-dir tldr-bench/results/agent-value/smoke
 ```
 
@@ -77,6 +78,7 @@ Run the full 72-cell pilot (12 tasks × 2 conditions × 3 repeats):
 PYTHONPATH=tldr-bench python3 tldr-bench/scripts/run_agent_value_eval.py \
   --model gpt-5.6-sol \
   --reasoning-effort medium \
+  --service-tier standard \
   --repeats 3 \
   --results-dir tldr-bench/results/agent-value/pilot-2026-07
 ```
@@ -87,6 +89,7 @@ Resume the exact same run without duplicating completed cells:
 PYTHONPATH=tldr-bench python3 tldr-bench/scripts/run_agent_value_eval.py \
   --model gpt-5.6-sol \
   --reasoning-effort medium \
+  --service-tier standard \
   --repeats 3 \
   --results-dir tldr-bench/results/agent-value/pilot-2026-07 \
   --resume

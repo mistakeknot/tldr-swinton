@@ -69,6 +69,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="medium",
     )
     parser.add_argument(
+        "--service-tier",
+        choices=("standard", "fast", "flex"),
+        default="standard",
+        help="Codex service tier; Standard is passed explicitly as default",
+    )
+    parser.add_argument(
         "--adaptive-policy",
         choices=[policy.value for policy in AdaptivePolicy],
         default=AdaptivePolicy.CURRENT.value,
@@ -259,6 +265,7 @@ def _metadata(
         ),
         "model": args.model,
         "reasoning_effort": args.reasoning_effort,
+        "service_tier": args.service_tier,
         "adaptive_policy": args.adaptive_policy,
         "packet_max_chars": args.packet_max_chars,
         "timeout_seconds": args.timeout_seconds,
@@ -293,6 +300,7 @@ def _validate_resume(expected: dict[str, Any], actual: dict[str, Any]) -> None:
         "harness_version",
         "model",
         "reasoning_effort",
+        "service_tier",
         "adaptive_policy",
         "packet_max_chars",
         "timeout_seconds",
@@ -377,6 +385,7 @@ def _render_dry_run(
             config = CodexRunConfig(
                 model=args.model,
                 reasoning_effort=args.reasoning_effort,
+                service_tier=args.service_tier,
                 timeout_s=args.timeout_seconds,
                 codex_executable=_resolve_executable(args.codex_executable),
             )
@@ -448,6 +457,7 @@ def _run_cell(
             config = CodexRunConfig(
                 model=args.model,
                 reasoning_effort=args.reasoning_effort,
+                service_tier=args.service_tier,
                 timeout_s=args.timeout_seconds,
                 codex_executable=_resolve_executable(args.codex_executable),
             )

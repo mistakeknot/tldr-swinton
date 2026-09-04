@@ -199,6 +199,7 @@ def _raw_read_paths(command: str) -> tuple[str, ...]:
 class CodexRunConfig:
     model: str
     reasoning_effort: str = "medium"
+    service_tier: str = "standard"
     timeout_s: int = 900
     codex_executable: Path = Path("codex")
     sandbox: str = "workspace-write"
@@ -228,6 +229,11 @@ def build_codex_command(
     prompt: str,
     output_last_message: Path,
 ) -> list[str]:
+    service_tier = {
+        "standard": "default",
+        "fast": "priority",
+        "flex": "flex",
+    }[config.service_tier]
     return [
         str(config.codex_executable),
         "exec",
@@ -246,6 +252,8 @@ def build_codex_command(
         'approval_policy="never"',
         "-c",
         f'model_reasoning_effort="{config.reasoning_effort}"',
+        "-c",
+        f'service_tier="{service_tier}"',
         "-C",
         str(workspace.resolve()),
         "--output-last-message",

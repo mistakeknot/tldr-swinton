@@ -179,6 +179,7 @@ def test_default_model_uses_codex_supported_concrete_id(monkeypatch) -> None:
     args = build_parser().parse_args([])
     assert args.harness == "codex"
     assert args.model == "gpt-5.6-sol"
+    assert args.service_tier == "standard"
     assert args.adaptive_policy == "current"
     assert args.packet_max_chars == 1_500
 
@@ -356,6 +357,7 @@ def test_execute_resume_and_report_only(tmp_path: Path) -> None:
     assert (results / "metadata.json").is_file()
     metadata = json.loads((results / "metadata.json").read_text())
     assert metadata["seed"] == 42
+    assert metadata["service_tier"] == "standard"
     assert metadata["adaptive_policy"] == "current"
     assert len(metadata["task_corpus_sha256"]) == 64
     assert (results / "report.json").is_file()
