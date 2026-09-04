@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-04T09:56:18Z",
+  "evaluator_sha": "adfb92239a9b6b021034a3981bbe0e6c4d6b0075",
+  "source_sha": "adfb92239a9b6b021034a3981bbe0e6c4d6b0075",
+  "codex_version": "codex-cli 0.153.2",
+  "condition": "baseline",
+  "tasks": [
+    "neg-import-statement",
+    "cross-gitignore-nested",
+    "cross-manifest-flags",
+    "diff-path-containment",
+    "refactor-callgraph-dedupe",
+    "refactor-go-signature"
+  ],
+  "routes": {
+    "sol_xhigh_standard": {
+      "status": "completed",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "xhigh",
+      "service_tier": "standard",
+      "attempted": 6,
+      "accepted": 6,
+      "escaped_defects": 0,
+      "agent_process_failures": 0,
+      "timeouts": 0,
+      "contaminated": 0,
+      "process_retries": 0,
+      "main_integration_packets": 6,
+      "main_integration_turns": 1,
+      "main_integration_context_tokens": null,
+      "total_elapsed_ms": 2500647,
+      "median_elapsed_ms": 409039.5,
+      "input_tokens": 5948962,
+      "cached_input_tokens": 5631104,
+      "output_tokens": 54321,
+      "uncached_total_tokens": 372179,
+      "median_uncached_total_tokens": 61461.5,
+      "tool_calls": 133,
+      "trace_command_failures": 31,
+      "cells": [
+        {"task_id": "neg-import-statement", "accepted": true, "elapsed_ms": 233848, "uncached_total_tokens": 39044, "tool_calls": 21},
+        {"task_id": "cross-gitignore-nested", "accepted": true, "elapsed_ms": 699771, "uncached_total_tokens": 82271, "tool_calls": 40},
+        {"task_id": "cross-manifest-flags", "accepted": true, "elapsed_ms": 427154, "uncached_total_tokens": 59979, "tool_calls": 21},
+        {"task_id": "diff-path-containment", "accepted": true, "elapsed_ms": 465225, "uncached_total_tokens": 62944, "tool_calls": 19},
+        {"task_id": "refactor-callgraph-dedupe", "accepted": true, "elapsed_ms": 283724, "uncached_total_tokens": 55933, "tool_calls": 14},
+        {"task_id": "refactor-go-signature", "accepted": true, "elapsed_ms": 390925, "uncached_total_tokens": 72008, "tool_calls": 18}
+      ]
+    },
+    "astra_high_standard": {
+      "status": "blocked",
+      "model": "gpt-6-astra",
+      "reasoning_effort": "high",
+      "service_tier": "standard",
+      "attempted": 0,
+      "process_retries": 0,
+      "fallback_used": false,
+      "block_class": "account_model_unavailable",
+      "preflight_http_status": 400
+    },
+    "astra_xhigh_standard": {
+      "status": "blocked",
+      "model": "gpt-6-astra",
+      "reasoning_effort": "xhigh",
+      "service_tier": "standard",
+      "attempted": 0,
+      "process_retries": 0,
+      "fallback_used": false,
+      "block_class": "account_model_unavailable",
+      "preflight_http_status": 400
+    }
+  },
+  "promotion_gates": {
+    "sol_plan_to_execution_rate": 1.0,
+    "minimum_plan_to_execution_rate": 0.909,
+    "astra_functional_non_inferiority": "not_evaluable",
+    "accepted_high_severity_finding_loss": "not_evaluable",
+    "same_model_consequential_validation": false,
+    "policy_block_retried": false,
+    "policy_block_fallback_used": false,
+    "verdict": "blocked"
+  },
+  "repository_verification": {
+    "focused_tests_passed": 17,
+    "focused_tests_failed": 0,
+    "broad_tests_passed": 122,
+    "broad_tests_failed": 3,
+    "broad_failures_reproduced_at_prework_sha": "6f6a4ec",
+    "broad_failures_are_preexisting": true
+  }
+}
