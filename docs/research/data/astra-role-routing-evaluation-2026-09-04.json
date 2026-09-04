@@ -4,6 +4,7 @@
   "evaluator_sha": "adfb92239a9b6b021034a3981bbe0e6c4d6b0075",
   "source_sha": "adfb92239a9b6b021034a3981bbe0e6c4d6b0075",
   "codex_version": "codex-cli 0.153.2",
+  "intercore_routing_decision_id": 519,
   "condition": "baseline",
   "tasks": [
     "neg-import-statement",

@@ -112,6 +112,8 @@ The machine-readable summary is
 [`data/astra-role-routing-evaluation-2026-09-04.json`](data/astra-role-routing-evaluation-2026-09-04.json).
 Raw traces, patches, messages, and grader output remain in the gitignored local
 run directory `tldr-bench/results/agent-value/astra-routing-2026-09-04-sol-xhigh-r1`.
+Intercore routing decision `519` records the resolved `deep-sol` profile and
+`account_access_absent` fallback reason for the `main-integrator` session.
 
 The evaluator's focused Codex-runner and CLI suites pass 17/17. The broader
 `tldr-bench/tests` run passes 122 tests and retains three pre-existing failures:
