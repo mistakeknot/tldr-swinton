@@ -111,11 +111,18 @@ precedence and no-fallback behavior are covered by the separate control-plane
 regressions and live routing evidence, not inferred from this all-success batch.
 
 Keep Astra/high as the opt-in deep candidate, Astra/xhigh for the user-selected
-integrator, and routine/bulk work on Sol. The estate canary remains **pending
-release gates, with zero accepted estate tasks**: protected-main Interflux
+integrator, and routine/bulk work on Sol. At comparison close, the estate canary
+was **pending release gates, with zero accepted estate tasks**: protected-main Interflux
 landing, scoped plugin publication, and signer-gated closure are not bypassed.
 Benchmark cells and transport probes do not count toward its 20-task/14-day
 window. No interserve class is promoted without the missing parity corpus.
+
+Release follow-up (2026-09-05): those release gates subsequently cleared. The
+[reviewed rollout packet](https://github.com/mistakeknot/Clavain/blob/e53ca59cbf36491e7d27526511c2cb827ae25955/docs/runbooks/astra-rollout.md)
+opens explicit Mac-only enrollment under Intercore decision 547, still with zero
+tasks. Its 20-terminal-task/14-day checkpoint is not automatic promotion. This
+does not alter the benchmark receipt, its original release-authority disposition,
+or the exclusion of these 54 cells from estate task counts.
 
 The [machine-readable receipt](data/astra-common-cli-2026-09-05.json) contains all
 54 cell outcomes, exact metadata, usage, costs, artifact hashes, review identities,
