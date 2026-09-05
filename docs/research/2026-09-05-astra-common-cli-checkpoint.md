@@ -9,6 +9,10 @@ tags: [codex, astra, evaluation, routing]
 
 # Astra common-CLI comparison: first-pass checkpoint
 
+This historical checkpoint is superseded by the
+[completed repeated comparison](2026-09-05-astra-common-cli-results.md): all
+three routes passed 18/18, with independent review and explicit dispositions.
+
 All three routes passed the six preregistered hidden graders. This is a checkpoint,
 not a promotion verdict: two repeats of every functional tie are underway, and
 independent review of Astra-produced patches remains pending.
@@ -16,8 +20,9 @@ independent review of Astra-produced patches remains pending.
 Every cell used Codex **0.153.3**, Standard service, frozen source and evaluator
 `adfb92239a9b6b021034a3981bbe0e6c4d6b0075`, and task-corpus digest
 `8cd2abcd20d8d67d5fadc6803ec5089ac7d725fb6c19b5b15c6ab513f8f0edef`.
-All used the baseline harness with user configuration ignored. Experimental
-context management was off for every treatment. The six tasks and promotion
+All used the baseline harness with user configuration ignored. The separate
+experimental Astra profile was not selected; resolved feature-flag state was
+not recorded. The six tasks and promotion
 gates remain those in the [preregistered protocol](2026-09-04-astra-role-routing-evaluation.md).
 
 | First-pass route | Accepted | Total seconds | Input tokens | Cached input | Output tokens | Tool calls |
