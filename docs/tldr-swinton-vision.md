@@ -73,7 +73,7 @@ relationship: Clavain orchestrates work, tldr-swinton optimizes each observation
 ## Product posture
 
 tldr-swinton is intentionally empirical: it ships with evaluation tracks, R&D
-plans (`docs/plans/`), and research artifacts (`docs/research/`, `docs/solutions/`)
+plans, and research artifacts (`docs/research/`, `docs/solutions/`)
 so capabilities are revised only when measurable signals justify changes.
 
 This product is the high-confidence answer to a simple question:

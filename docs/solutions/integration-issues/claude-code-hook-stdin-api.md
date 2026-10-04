@@ -142,7 +142,7 @@ touch "$FLAG"
 ## Complete Working Implementation
 
 See the corrected hook script at:
-- **File**: `/root/projects/tldr-swinton/.claude-plugin/hooks/suggest-recon.sh`
+- **File**: `.claude-plugin/hooks/suggest-recon.sh`
 - **Deployed**: 2026-02-08
 
 Highlights:
@@ -255,9 +255,8 @@ CMD=$(echo "$INPUT" | jq -r '.tool_input.command')
 
 ## Links
 
-- **Source File**: `/root/projects/tldr-swinton/.claude-plugin/hooks/suggest-recon.sh`
-- **Hook Definition**: `/root/projects/tldr-swinton/.claude-plugin/hooks/hooks.json`
-- **Detailed Analysis**: `docs/research/document-hook-stdin-json-learning.md`
+- **Source File**: `.claude-plugin/hooks/suggest-recon.sh`
+- **Hook Definition**: `.claude-plugin/hooks/hooks.json`
 - **Reference Implementations**:
   - `tool-time` plugin hooks
   - `interagency-marketplace` plugin hooks

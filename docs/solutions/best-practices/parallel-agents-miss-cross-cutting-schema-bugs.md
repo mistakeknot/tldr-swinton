@@ -55,6 +55,5 @@ This is the same dynamic as human code review: the author knows *why* they chose
 
 ## Related
 
-- Quality gate reports: `docs/research/qg-fd-*.md`
 - Compact extract implementation: `src/tldr_swinton/modules/core/api.py:714`
 - Fix commit: `5b57da6`
