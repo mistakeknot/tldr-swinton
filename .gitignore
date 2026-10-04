@@ -89,3 +89,6 @@ logs/
 # Runtime audit logs and flags
 .claude/*-audit.log
 .claude/*-toggle.flag
+
+# Agent working state
+.claude/flux-drive.yaml
