@@ -11,7 +11,8 @@ description: Check downstream projects and synchronization requirements before c
 
 **interbench sync**: When adding new tldrs formats or flags, 4 interbench files must stay in sync. Use the automated check:
 ```bash
-tldrs manifest | python3 <monorepo>/core/interbench/scripts/check_tldrs_sync.py
+MONOREPO=/path/to/monorepo   # the checkout that contains core/interbench
+tldrs manifest | python3 "$MONOREPO/core/interbench/scripts/check_tldrs_sync.py"
 ```
 Or use the `/tldrs-interbench-sync` skill for guided remediation.
 
