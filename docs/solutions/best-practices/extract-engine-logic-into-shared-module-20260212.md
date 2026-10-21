@@ -88,6 +88,4 @@ This pattern applies anywhere you add a capability that depends on optional infr
 
 ## Related
 
-- `docs/research/review-block-compression-plan.md` — architecture review that caught the duplication
-- `docs/plans/2026-02-12-longcodezip-block-compression.md` — revised plan after review
 - `src/tldr_swinton/modules/core/block_compress.py` — the extracted shared module

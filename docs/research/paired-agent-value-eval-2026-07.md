@@ -3,7 +3,6 @@ title: "Paired Agent Value Evaluation: GPT-5.6 Sol"
 date: 2026-07-21
 research_type: evaluation
 component: agent-workflow
-bead: mk-5szd
 tags: [codex, evaluation, token-efficiency, routing, hidden-graders]
 ---
 
